@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { Plus } from "lucide-react"
+import { useMemo, useRef, useState } from "react"
+import { FileText, Paperclip, Plus, X } from "lucide-react"
 import { motion } from "motion/react"
 
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,12 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer"
 import { CategoryIcon } from "@/components/CategoryIcon"
-import { useAccounts, useAddTransaction, useCategories } from "@/lib/queries"
+import {
+  useAccounts,
+  useAddTransaction,
+  useCategories,
+  useUploadAttachment,
+} from "@/lib/queries"
 import { springIndicator } from "@/lib/springs"
 import { toISODate } from "@/lib/format"
 import type { TransactionType } from "@/lib/types"
@@ -46,12 +51,16 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   const { data: accounts = [] } = useAccounts()
   const { data: categories = [] } = useCategories()
   const addTransaction = useAddTransaction()
+  const uploadAttachment = useUploadAttachment()
 
   const [type, setType] = useState<TransactionType>("expense")
   const [amountText, setAmountText] = useState("")
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [accountId, setAccountId] = useState<string | null>(null)
+  const [date, setDate] = useState(() => toISODate(new Date()))
   const [note, setNote] = useState("")
+  const [file, setFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const amount = Number(amountText.replace(",", ".")) || 0
   const visibleCategories = useMemo(
@@ -59,7 +68,8 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
     [categories, type],
   )
   const effectiveAccountId = accountId ?? accounts.find((a) => a.kind === "debit")?.id ?? accounts[0]?.id
-  const canSave = amount > 0 && categoryId !== null && effectiveAccountId
+  const canSave = amount > 0 && categoryId !== null && effectiveAccountId && date
+  const isSaving = addTransaction.isPending || uploadAttachment.isPending
 
   function save() {
     if (!canSave || !categoryId || !effectiveAccountId) return
@@ -69,13 +79,29 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
         amount,
         categoryId,
         accountId: effectiveAccountId,
-        date: toISODate(new Date()),
+        date,
         note: note.trim() || undefined,
       },
       {
-        onSuccess: () => {
-          navigator.vibrate?.(10)
-          onDone()
+        onSuccess: (created) => {
+          if (file) {
+            uploadAttachment.mutate(
+              { transactionId: created.id, file },
+              {
+                onError: (err) => {
+                  // La transacción ya quedó guardada; solo falló el adjunto.
+                  console.error("Error al subir el comprobante:", err)
+                },
+                onSettled: () => {
+                  navigator.vibrate?.(10)
+                  onDone()
+                },
+              },
+            )
+          } else {
+            navigator.vibrate?.(10)
+            onDone()
+          }
         },
       },
     )
@@ -183,6 +209,66 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
         </div>
       </div>
 
+      {/* Fecha: hoy por defecto, editable para gastos de días anteriores */}
+      <div>
+        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
+          Fecha
+        </p>
+        <input
+          type="date"
+          value={date}
+          max={toISODate(new Date())}
+          onChange={(e) => e.target.value && setDate(e.target.value)}
+          className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none [color-scheme:light] dark:[color-scheme:dark]"
+          aria-label="Fecha del movimiento"
+        />
+      </div>
+
+      {/* Comprobante opcional */}
+      <div>
+        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
+          Comprobante (opcional)
+        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf,.doc,.docx"
+          className="hidden"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
+        {file ? (
+          <div className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2">
+            <FileText size={16} className="shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+              {file.name}
+            </span>
+            <span className="tnum shrink-0 text-[12px] text-muted-foreground">
+              {formatFileSize(file.size)}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setFile(null)
+                if (fileInputRef.current) fileInputRef.current.value = ""
+              }}
+              className="pressable shrink-0 rounded-full bg-muted p-1 text-muted-foreground"
+              aria-label="Quitar comprobante"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="pressable flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-2.5 text-[13px] font-medium text-muted-foreground"
+          >
+            <Paperclip size={14} />
+            Adjuntar foto, PDF o doc
+          </button>
+        )}
+      </div>
+
       {/* Nota opcional */}
       <input
         value={note}
@@ -193,7 +279,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
 
       <Button
         size="lg"
-        disabled={!canSave}
+        disabled={!canSave || isSaving}
         onClick={save}
         className="pressable h-12 rounded-2xl text-[16px] font-semibold"
       >
@@ -201,4 +287,10 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
       </Button>
     </div>
   )
+}
+
+/** Tamaño legible: KB/MB con 1 decimal. */
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / 1024).toFixed(1)} KB`
 }

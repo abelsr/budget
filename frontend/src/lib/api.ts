@@ -55,3 +55,15 @@ export async function apiFetch<T>(
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
+
+/** Como apiFetch pero devuelve el cuerpo binario (para descargar adjuntos). */
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  const token = getToken()
+  const headers = new Headers()
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+
+  const res = await fetch(`/api${path}`, { headers })
+  if (res.status === 401) setToken(null) // sesión expirada
+  if (!res.ok) throw await parseError(res)
+  return res.blob()
+}

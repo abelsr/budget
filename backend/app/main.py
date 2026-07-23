@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
     accounts,
+    attachments,
     auth,
     categories,
     households,
@@ -26,7 +27,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (auth, households, accounts, categories, transactions, summary, tickets):
+for module in (
+    auth,
+    households,
+    accounts,
+    categories,
+    transactions,
+    attachments,
+    summary,
+    tickets,
+):
     app.include_router(module.router)
 
 

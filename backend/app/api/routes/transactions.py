@@ -50,6 +50,7 @@ def _tx_out(tx: Transaction) -> TransactionOut:
         member_id=tx.member_id,
         date=tx.date,
         note=tx.note,
+        attachments=tx.attachments,
     )
 
 

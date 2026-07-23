@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api"
 import type {
   Account,
+  Attachment,
   Category,
   Member,
   NewTransaction,
@@ -113,6 +114,29 @@ export function useAddTransaction() {
       queryClient.invalidateQueries({ queryKey: keys.transactions })
       queryClient.invalidateQueries({ queryKey: keys.accounts })
       queryClient.invalidateQueries({ queryKey: keys.summary })
+    },
+  })
+}
+
+export function useUploadAttachment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      transactionId,
+      file,
+    }: {
+      transactionId: string
+      file: File
+    }) => {
+      const formData = new FormData()
+      formData.append("file", file)
+      return apiFetch<Attachment>(`/transactions/${transactionId}/attachments`, {
+        method: "POST",
+        body: formData,
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.transactions })
     },
   })
 }

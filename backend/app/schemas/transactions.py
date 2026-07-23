@@ -4,6 +4,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
+from app.schemas.attachments import AttachmentResponse
+
 TransactionType = Literal["expense", "income"]
 
 
@@ -39,3 +41,4 @@ class TransactionOut(_CamelModel):
     member_id: str
     date: date_t
     note: str | None
+    attachments: list[AttachmentResponse] = []

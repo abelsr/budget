@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 30  # 30 días
 
+    # Comprobantes adjuntos: ruta local en dev; en docker ATTACHMENTS_DIR=/data/attachments
+    attachments_dir: str = "data/attachments"
+
     # Escáner de tickets: LLM con visión vía OpenRouter (API compatible
     # con OpenAI). Sin key → endpoint responde 501.
     openrouter_api_key: str | None = None

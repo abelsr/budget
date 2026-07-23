@@ -33,6 +33,16 @@ export interface Category {
   active: boolean
 }
 
+/** Comprobante adjunto a una transacción (foto, PDF, doc). */
+export interface Attachment {
+  id: string
+  transactionId: string
+  filename: string
+  contentType: string
+  sizeBytes: number
+  createdAt: string
+}
+
 export interface Transaction {
   id: string
   householdId: string
@@ -44,6 +54,7 @@ export interface Transaction {
   /** ISO date: YYYY-MM-DD */
   date: string
   note?: string
+  attachments: Attachment[]
 }
 
 export interface NewTransaction {

@@ -151,5 +151,16 @@ gasto → persistencia tras recarga → error 501 del escáner sin API key):
 - Config de secretos: `.env` raíz (docker-compose) y `backend/.env` (dev
   local), ambos ignorados por git; plantillas en `.env.example`.
 
+**Comprobantes adjuntos** (full-stack, verificado E2E):
+
+- Backend: modelo `Attachment`, storage en disco (`ATTACHMENTS_DIR`, volumen
+  `attachments_data` en Docker), endpoints POST `/transactions/{id}/attachments`
+  (imagen/pdf/doc, máx 10MB), GET/DELETE `/attachments/{id}`; el JSON de
+  Transaction incluye `attachments[]`.
+- Frontend: sección "Comprobante (opcional)" en el sheet de registro (sube tras
+  crear la transacción), paperclip en filas con adjuntos, click abre el archivo
+  (blob autenticado → object URL).
+- Registro de gasto con **fecha editable** (default hoy, sin fechas futuras).
+
 **Pendiente inmediato:** Alembic (hoy `create_all`), CRUD de cuentas/categorías
 en la UI (la API ya existe), recurring rules (fase 2), HTTPS con Caddy.

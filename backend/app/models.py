@@ -96,6 +96,23 @@ class Transaction(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    attachments: Mapped[list["Attachment"]] = relationship(lazy="selectin")
+
+
+class Attachment(Base):
+    __tablename__ = "attachments"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    transaction_id: Mapped[str] = mapped_column(
+        ForeignKey("transactions.id"), index=True
+    )
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    filename: Mapped[str] = mapped_column(String(255))  # nombre original
+    content_type: Mapped[str] = mapped_column(String(120))
+    size_bytes: Mapped[int] = mapped_column()
+    storage_path: Mapped[str] = mapped_column(String(500))  # ruta en disco
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
 
 class RecurringRule(Base):
     """Fase 2: esquema preparado, sin endpoints todavía."""

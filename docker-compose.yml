@@ -20,6 +20,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemini-3.6-flash}
+      ATTACHMENTS_DIR: /data/attachments
+    volumes:
+      - attachments_data:/data/attachments
     depends_on:
       db:
         condition: service_healthy
@@ -35,3 +38,4 @@ services:
 
 volumes:
   pgdata:
+  attachments_data:
