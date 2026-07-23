@@ -3,7 +3,7 @@ import { LayoutDashboard, ArrowLeftRight, Wallet, Settings } from "lucide-react"
 import { motion } from "motion/react"
 
 import { springIndicator } from "@/lib/springs"
-import { useMembers } from "@/lib/queries"
+import { useHousehold, useMembers } from "@/lib/queries"
 import { AddTransactionButton } from "@/components/AddTransactionSheet"
 import { TicketScannerButton } from "@/components/TicketScanner"
 
@@ -24,13 +24,17 @@ const tabs = [
  */
 export function AppShell() {
   const { data: members = [] } = useMembers()
+  const { data: household, isError: householdError } = useHousehold()
+  const householdName = householdError
+    ? "Mi hogar"
+    : (household?.name ?? "…")
   return (
     <div className="min-h-dvh">
       {/* Sidebar (desktop) */}
       <aside className="material-bar fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r md:flex">
         <div className="px-6 pt-8 pb-6">
           <p className="text-[13px] font-medium tracking-wide text-muted-foreground">
-            Familia
+            {householdName}
           </p>
           <h1 className="text-xl font-bold tracking-tight">Finanzas</h1>
         </div>

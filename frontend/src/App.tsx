@@ -11,8 +11,12 @@ import { LoginPage } from "@/pages/LoginPage"
 
 /** Rutas que requieren sesión; redirige a /login recordando el destino. */
 function RequireAuth() {
-  const { session } = useAuth()
+  const { session, isLoading } = useAuth()
   const location = useLocation()
+  // Espera la restauración de sesión (/auth/me) antes de decidir
+  if (isLoading) {
+    return <div className="min-h-dvh" aria-label="Cargando" />
+  }
   if (!session) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
@@ -21,7 +25,10 @@ function RequireAuth() {
 
 /** Si ya hay sesión, /login no tiene sentido. */
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
-  const { session } = useAuth()
+  const { session, isLoading } = useAuth()
+  if (isLoading) {
+    return <div className="min-h-dvh" aria-label="Cargando" />
+  }
   if (session) return <Navigate to="/" replace />
   return children
 }

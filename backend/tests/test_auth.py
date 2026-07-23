@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Category, Invitation, User
+from app.models import Account, Category, Invitation, User
 
 
 def _now() -> datetime:
@@ -39,6 +39,13 @@ def test_register_creates_user_household_token_and_categories(client, session: S
         )
     )
     assert count == 10
+
+    # Cuenta inicial "Efectivo" para que el hogar no arranque vacío
+    account = session.scalar(
+        select(Account).where(Account.household_id == user.household_id)
+    )
+    assert account is not None
+    assert account.kind == "cash"
 
 
 def test_register_duplicate_email_returns_409(client):

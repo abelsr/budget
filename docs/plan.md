@@ -121,5 +121,21 @@ budget/
   con proxy `/api`), Dockerfiles de backend y frontend, `.env.example`.
 - Tests: SQLite en memoria vía override de `get_db` (26 tests).
 
-**Pendiente inmediato:** Alembic (hoy `create_all`), conectar frontend a `/api`,
+**Frontend conectado al backend real** (E2E verificado: registro → ingreso →
+gasto → persistencia tras recarga → error 501 del escáner sin API key):
+
+- `src/lib/api.ts`: cliente HTTP (base `/api`, Bearer token en localStorage,
+  ApiError con detalle del servidor, limpia token en 401).
+- Proxy de Vite: `/api` → `127.0.0.1:8000` en dev (nginx en prod).
+- `auth.tsx` real: restauración de sesión vía `/auth/me` con `isLoading`,
+  login/registro/join; LoginPage con segmented control Entrar/Crear cuenta
+  y modo invitación vía `?invite=TOKEN`.
+- `queries.ts` real: mismos hooks contra la API (mock-db eliminado);
+  `useHousehold` alimenta el nombre del hogar en la sidebar.
+- `scan.ts` real: POST multipart a `/tickets/scan`; TicketScanner con
+  estado de error + reintento.
+- Register del backend crea cuenta inicial "Efectivo" (hogar no arranca vacío).
+
+**Pendiente inmediato:** Alembic (hoy `create_all`), GEMINI_API_KEY real para
+el escáner, CRUD de cuentas/categorías en la UI (la API ya existe),
 recurring rules (fase 2), HTTPS con Caddy.

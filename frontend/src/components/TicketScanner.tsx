@@ -11,15 +11,16 @@ import {
 } from "@/components/ui/drawer"
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { useAccounts, useAddTransaction, useCategories } from "@/lib/queries"
+import { ApiError } from "@/lib/api"
 import { analyzeTicket, type TicketScanResult } from "@/lib/scan"
 import { springAppear } from "@/lib/springs"
 import { formatMoney } from "@/lib/format"
 
 /**
  * Escaneo de ticket con IA.
- * Flujo: elegir/tomar foto → preview → analizar (mock) → revisar campos
- * editables → guardar como gasto. El análisis vive en lib/scan.ts, listo
- * para conectarse al endpoint del backend sin tocar esta UI.
+ * Flujo: elegir/tomar foto → preview → analizar (backend real) → revisar
+ * campos editables → guardar como gasto; si el análisis falla, pantalla
+ * de error con reintento. El análisis vive en lib/scan.ts.
  */
 export function TicketScannerButton({
   variant = "banner",
@@ -70,6 +71,7 @@ type Step =
   | { name: "preview"; file: File; url: string }
   | { name: "analyzing"; url: string }
   | { name: "review"; url: string; result: TicketScanResult }
+  | { name: "error"; message: string }
 
 function ScannerFlow({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState<Step>({ name: "pick" })
@@ -82,8 +84,17 @@ function ScannerFlow({ onDone }: { onDone: () => void }) {
 
   async function analyze(file: File, url: string) {
     setStep({ name: "analyzing", url })
-    const result = await analyzeTicket(file)
-    setStep({ name: "review", url, result })
+    try {
+      const result = await analyzeTicket(file)
+      setStep({ name: "review", url, result })
+    } catch (err) {
+      // ApiError trae el detail del servidor (p. ej. 501 sin GEMINI_API_KEY)
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo analizar el ticket. Inténtalo de nuevo."
+      setStep({ name: "error", message })
+    }
   }
 
   return (
@@ -116,6 +127,13 @@ function ScannerFlow({ onDone }: { onDone: () => void }) {
           {step.name === "analyzing" && <AnalyzingStep url={step.url} />}
           {step.name === "review" && (
             <ReviewStep url={step.url} result={step.result} onDone={onDone} />
+          )}
+          {step.name === "error" && (
+            <ErrorStep
+              message={step.message}
+              onRetry={() => setStep({ name: "pick" })}
+              onDone={onDone}
+            />
           )}
         </motion.div>
       </AnimatePresence>
@@ -224,6 +242,37 @@ function AnalyzingStep({ url }: { url: string }) {
         <div className="h-4 w-2/3 animate-pulse rounded-full bg-secondary" />
         <div className="h-4 w-1/3 animate-pulse rounded-full bg-secondary" />
         <div className="h-4 w-1/2 animate-pulse rounded-full bg-secondary" />
+      </div>
+    </div>
+  )
+}
+
+function ErrorStep({
+  message,
+  onRetry,
+  onDone,
+}: {
+  message: string
+  onRetry: () => void
+  onDone: () => void
+}) {
+  return (
+    <div className="flex flex-col items-center gap-4 py-2">
+      <span className="flex size-14 items-center justify-center rounded-full bg-expense/10 text-expense">
+        <TriangleAlert size={26} />
+      </span>
+      <p className="text-center text-[15px] font-medium">{message}</p>
+      <div className="flex w-full gap-2">
+        <Button
+          variant="secondary"
+          onClick={onDone}
+          className="pressable flex-1 rounded-2xl"
+        >
+          Cerrar
+        </Button>
+        <Button onClick={onRetry} className="pressable flex-1 rounded-2xl">
+          Intentar de nuevo
+        </Button>
       </div>
     </div>
   )

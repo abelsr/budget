@@ -2,61 +2,147 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from "react"
 
+import { apiFetch, getToken, setToken } from "@/lib/api"
+
 /**
- * Auth mock. Persiste una sesión falsa en localStorage para desarrollar
- * la UI completa (login, guarda de rutas, cerrar sesión).
+ * Autenticación contra el backend FastAPI.
  *
- * INTEGRACIÓN BACKEND: reemplazar login/logout por llamadas a
- * POST /auth/login (email+password → JWT) y guardar el token; la UI
- * no cambia.
+ * - El JWT lo persiste api.ts ("ff-token"); aquí solo se hidrata la sesión.
+ * - Al montar el provider, si hay token se llama GET /auth/me; si falla
+ *   se limpia el token y la app queda deslogueada.
+ * - login/register/join guardan el accessToken y luego hidratan la sesión
+ *   con GET /auth/me. Los ApiError se propagan para que la página los muestre.
  */
 
 export interface Session {
+  id: string
   email: string
   name: string
+  householdId: string | null
 }
 
-const STORAGE_KEY = "ff-session"
+interface TokenResponse {
+  accessToken: string
+  tokenType: string
+}
 
-const AuthContext = createContext<{
+interface AuthContextValue {
   session: Session | null
-  login: (email: string, password: string) => void
+  /** true mientras se restaura la sesión inicial (GET /auth/me). */
+  isLoading: boolean
+  login: (email: string, password: string) => Promise<void>
+  register: (
+    email: string,
+    password: string,
+    name: string,
+    householdName: string,
+  ) => Promise<void>
+  join: (
+    inviteToken: string,
+    email: string,
+    password: string,
+    name: string,
+  ) => Promise<void>
   logout: () => void
-} | null>(null)
+}
 
-function readSession(): Session | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as Session) : null
-  } catch {
-    return null
-  }
+const AuthContext = createContext<AuthContextValue | null>(null)
+
+function fetchMe(): Promise<Session> {
+  return apiFetch<Session>("/auth/me")
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(readSession)
+  const [session, setSession] = useState<Session | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const login = useCallback((email: string, _password: string) => {
-    const name = email.split("@")[0]
-    const s: Session = {
-      email,
-      name: name.charAt(0).toUpperCase() + name.slice(1),
+  // Restaurar sesión inicial
+  useEffect(() => {
+    if (!getToken()) {
+      setIsLoading(false)
+      return
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
-    setSession(s)
+    let cancelled = false
+    fetchMe()
+      .then((me) => {
+        if (!cancelled) setSession(me)
+      })
+      .catch(() => {
+        // 401 u otro error: token inválido/expirado → limpiar
+        setToken(null)
+        if (!cancelled) setSession(null)
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
+  /** Guarda el token del endpoint y luego hidrata la sesión con /auth/me. */
+  const authenticate = useCallback(
+    async (tokenRequest: Promise<TokenResponse>) => {
+      const { accessToken } = await tokenRequest
+      setToken(accessToken)
+      const me = await fetchMe()
+      setSession(me)
+    },
+    [],
+  )
+
+  const login = useCallback(
+    (email: string, password: string) =>
+      authenticate(
+        apiFetch<TokenResponse>("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        }),
+      ),
+    [authenticate],
+  )
+
+  const register = useCallback(
+    (email: string, password: string, name: string, householdName: string) =>
+      authenticate(
+        apiFetch<TokenResponse>("/auth/register", {
+          method: "POST",
+          body: JSON.stringify({ email, password, name, householdName }),
+        }),
+      ),
+    [authenticate],
+  )
+
+  const join = useCallback(
+    (inviteToken: string, email: string, password: string, name: string) =>
+      authenticate(
+        apiFetch<TokenResponse>("/auth/join", {
+          method: "POST",
+          body: JSON.stringify({
+            token: inviteToken,
+            email,
+            password,
+            name,
+          }),
+        }),
+      ),
+    [authenticate],
+  )
+
   const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
+    setToken(null)
     setSession(null)
   }, [])
 
   return (
-    <AuthContext.Provider value={{ session, login, logout }}>
+    <AuthContext.Provider
+      value={{ session, isLoading, login, register, join, logout }}
+    >
       {children}
     </AuthContext.Provider>
   )

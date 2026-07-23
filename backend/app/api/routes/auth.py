@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbDep
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models import Category, Household, Invitation, User
+from app.models import Account, Category, Household, Invitation, User
 from app.schemas.auth import (
     JoinRequest,
     LoginRequest,
@@ -39,6 +39,9 @@ def register(db: DbDep, body: Annotated[RegisterRequest, Body()]):
 
     for cat in DEFAULT_CATEGORIES:
         db.add(Category(household_id=household.id, active=True, **cat))
+
+    # Cuenta inicial para que el hogar no arranque vacío
+    db.add(Account(household_id=household.id, name="Efectivo", kind="cash"))
 
     user = User(
         email=body.email,
