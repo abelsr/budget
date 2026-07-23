@@ -106,5 +106,20 @@ budget/
   (`src/lib/mock-db.ts`); al existir el backend solo cambian esas funciones
   por `fetch`.
 
-**Pendiente inmediato:** backend FastAPI (modelos, auth JWT, endpoints),
-PWA manifest/service worker, Docker Compose.
+**Backend implementado** (`backend/`, 26 tests pasando, smoke test E2E OK):
+
+- FastAPI + SQLAlchemy sync + Pydantic v2; multi-tenant por `household_id`.
+- Auth: register (crea hogar + siembra 10 categorías default), login JWT
+  (Argon2 + PyJWT), `/auth/me`, `/auth/join` con invitaciones.
+- CRUD completo: cuentas (balance calculado = opening + ingresos − gastos),
+  categorías, transacciones (filtro `?month=`, orden desc, aislamiento por hogar).
+- `/summary/month`: ingresos, gastos y dona por categoría.
+- `/tickets/scan`: servicio de visión con Gemini (`GEMINI_API_KEY`); sin key → 501.
+  Contrato idéntico al mock del frontend.
+- Respuestas camelCase (alias Pydantic), path ops sync, estilo `Annotated`.
+- Docker: `docker-compose.yml` raíz (db Postgres 17 + backend + frontend/nginx
+  con proxy `/api`), Dockerfiles de backend y frontend, `.env.example`.
+- Tests: SQLite en memoria vía override de `get_db` (26 tests).
+
+**Pendiente inmediato:** Alembic (hoy `create_all`), conectar frontend a `/api`,
+recurring rules (fase 2), HTTPS con Caddy.
