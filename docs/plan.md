@@ -111,32 +111,34 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 
 ### Pendientes
 
+> Detalle completo en **[docs/roadmap/](roadmap/README.md)** — un archivo por
+> pendiente con porqué, alcance, diseño y criterios de aceptación.
+
 **Inmediato (robustez):**
 
-- ⬜ **Alembic:** migraciones formales (hoy `Base.metadata.create_all`).
-- ⬜ **Invitaciones end-to-end en UI:** generar link desde Ajustes (la API
-  y la pantalla de unirse ya existen; falta el botón + copiar link).
-- ⬜ **PWA real:** manifest + service worker (instalable, shell offline).
-- ⬜ Backups de Postgres y MinIO (cron + script).
+- ⬜ [Alembic](roadmap/01-alembic-migraciones.md): migraciones formales (hoy `create_all`).
+- ⬜ [Invitaciones end-to-end](roadmap/02-invitaciones-end-to-end.md): generar y compartir link desde Ajustes.
+- ⬜ [PWA real](roadmap/03-pwa-instalable.md): manifest + service worker (instalable, shell offline).
+- ⬜ [Backups](roadmap/04-backups.md) de Postgres y MinIO.
+- ⬜ [Onboarding estilo Plane](roadmap/05-onboarding.md): wizard post-registro (bienvenida → cuentas → invitar → listo).
 
 **Fase 2 (features):**
 
-- ⬜ **Transacciones recurrentes** (tabla `recurring_rules` ya en esquema):
-  reglas semanales/mensuales que materializan movimientos.
-- ⬜ **Presupuestos mensuales** por categoría con alertas de progreso.
-- ⬜ **Importación CSV** de estados de cuenta (mapeo de columnas, dedupe).
-- ⬜ Filtros/búsqueda en Movimientos (por categoría, cuenta, miembro, texto).
-- ⬜ Edición de perfil y cambio de contraseña.
+- ⬜ [Transacciones recurrentes](roadmap/06-transacciones-recurrentes.md) (tabla `recurring_rules` ya existe).
+- ⬜ [Presupuestos mensuales](roadmap/07-presupuestos-mensuales.md) por categoría con barras semáforo.
+- ⬜ [Importación CSV](roadmap/08-importacion-csv.md) de estados de cuenta.
+- ⬜ [Filtros y búsqueda](roadmap/09-filtros-busqueda.md) en Movimientos.
+- ⬜ [Perfil y cambio de contraseña](roadmap/10-perfil-y-password.md).
 
 **Fase 3 (crecimiento):**
 
-- ⬜ Metas de ahorro con seguimiento de progreso.
-- ⬜ Cuentas personales (privacidad entre miembros del hogar).
-- ⬜ Offline-first con cola de sincronización.
-- ⬜ Apertura multi-familia (signup público, emails transaccionales).
+- ⬜ [Metas de ahorro](roadmap/11-metas-de-ahorro.md) con seguimiento de progreso.
+- ⬜ [Cuentas personales](roadmap/12-cuentas-personales.md) (privacidad entre miembros).
+- ⬜ [Offline-first](roadmap/13-offline-first.md) con cola de sincronización.
+- ⬜ [Apertura multi-familia](roadmap/14-multi-familia.md) (signup público).
 
 **Producción:**
 
-- ⬜ HTTPS con Caddy + dominio propio.
-- ⬜ CI (GitHub Actions): pytest + build de frontend en cada push.
-- ⬜ Monitoreo básico (logs estructurados, healthchecks externos).
+- ⬜ [HTTPS con Caddy](roadmap/15-https-caddy.md) + dominio propio.
+- ⬜ [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + build en cada push.
+- ⬜ [Monitoreo](roadmap/17-monitoreo.md): logs JSON, alertas de caída y disco.
