@@ -1,7 +1,7 @@
 # Plan: App de Finanzas Familiares
 
 > Documento vivo con las decisiones de diseño y arquitectura acordadas.
-> Última actualización: 2026-07-22
+> Última actualización: 2026-07-23
 
 ## Visión
 
@@ -28,12 +28,14 @@ Self-hosted, pero con esquema multi-tenant preparado para crecer a producto mult
 
 | Capa | Tecnología |
 |---|---|
-| Backend | Python 3.14 + uv + **FastAPI**, SQLAlchemy + Alembic, auth email/contraseña con JWT (hash argon2/bcrypt) |
+| Backend | Python 3.14 + uv + **FastAPI**, SQLAlchemy, auth email/contraseña con JWT (Argon2 + PyJWT). Migraciones con Alembic: pendiente (hoy `create_all`) |
 | Base de datos | **PostgreSQL**; todas las tablas con `household_id` (multi-tenant desde el día 1) |
+| Storage | **MinIO** (S3) para comprobantes adjuntos |
+| IA | **OpenRouter** (SDK OpenAI async) para el escáner de tickets; modelo configurable, default `google/gemini-3.6-flash` |
 | Frontend | **React + Vite** (TypeScript), Tailwind CSS + shadcn/ui, TanStack Query, Recharts, Motion (springs) |
 | Plataforma | **Web responsive / PWA** (un solo codebase para móvil y escritorio) |
-| Despliegue | **Docker Compose**: nginx (build estático) + FastAPI + PostgreSQL; HTTPS con Caddy/reverse proxy |
-| Calidad | pytest para lógica de negocio y API del backend; frontend validado manualmente |
+| Despliegue | **Docker Compose**: nginx (build estático) + FastAPI + PostgreSQL + MinIO; HTTPS con Caddy/reverse proxy (pendiente) |
+| Calidad | pytest para el backend (37 tests); frontend validado manualmente |
 
 ## Lenguaje de diseño (frontend)
 
@@ -50,128 +52,91 @@ Basado en la skill **Apple Design** (WWDC *Designing Fluid Interfaces* y princip
 
 ## Roadmap
 
-1. **MVP:** auth + hogares + cuentas + categorías + transacciones + dashboard.
-2. **Fase 2:** recurrencia, importación CSV, presupuestos mensuales.
-3. **Fase 3:** metas de ahorro, cuentas personales (privacidad entre miembros), offline-first con sincronización, apertura multi-familia.
+1. **MVP:** auth + hogares + cuentas + categorías + transacciones + dashboard. ✅ **HECHO** (+ escáner IA, adjuntos, modo oscuro)
+2. **Fase 2:** recurrencia, importación CSV, presupuestos mensuales. ⬜ Siguiente
+3. **Fase 3:** metas de ahorro, cuentas personales (privacidad entre miembros), offline-first con sincronización, apertura multi-familia. ⬜
 
 ## Estructura del repo
 
 ```
 budget/
-├── docs/plan.md      ← este documento
-├── backend/          ← FastAPI + PostgreSQL (Python 3.14, uv)
-└── frontend/         ← React + Vite PWA
+├── docs/plan.md        ← este documento
+├── docker-compose.yml  ← db + backend + frontend + minio
+├── .env                ← secretos de compose (ignorado por git)
+├── backend/            ← FastAPI + PostgreSQL + MinIO (Python 3.14, uv)
+└── frontend/           ← React + Vite PWA (nginx en prod)
 ```
 
-## Estado actual (2026-07-22)
+## Estado actual (2026-07-23)
 
-**Frontend funcional con datos mock** (`frontend/`, `npm run dev`):
+**Repo publicado en GitHub.** Stack completo corriendo en Docker Compose
+(frontend nginx :8081, backend :8000, Postgres 17, MinIO :9000/:9001) y
+verificado de punta a punta, incluyendo acceso desde celular por IP local.
 
-- App shell responsive: tab bar translúcida en móvil / sidebar en desktop,
-  indicador activo con spring compartido (`layoutId`).
-- Dashboard: balance total + chips por cuenta, ingresos vs gastos del mes,
-  dona por categoría (Recharts), movimientos recientes.
-- Movimientos: lista completa agrupada por día con total diario.
-- Cuentas: saldos por cuenta.
-- Registro rápido: FAB → bottom sheet (Base UI drawer) con segmented control
-  gasto/ingreso, monto protagonista, grid de categorías, selector de cuenta,
-  nota opcional. Guardar actualiza balances, resumen y listas (mock en memoria).
-- **Escáner de ticket con IA** (`src/components/TicketScanner.tsx`): subir/tomar
-  foto (drag & drop en desktop, cámara trasera en móvil) → preview → análisis
-  (línea de escaneo animada) → revisión editable (monto, comercio, categoría
-  sugerida, cuenta; badge "Revisar" si la confianza es baja) → guardar como
-  gasto. La capa `src/lib/scan.ts` es mock pero define el contrato del futuro
-  endpoint `POST /tickets/scan` (multipart → `{ merchant, total, date,
-  suggestedCategoryId, confidence }`).
-  **Decisión pendiente:** proveedor del modelo de visión (GPT-4o / Claude /
-  Gemini / Ollama local) — se resuelve al construir el backend.
-- **Layout escritorio mejorado:** dos columnas (principal + rail lateral de
-  340–380px con escáner, dona y resumen de cuentas), contenedor `max-w-6xl`
-  (2xl: `max-w-7xl`), balance y tarjetas del mes comparten fila en xl.
-  Movimientos agrupados por día en grid de 2–3 columnas en escritorio.
-- **Modo oscuro** (`src/lib/theme.tsx`): claro/oscuro/sistema con segmented
-  control en Ajustes, persistido en localStorage, script anti-FOUC en
-  `index.html`, `theme-color` sincronizado, escucha cambios del SO en vivo.
-- **Login + auth mock** (`src/lib/auth.tsx`, `/login`): página pública sin
-  shell, guarda `RequireAuth` que redirige a /login, sesión falsa en
-  localStorage (integración: `POST /auth/login` con JWT).
-- **Ajustes** (`/ajustes`): cuenta, apariencia (tema), miembros del hogar
-  (invitar = próximamente), preferencias (categorías, escáner IA), moneda del
-  hogar, cerrar sesión. Accesible como 4º tab en móvil y en la sidebar.
-- Lenguaje Apple Design aplicado: tokens en `src/index.css` (paleta iOS,
-  materiales `backdrop-filter`, `.pressable` con feedback en pointer-down),
-  presets de springs en `src/lib/springs.ts`, `MotionConfig reducedMotion="user"`,
-  tipografía system stack con tracking por tamaño y cifras tabulares.
-- Capa de datos (`src/lib/queries.ts`) con TanStack Query sobre mock
-  (`src/lib/mock-db.ts`); al existir el backend solo cambian esas funciones
-  por `fetch`.
+### Avance — qué ya está construido y verificado
 
-**Backend implementado** (`backend/`, 26 tests pasando, smoke test E2E OK):
+**Producto (MVP completo + extras):**
 
-- FastAPI + SQLAlchemy sync + Pydantic v2; multi-tenant por `household_id`.
-- Auth: register (crea hogar + siembra 10 categorías default), login JWT
-  (Argon2 + PyJWT), `/auth/me`, `/auth/join` con invitaciones.
-- CRUD completo: cuentas (balance calculado = opening + ingresos − gastos),
-  categorías, transacciones (filtro `?month=`, orden desc, aislamiento por hogar).
-- `/summary/month`: ingresos, gastos y dona por categoría.
-- `/tickets/scan`: servicio de visión **async** con SDK de OpenAI apuntado a
-  **OpenRouter** (`AsyncOpenAI`, modelo configurable vía `OPENROUTER_MODEL`,
-  default `openai/gpt-4o-mini`); sin `OPENROUTER_API_KEY` → 501.
-  Contrato idéntico al del frontend. Config vía `backend/.env` (no commiteado;
-  plantilla en `.env.example`).
-- Respuestas camelCase (alias Pydantic), path ops sync, estilo `Annotated`.
-- Docker: `docker-compose.yml` raíz (db Postgres 17 + backend + frontend/nginx
-  con proxy `/api`), Dockerfiles de backend y frontend, `.env.example`.
-- Tests: SQLite en memoria vía override de `get_db` (26 tests).
+- ✅ **Auth real:** registro (crea hogar + 10 categorías default + cuenta
+  Efectivo), login JWT (Argon2), restauración de sesión, unirse con
+  invitación (`/login?invite=TOKEN`), cerrar sesión.
+- ✅ **Transacciones:** registro rápido (<10s) con monto, categoría, cuenta,
+  **fecha editable** (default hoy) y nota; lista agrupada por día; detalle
+  con edición completa y borrado en dos pasos.
+- ✅ **Escáner de tickets con IA:** foto/archivo → análisis con OpenRouter
+  (gemini-3.6-flash) → revisión editable → gasto. Normalización EXIF +
+  downscale (fotos de celular rotadas funcionan: ticket real de Sam's Club
+  extraído exacto: comercio, $1,014.99, fecha 19/07, categoría, conf. 0.98).
+- ✅ **Comprobantes adjuntos** (MinIO): foto/pdf/doc por movimiento (máx
+  10MB), ver/eliminar desde el detalle; paperclip en las listas.
+- ✅ **CRUD cuentas:** crear/editar/eliminar (nombre, tipo, saldo inicial),
+  balances calculados en vivo; 409 "tiene movimientos" manejado.
+- ✅ **CRUD categorías:** página de gestión con toggles activo/inactivo,
+  picker de icono y color, preview en vivo.
+- ✅ **Dashboard:** balance total y por cuenta, ingresos vs gastos del mes,
+  dona por categoría, movimientos recientes; layout de 2 columnas en desktop.
+- ✅ **Hogar multi-miembro:** aislamiento estricto por `household_id`
+  (verificado), miembros en sidebar/ajustes, invitaciones por API.
+- ✅ **UX Apple Design:** modo oscuro (claro/oscuro/sistema, anti-FOUC),
+  materiales translúcidos, springs, feedback en pointer-down,
+  `prefers-reduced-motion`, español.
 
-**Frontend conectado al backend real** (E2E verificado: registro → ingreso →
-gasto → persistencia tras recarga → error 501 del escáner sin API key):
+**Infraestructura:**
 
-- `src/lib/api.ts`: cliente HTTP (base `/api`, Bearer token en localStorage,
-  ApiError con detalle del servidor, limpia token en 401).
-- Proxy de Vite: `/api` → `127.0.0.1:8000` en dev (nginx en prod).
-- `auth.tsx` real: restauración de sesión vía `/auth/me` con `isLoading`,
-  login/registro/join; LoginPage con segmented control Entrar/Crear cuenta
-  y modo invitación vía `?invite=TOKEN`.
-- `queries.ts` real: mismos hooks contra la API (mock-db eliminado);
-  `useHousehold` alimenta el nombre del hogar en la sidebar.
-- `scan.ts` real: POST multipart a `/tickets/scan`; TicketScanner con
-  estado de error + reintento.
-- Register del backend crea cuenta inicial "Efectivo" (hogar no arranca vacío).
+- ✅ Backend FastAPI multi-tenant (37 tests pytest, SQLite en memoria).
+- ✅ Respuestas camelCase end-to-end; proxy `/api` en Vite (dev) y nginx (prod).
+- ✅ Secretos en `.env` (raíz y backend/, ignorados por git; plantillas en
+  `.env.example`).
+- ✅ Dockerfiles limpios (lock regenerado tras fix de `pyproject.toml`).
 
-**Stack dockerizado verificado E2E** (7/7 pruebas PASS):
+### Pendientes
 
-- `docker compose up` levanta db (Postgres 17) + backend + frontend/nginx.
-- Frontend servido en **:8081** (el 8080 del host está ocupado por otro
-  contenedor del usuario; revertir el puerto en compose si se libera).
-- Escáner con IA real verificado contra OpenRouter: el ticket de prueba
-  devolvió `{merchant: "Walmart Supercenter Mexico", total: 1234.56,
-  suggestedCategoryId: <Supermercado real>, confidence: 1.0}`.
-- Persistencia en Postgres confirmada vía psql; aislamiento multi-hogar OK.
-- Config de secretos: `.env` raíz (docker-compose) y `backend/.env` (dev
-  local), ambos ignorados por git; plantillas en `.env.example`.
+**Inmediato (robustez):**
 
-**Comprobantes adjuntos** (full-stack, verificado E2E):
+- ⬜ **Alembic:** migraciones formales (hoy `Base.metadata.create_all`).
+- ⬜ **Invitaciones end-to-end en UI:** generar link desde Ajustes (la API
+  y la pantalla de unirse ya existen; falta el botón + copiar link).
+- ⬜ **PWA real:** manifest + service worker (instalable, shell offline).
+- ⬜ Backups de Postgres y MinIO (cron + script).
 
-- Backend: modelo `Attachment`, storage en **MinIO** (S3-compatible, servicio
-  `minio` en compose con consola en :9001, bucket `attachments` auto-creado,
-  objetos `{household_id}/{attachment_id}{ext}`). Endpoints POST
-  `/transactions/{id}/attachments` (imagen/pdf/doc, máx 10MB), GET/DELETE
-  `/attachments/{id}` (streaming vía backend); el JSON de Transaction incluye
-  `attachments[]`.
-- Frontend: sección "Comprobante (opcional)" en el sheet de registro (sube tras
-  crear la transacción), paperclip en filas con adjuntos, visor/eliminación
-  desde el detalle del movimiento.
-- Registro de gasto con **fecha editable** (default hoy, sin fechas futuras).
+**Fase 2 (features):**
 
-**CRUD completo en la UI** (verificado E2E):
+- ⬜ **Transacciones recurrentes** (tabla `recurring_rules` ya en esquema):
+  reglas semanales/mensuales que materializan movimientos.
+- ⬜ **Presupuestos mensuales** por categoría con alertas de progreso.
+- ⬜ **Importación CSV** de estados de cuenta (mapeo de columnas, dedupe).
+- ⬜ Filtros/búsqueda en Movimientos (por categoría, cuenta, miembro, texto).
+- ⬜ Edición de perfil y cambio de contraseña.
 
-- Cuentas: crear/editar/eliminar con sheet (nombre, tipo, saldo inicial;
-  409 "tiene movimientos" manejado). `Account` expone `openingBalance`.
-- Categorías: página `/ajustes/categorias` (toggle activo, crear/editar/
-  eliminar con picker de icono y color, preview en vivo).
-- Transacciones: click en fila → sheet de detalle (datos, comprobantes con
-  ver/eliminar) con modo edición completo y borrado en dos pasos.
+**Fase 3 (crecimiento):**
 
-**Pendiente inmediato:** Alembic (hoy `create_all`), recurring rules (fase 2),
-HTTPS con Caddy, presupuestos mensuales.
+- ⬜ Metas de ahorro con seguimiento de progreso.
+- ⬜ Cuentas personales (privacidad entre miembros del hogar).
+- ⬜ Offline-first con cola de sincronización.
+- ⬜ Apertura multi-familia (signup público, emails transaccionales).
+
+**Producción:**
+
+- ⬜ HTTPS con Caddy + dominio propio.
+- ⬜ CI (GitHub Actions): pytest + build de frontend en cada push.
+- ⬜ Monitoreo básico (logs estructurados, healthchecks externos).
