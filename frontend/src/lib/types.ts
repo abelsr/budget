@@ -18,6 +18,7 @@ export interface Account {
   householdId: string
   name: string
   kind: AccountKind
+  openingBalance: number
   balance: number
 }
 

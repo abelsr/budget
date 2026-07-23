@@ -7,6 +7,7 @@ import { DashboardPage } from "@/pages/DashboardPage"
 import { TransactionsPage } from "@/pages/TransactionsPage"
 import { AccountsPage } from "@/pages/AccountsPage"
 import { SettingsPage } from "@/pages/SettingsPage"
+import { CategoriesPage } from "@/pages/CategoriesPage"
 import { LoginPage } from "@/pages/LoginPage"
 
 /** Rutas que requieren sesión; redirige a /login recordando el destino. */
@@ -54,6 +55,7 @@ function App() {
               <Route path="transacciones" element={<TransactionsPage />} />
               <Route path="cuentas" element={<AccountsPage />} />
               <Route path="ajustes" element={<SettingsPage />} />
+              <Route path="ajustes/categorias" element={<CategoriesPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

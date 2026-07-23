@@ -153,14 +153,25 @@ gasto → persistencia tras recarga → error 501 del escáner sin API key):
 
 **Comprobantes adjuntos** (full-stack, verificado E2E):
 
-- Backend: modelo `Attachment`, storage en disco (`ATTACHMENTS_DIR`, volumen
-  `attachments_data` en Docker), endpoints POST `/transactions/{id}/attachments`
-  (imagen/pdf/doc, máx 10MB), GET/DELETE `/attachments/{id}`; el JSON de
-  Transaction incluye `attachments[]`.
+- Backend: modelo `Attachment`, storage en **MinIO** (S3-compatible, servicio
+  `minio` en compose con consola en :9001, bucket `attachments` auto-creado,
+  objetos `{household_id}/{attachment_id}{ext}`). Endpoints POST
+  `/transactions/{id}/attachments` (imagen/pdf/doc, máx 10MB), GET/DELETE
+  `/attachments/{id}` (streaming vía backend); el JSON de Transaction incluye
+  `attachments[]`.
 - Frontend: sección "Comprobante (opcional)" en el sheet de registro (sube tras
-  crear la transacción), paperclip en filas con adjuntos, click abre el archivo
-  (blob autenticado → object URL).
+  crear la transacción), paperclip en filas con adjuntos, visor/eliminación
+  desde el detalle del movimiento.
 - Registro de gasto con **fecha editable** (default hoy, sin fechas futuras).
 
-**Pendiente inmediato:** Alembic (hoy `create_all`), CRUD de cuentas/categorías
-en la UI (la API ya existe), recurring rules (fase 2), HTTPS con Caddy.
+**CRUD completo en la UI** (verificado E2E):
+
+- Cuentas: crear/editar/eliminar con sheet (nombre, tipo, saldo inicial;
+  409 "tiene movimientos" manejado). `Account` expone `openingBalance`.
+- Categorías: página `/ajustes/categorias` (toggle activo, crear/editar/
+  eliminar con picker de icono y color, preview en vivo).
+- Transacciones: click en fila → sheet de detalle (datos, comprobantes con
+  ver/eliminar) con modo edición completo y borrado en dos pasos.
+
+**Pendiente inmediato:** Alembic (hoy `create_all`), recurring rules (fase 2),
+HTTPS con Caddy, presupuestos mensuales.

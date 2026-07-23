@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import {
   ChevronRight,
   LogOut,
@@ -133,8 +133,7 @@ export function SettingsPage() {
         <Row
           icon={<Tags size={16} />}
           label="Categorías"
-          value="Próximamente"
-          disabled
+          to="/ajustes/categorias"
         />
         <Row
           icon={<ScanLine size={16} />}
@@ -198,26 +197,38 @@ function Row({
   value,
   disabled,
   last,
+  to,
 }: {
   icon: React.ReactNode
   label: string
   value?: string
   disabled?: boolean
   last?: boolean
+  to?: string
 }) {
-  return (
-    <button
-      disabled={disabled}
-      className={`flex w-full items-center gap-3 px-4 py-3 text-left ${
-        !last ? "border-b border-border/60" : ""
-      } ${disabled ? "opacity-50" : "pressable"}`}
-    >
+  const className = `flex w-full items-center gap-3 px-4 py-3 text-left ${
+    !last ? "border-b border-border/60" : ""
+  } ${disabled ? "opacity-50" : "pressable"}`
+  const content = (
+    <>
       <span className="flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
         {icon}
       </span>
       <p className="flex-1 text-[15px] font-medium">{label}</p>
       {value && <span className="text-[13px] text-muted-foreground">{value}</span>}
       <ChevronRight size={16} className="text-muted-foreground/50" />
+    </>
+  )
+  if (to) {
+    return (
+      <Link to={to} className={className}>
+        {content}
+      </Link>
+    )
+  }
+  return (
+    <button disabled={disabled} className={className}>
+      {content}
     </button>
   )
 }

@@ -27,4 +27,5 @@ class AccountOut(_CamelModel):
     household_id: str
     name: str
     kind: str
+    opening_balance: float
     balance: float

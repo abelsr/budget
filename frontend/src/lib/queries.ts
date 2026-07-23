@@ -140,3 +140,102 @@ export function useUploadAttachment() {
     },
   })
 }
+
+// ---------------------------------------------------------------------------
+// Mutaciones CRUD (cuentas, categorías, transacciones)
+// ---------------------------------------------------------------------------
+
+export interface AccountInput {
+  name: string
+  kind: Account["kind"]
+  openingBalance?: number
+}
+
+export interface CategoryInput {
+  name: string
+  icon: string
+  color: string
+  type: Category["type"]
+}
+
+function useInvalidator(...queryKeys: readonly (readonly string[])[]) {
+  const queryClient = useQueryClient()
+  return () => queryKeys.forEach((key) => queryClient.invalidateQueries({ queryKey: key }))
+}
+
+export function useCreateAccount() {
+  const invalidate = useInvalidator(keys.accounts)
+  return useMutation({
+    mutationFn: (input: AccountInput) =>
+      apiFetch<Account>("/accounts", { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateAccount() {
+  const invalidate = useInvalidator(keys.accounts)
+  return useMutation({
+    mutationFn: ({ id, ...input }: Partial<AccountInput> & { id: string }) =>
+      apiFetch<Account>(`/accounts/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteAccount() {
+  const invalidate = useInvalidator(keys.accounts)
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/accounts/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useCreateCategory() {
+  const invalidate = useInvalidator(keys.categories)
+  return useMutation({
+    mutationFn: (input: CategoryInput) =>
+      apiFetch<Category>("/categories", { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateCategory() {
+  const invalidate = useInvalidator(keys.categories)
+  return useMutation({
+    mutationFn: ({ id, ...input }: Partial<CategoryInput & { active: boolean }> & { id: string }) =>
+      apiFetch<Category>(`/categories/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteCategory() {
+  const invalidate = useInvalidator(keys.categories)
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/categories/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateTransaction() {
+  const invalidate = useInvalidator(keys.transactions, keys.accounts, keys.summary)
+  return useMutation({
+    mutationFn: ({ id, ...input }: Partial<NewTransaction> & { id: string }) =>
+      apiFetch<Transaction>(`/transactions/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteTransaction() {
+  const invalidate = useInvalidator(keys.transactions, keys.accounts, keys.summary)
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/transactions/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteAttachment() {
+  const invalidate = useInvalidator(keys.transactions)
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/attachments/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}

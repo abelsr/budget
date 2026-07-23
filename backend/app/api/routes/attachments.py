@@ -1,13 +1,12 @@
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.config import settings
 from app.models import Attachment, Transaction, User
 from app.schemas.attachments import AttachmentResponse
+from app.services import storage
 
 router = APIRouter(tags=["attachments"])
 
@@ -65,12 +64,14 @@ def upload_attachment(
     db.flush()  # genera attachment.id
 
     suffix = Path(attachment.filename).suffix
-    directory = Path(settings.attachments_dir) / household_id
-    directory.mkdir(parents=True, exist_ok=True)
-    storage_path = directory / f"{attachment.id}{suffix}"
-    storage_path.write_bytes(content)
-    attachment.storage_path = str(storage_path)
+    object_key = f"{household_id}/{attachment.id}{suffix}"
+    try:
+        storage.put_attachment(object_key, content, content_type)
+    except storage.StorageError:
+        db.rollback()  # no queda registro huérfano
+        raise HTTPException(status_code=502, detail="Error al guardar el comprobante")
 
+    attachment.storage_path = object_key
     db.commit()
     db.refresh(attachment)
     return AttachmentResponse.model_validate(attachment)
@@ -79,14 +80,17 @@ def upload_attachment(
 @router.get("/attachments/{attachment_id}")
 def download_attachment(
     attachment_id: str, db: DbDep, user: CurrentUserDep
-) -> FileResponse:
+) -> Response:
     household_id = _household_id(user)
     attachment = _get_attachment(db, household_id, attachment_id)
-    path = Path(attachment.storage_path)
-    if not path.exists():
+    try:
+        content = storage.get_attachment(attachment.storage_path)
+    except storage.StorageError:
         raise HTTPException(status_code=404, detail="Adjunto no encontrado")
-    return FileResponse(
-        path, media_type=attachment.content_type, filename=attachment.filename
+    return Response(
+        content=content,
+        media_type=attachment.content_type,
+        headers={"Content-Disposition": f'inline; filename="{attachment.filename}"'},
     )
 
 
@@ -94,6 +98,6 @@ def download_attachment(
 def delete_attachment(attachment_id: str, db: DbDep, user: CurrentUserDep) -> None:
     household_id = _household_id(user)
     attachment = _get_attachment(db, household_id, attachment_id)
-    Path(attachment.storage_path).unlink(missing_ok=True)
+    storage.delete_attachment(attachment.storage_path)
     db.delete(attachment)
     db.commit()

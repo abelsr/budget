@@ -4,7 +4,8 @@ import jwt
 import pytest
 
 from app.config import settings
-from app.models import Account, Category, Household, Transaction, User
+from app.models import Account, Attachment, Category, Household, Transaction, User
+from app.services import storage
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\nfake-png-content"
 
@@ -18,10 +19,25 @@ def make_token(user: User) -> str:
 
 
 @pytest.fixture(name="world")
-def world_fixture(session, tmp_path, monkeypatch):
+def world_fixture(session, monkeypatch):
     """Dos hogares, cada uno con usuario, cuenta, categoría y transacción.
-    Redirige el almacenamiento de adjuntos a tmp_path."""
-    monkeypatch.setattr(settings, "attachments_dir", str(tmp_path))
+    Sustituye el storage S3 por un fake en memoria (dict)."""
+    store: dict[str, bytes] = {}
+
+    def fake_put(object_key: str, data: bytes, content_type: str) -> None:
+        store[object_key] = data
+
+    def fake_get(object_key: str) -> bytes:
+        if object_key not in store:
+            raise storage.StorageError(f"no existe: {object_key}")
+        return store[object_key]
+
+    def fake_delete(object_key: str) -> None:
+        store.pop(object_key, None)
+
+    monkeypatch.setattr(storage, "put_attachment", fake_put)
+    monkeypatch.setattr(storage, "get_attachment", fake_get)
+    monkeypatch.setattr(storage, "delete_attachment", fake_delete)
 
     h1 = Household(name="Hogar Uno")
     h2 = Household(name="Hogar Dos")
@@ -76,7 +92,7 @@ def world_fixture(session, tmp_path, monkeypatch):
         "tx2": txs["tx2"],
         "headers1": {"Authorization": f"Bearer {make_token(u1)}"},
         "headers2": {"Authorization": f"Bearer {make_token(u2)}"},
-        "tmp_path": tmp_path,
+        "store": store,
     }
 
 
@@ -105,10 +121,10 @@ def test_upload_attachment_and_list_in_transaction(client, world):
     assert attachment["contentType"] == "image/png"
     assert attachment["sizeBytes"] == len(PNG_BYTES)
 
-    # El archivo existe en disco bajo tmp_path/{household_id}/
-    stored = list((world["tmp_path"] / world["h1"].id).iterdir())
-    assert len(stored) == 1
-    assert stored[0].read_bytes() == PNG_BYTES
+    # El objeto existe en el storage bajo la key {household_id}/{attachment_id}.png
+    assert len(world["store"]) == 1
+    object_key = f"{world['h1'].id}/{attachment['id']}.png"
+    assert world["store"][object_key] == PNG_BYTES
 
     # La transacción incluye el adjunto
     resp = client.get("/transactions", headers=world["headers1"])
@@ -148,6 +164,21 @@ def test_upload_over_10mb_returns_413(client, world):
     assert resp.status_code == 413
 
 
+def test_upload_storage_failure_returns_502_and_no_record(client, world, session, monkeypatch):
+    def failing_put(object_key: str, data: bytes, content_type: str) -> None:
+        raise storage.StorageError("S3 caído")
+
+    monkeypatch.setattr(storage, "put_attachment", failing_put)
+
+    resp = upload(client, world["headers1"], world["tx1"].id)
+    assert resp.status_code == 502
+    assert resp.json() == {"detail": "Error al guardar el comprobante"}
+
+    # No queda registro en la base de datos
+    session.expire_all()
+    assert session.query(Attachment).count() == 0
+
+
 def test_download_attachment_returns_same_bytes(client, world):
     attachment = upload(client, world["headers1"], world["tx1"].id).json()
 
@@ -168,12 +199,11 @@ def test_download_foreign_attachment_returns_404(client, world):
 def test_delete_attachment_removes_file_and_record(client, world):
     headers = world["headers1"]
     attachment = upload(client, headers, world["tx1"].id).json()
-    stored = list((world["tmp_path"] / world["h1"].id).iterdir())
-    assert len(stored) == 1
+    assert len(world["store"]) == 1
 
     resp = client.delete(f"/attachments/{attachment['id']}", headers=headers)
     assert resp.status_code == 204
-    assert not stored[0].exists()
+    assert len(world["store"]) == 0
 
     resp = client.get(f"/attachments/{attachment['id']}", headers=headers)
     assert resp.status_code == 404

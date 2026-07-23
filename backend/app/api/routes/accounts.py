@@ -27,6 +27,7 @@ def _account_out(account: Account, balance: float) -> AccountOut:
         household_id=account.household_id,
         name=account.name,
         kind=account.kind,
+        opening_balance=float(account.opening_balance),
         balance=round(balance, 2),
     )
 

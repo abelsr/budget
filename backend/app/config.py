@@ -13,8 +13,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 30  # 30 días
 
-    # Comprobantes adjuntos: ruta local en dev; en docker ATTACHMENTS_DIR=/data/attachments
-    attachments_dir: str = "data/attachments"
+    # Comprobantes adjuntos: almacenamiento S3 (MinIO). Endpoint sin scheme.
+    minio_endpoint: str = "localhost:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_bucket: str = "attachments"
+    minio_secure: bool = False
 
     # Escáner de tickets: LLM con visión vía OpenRouter (API compatible
     # con OpenAI). Sin key → endpoint responde 501.
