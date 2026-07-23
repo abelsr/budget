@@ -2,66 +2,60 @@ import base64
 import json
 from datetime import date
 
-import httpx
+from openai import AsyncOpenAI
 
 from app.config import settings
 
-GEMINI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-2.0-flash:generateContent"
-)
-
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 HTTP_TIMEOUT_SECONDS = 30
 
 
 class TicketScanUnavailable(Exception):
-    """El escáner no está configurado (falta GEMINI_API_KEY)."""
+    """El escáner no está configurado (falta OPENROUTER_API_KEY)."""
 
 
 class TicketScanError(Exception):
-    """Falló la llamada al proveedor de visión o su respuesta es inválida."""
+    """Falló la llamada al modelo de visión o su respuesta es inválida."""
 
 
-def analyze_ticket(
+async def analyze_ticket(
     image_bytes: bytes, mime_type: str, categories: list[dict]
 ) -> dict:
-    """Analiza la imagen de un ticket con Gemini y devuelve datos estructurados.
+    """Analiza la imagen de un ticket con un LLM de visión (OpenRouter,
+    API compatible con OpenAI) y devuelve datos estructurados.
 
     categories: [{"id": ..., "name": ...}] de categorías expense activas del
     hogar. Devuelve dict snake_case: merchant, total, date,
     suggested_category_id, confidence.
     """
-    if settings.gemini_api_key is None:
-        raise TicketScanUnavailable("Falta GEMINI_API_KEY")
+    if settings.openrouter_api_key is None:
+        raise TicketScanUnavailable("Falta OPENROUTER_API_KEY")
 
-    prompt = _build_prompt(categories)
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {
-                        "inline_data": {
-                            "mime_type": mime_type,
-                            "data": base64.b64encode(image_bytes).decode("ascii"),
-                        }
-                    },
-                    {"text": prompt},
-                ]
-            }
-        ],
-        "generation_config": {"response_mime_type": "application/json"},
-    }
+    client = AsyncOpenAI(
+        base_url=OPENROUTER_BASE_URL,
+        api_key=settings.openrouter_api_key,
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    data_url = (
+        f"data:{mime_type};base64,"
+        f"{base64.b64encode(image_bytes).decode('ascii')}"
+    )
 
     try:
-        response = httpx.post(
-            GEMINI_URL,
-            params={"key": settings.gemini_api_key},
-            json=payload,
-            timeout=HTTP_TIMEOUT_SECONDS,
+        completion = await client.chat.completions.create(
+            model=settings.openrouter_model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": _build_prompt(categories)},
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                }
+            ],
+            response_format={"type": "json_object"},
         )
-        response.raise_for_status()
-        text = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-        data = json.loads(text)
+        data = json.loads(completion.choices[0].message.content or "{}")
     except Exception as exc:
         raise TicketScanError("Error al analizar el ticket") from exc
 

@@ -40,7 +40,8 @@ app/
 │   ├── deps.py        # get_db, get_current_user (Bearer JWT)
 │   └── routes/        # auth, households, accounts, categories,
 │                      # transactions, summary, tickets
-├── services/vision.py # escáner de tickets (Gemini; sin key → 501)
+├── services/vision.py # escáner de tickets (OpenRouter vía SDK OpenAI
+│                      # async; sin OPENROUTER_API_KEY → 501)
 └── schemas/           # Pydantic, respuestas camelCase
 ```
 

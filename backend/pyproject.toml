@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "openai>=2.47.0",
     "psycopg[binary]>=3.3.4",
 ]
 

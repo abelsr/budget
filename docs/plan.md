@@ -114,8 +114,11 @@ budget/
 - CRUD completo: cuentas (balance calculado = opening + ingresos − gastos),
   categorías, transacciones (filtro `?month=`, orden desc, aislamiento por hogar).
 - `/summary/month`: ingresos, gastos y dona por categoría.
-- `/tickets/scan`: servicio de visión con Gemini (`GEMINI_API_KEY`); sin key → 501.
-  Contrato idéntico al mock del frontend.
+- `/tickets/scan`: servicio de visión **async** con SDK de OpenAI apuntado a
+  **OpenRouter** (`AsyncOpenAI`, modelo configurable vía `OPENROUTER_MODEL`,
+  default `openai/gpt-4o-mini`); sin `OPENROUTER_API_KEY` → 501.
+  Contrato idéntico al del frontend. Config vía `backend/.env` (no commiteado;
+  plantilla en `.env.example`).
 - Respuestas camelCase (alias Pydantic), path ops sync, estilo `Annotated`.
 - Docker: `docker-compose.yml` raíz (db Postgres 17 + backend + frontend/nginx
   con proxy `/api`), Dockerfiles de backend y frontend, `.env.example`.
@@ -136,6 +139,6 @@ gasto → persistencia tras recarga → error 501 del escáner sin API key):
   estado de error + reintento.
 - Register del backend crea cuenta inicial "Efectivo" (hogar no arranca vacío).
 
-**Pendiente inmediato:** Alembic (hoy `create_all`), GEMINI_API_KEY real para
-el escáner, CRUD de cuentas/categorías en la UI (la API ya existe),
+**Pendiente inmediato:** Alembic (hoy `create_all`), `OPENROUTER_API_KEY` real
+para el escáner, CRUD de cuentas/categorías en la UI (la API ya existe),
 recurring rules (fase 2), HTTPS con Caddy.

@@ -18,7 +18,7 @@ MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 @router.post("/scan", response_model=TicketScanResponse)
-def scan_ticket(
+async def scan_ticket(
     db: DbDep,
     current_user: CurrentUserDep,
     file: Annotated[UploadFile, File(...)],
@@ -31,7 +31,7 @@ def scan_ticket(
             status_code=415, detail="El archivo debe ser una imagen"
         )
 
-    image_bytes = file.file.read()
+    image_bytes = await file.read()
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise HTTPException(
             status_code=413, detail="La imagen excede el límite de 10 MB"
@@ -52,11 +52,11 @@ def scan_ticket(
     category_dicts = [{"id": c.id, "name": c.name} for c in categories]
 
     try:
-        result = analyze_ticket(image_bytes, file.content_type, category_dicts)
+        result = await analyze_ticket(image_bytes, file.content_type, category_dicts)
     except TicketScanUnavailable:
         raise HTTPException(
             status_code=501,
-            detail="Escáner no configurado: falta GEMINI_API_KEY",
+            detail="Escáner no configurado: falta OPENROUTER_API_KEY",
         ) from None
     except TicketScanError:
         raise HTTPException(

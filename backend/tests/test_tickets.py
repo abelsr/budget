@@ -39,7 +39,7 @@ def _create_user_with_category(session):
     return user, category, {"Authorization": f"Bearer {token}"}
 
 
-def test_scan_without_gemini_api_key_returns_501(client, session):
+def test_scan_without_openrouter_api_key_returns_501(client, session):
     _, _, headers = _create_user_with_category(session)
 
     response = client.post(
@@ -50,14 +50,14 @@ def test_scan_without_gemini_api_key_returns_501(client, session):
 
     assert response.status_code == 501
     assert response.json() == {
-        "detail": "Escáner no configurado: falta GEMINI_API_KEY"
+        "detail": "Escáner no configurado: falta OPENROUTER_API_KEY"
     }
 
 
 def test_scan_success_returns_camel_case(client, session, monkeypatch):
     _, category, headers = _create_user_with_category(session)
 
-    def fake_analyze(image_bytes, mime_type, categories):
+    async def fake_analyze(image_bytes, mime_type, categories):
         return {
             "merchant": "Walmart",
             "total": 1234.56,

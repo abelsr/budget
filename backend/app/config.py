@@ -11,10 +11,12 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "dev-secret-change-me"
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 24 * 7  # 7 días
+    jwt_expire_minutes: int = 60 * 24 * 30  # 30 días
 
-    # Escáner de tickets: proveedor de visión (opcional; sin key → 501)
-    gemini_api_key: str | None = None
+    # Escáner de tickets: LLM con visión vía OpenRouter (API compatible
+    # con OpenAI). Sin key → endpoint responde 501.
+    openrouter_api_key: str | None = None
+    openrouter_model: str = "openai/gpt-4o-mini"
 
     cors_origins: list[str] = [
         "http://localhost:5173",
