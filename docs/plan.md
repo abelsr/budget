@@ -139,6 +139,17 @@ gasto → persistencia tras recarga → error 501 del escáner sin API key):
   estado de error + reintento.
 - Register del backend crea cuenta inicial "Efectivo" (hogar no arranca vacío).
 
-**Pendiente inmediato:** Alembic (hoy `create_all`), `OPENROUTER_API_KEY` real
-para el escáner, CRUD de cuentas/categorías en la UI (la API ya existe),
-recurring rules (fase 2), HTTPS con Caddy.
+**Stack dockerizado verificado E2E** (7/7 pruebas PASS):
+
+- `docker compose up` levanta db (Postgres 17) + backend + frontend/nginx.
+- Frontend servido en **:8081** (el 8080 del host está ocupado por otro
+  contenedor del usuario; revertir el puerto en compose si se libera).
+- Escáner con IA real verificado contra OpenRouter: el ticket de prueba
+  devolvió `{merchant: "Walmart Supercenter Mexico", total: 1234.56,
+  suggestedCategoryId: <Supermercado real>, confidence: 1.0}`.
+- Persistencia en Postgres confirmada vía psql; aislamiento multi-hogar OK.
+- Config de secretos: `.env` raíz (docker-compose) y `backend/.env` (dev
+  local), ambos ignorados por git; plantillas en `.env.example`.
+
+**Pendiente inmediato:** Alembic (hoy `create_all`), CRUD de cuentas/categorías
+en la UI (la API ya existe), recurring rules (fase 2), HTTPS con Caddy.

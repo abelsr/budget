@@ -39,8 +39,10 @@ def _create_user_with_category(session):
     return user, category, {"Authorization": f"Bearer {token}"}
 
 
-def test_scan_without_openrouter_api_key_returns_501(client, session):
+def test_scan_without_openrouter_api_key_returns_501(client, session, monkeypatch):
     _, _, headers = _create_user_with_category(session)
+    # Hermético: fuerza ausencia de key aunque exista en .env
+    monkeypatch.setattr(settings, "openrouter_api_key", None)
 
     response = client.post(
         "/tickets/scan",
