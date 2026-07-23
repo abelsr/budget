@@ -1,13 +1,18 @@
 import base64
+import io
 import json
 from datetime import date
 
 from openai import AsyncOpenAI
+from PIL import Image, ImageOps
 
 from app.config import settings
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 HTTP_TIMEOUT_SECONDS = 30
+# Redimensiona fotos grandes (las de celular pesan 5-10 MB); los modelos
+# de visión downsamplean de todos modos, así se reduce payload y costo.
+MAX_IMAGE_DIMENSION = 2048
 
 
 class TicketScanUnavailable(Exception):
@@ -16,6 +21,28 @@ class TicketScanUnavailable(Exception):
 
 class TicketScanError(Exception):
     """Falló la llamada al modelo de visión o su respuesta es inválida."""
+
+
+def normalize_image(image_bytes: bytes) -> bytes:
+    """Endereza la imagen según su orientación EXIF y la redimensiona.
+
+    Las fotos de celular guardan la rotación en EXIF (orientation=6/8) y los
+    pipelines de visión no siempre la honran: llegan de lado y el modelo lee
+    mal (fechas y totales incorrectos). Si la imagen no se puede procesar,
+    se devuelven los bytes originales.
+    """
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        img = ImageOps.exif_transpose(img)
+        if max(img.size) > MAX_IMAGE_DIMENSION:
+            img.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION))
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        return buffer.getvalue()
+    except Exception:
+        return image_bytes
 
 
 async def analyze_ticket(
@@ -36,9 +63,10 @@ async def analyze_ticket(
         api_key=settings.openrouter_api_key,
         timeout=HTTP_TIMEOUT_SECONDS,
     )
+    normalized = normalize_image(image_bytes)
     data_url = (
-        f"data:{mime_type};base64,"
-        f"{base64.b64encode(image_bytes).decode('ascii')}"
+        "data:image/jpeg;base64,"
+        f"{base64.b64encode(normalized).decode('ascii')}"
     )
 
     try:

@@ -19,7 +19,7 @@ services:
       DATABASE_URL: postgresql+psycopg://budget:budget@db:5432/budget
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemini-3.6-flash}
     depends_on:
       db:
         condition: service_healthy

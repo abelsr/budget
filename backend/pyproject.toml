@@ -8,6 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.139.2",
     "httpx>=0.28.1",
     "openai>=2.47.0",
+    "pillow>=12.3.0",
     "psycopg[binary]>=3.3.4",
     "pwdlib[argon2]>=0.3.0",
     "pydantic-settings>=2.14.2",

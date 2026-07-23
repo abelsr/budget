@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Escáner de tickets: LLM con visión vía OpenRouter (API compatible
     # con OpenAI). Sin key → endpoint responde 501.
     openrouter_api_key: str | None = None
-    openrouter_model: str = "openai/gpt-4o-mini"
+    openrouter_model: str = "google/gemini-3.6-flash"
 
     cors_origins: list[str] = [
         "http://localhost:5173",
