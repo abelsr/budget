@@ -1,6 +1,6 @@
 # 👤 Cuentas personales vs compartidas
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Baja · **Esfuerzo:** M (1-3 días) · **Dependencias:** 01-alembic (migración real sobre datos existentes)
+**Estado:** ⬜ Pendiente · **Prioridad:** Baja · **Esfuerzo:** M (1-3 días) · **Dependencias:** 01-alembic ✅ (hecho)
 
 ## Por qué
 La decisión original del producto fue "todas las cuentas son del hogar, con trazabilidad de quién registró cada movimiento". Eso funciona para gastos comunes, pero choca con casos reales: la cuenta personal de nómina, una tarjeta que uno no quiere compartir, un ahorro privado. Sin cuentas personales, los usuarios terminan no registrando esos movimientos y la app pierde valor. Es un cambio de modelo, no una feature más.
@@ -38,7 +38,7 @@ La decisión original del producto fue "todas las cuentas son del hogar, con tra
 - Al cambiar una cuenta de compartida a personal (o viceversa): confirmación explicando el efecto en saldos y visibilidad
 
 ### Infra
-- Sin cambios (la migración corre con el entrypoint de Alembic de 01)
+- Sin cambios: la migración corre con el entrypoint de Alembic (01, ya hecho)
 
 ## Criterios de aceptación
 - [ ] La cuenta personal de A es invisible para B en listados, movimientos y saldos

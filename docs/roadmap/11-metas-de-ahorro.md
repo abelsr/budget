@@ -1,6 +1,6 @@
 # 🎯 Metas de ahorro
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Media · **Esfuerzo:** M (1-3 días) · **Dependencias:** Ninguna (la tabla nueva debería entrar vía 01-alembic si ya existe; si no, `create_all` la cubre)
+**Estado:** ⬜ Pendiente · **Prioridad:** Media · **Esfuerzo:** M (1-3 días) · **Dependencias:** 01-alembic ✅ (hecho: la tabla nueva entra por migración)
 
 ## Por qué
 Las familias ahorran para cosas concretas ("vacaciones $30,000 para diciembre", "el enganche del coche") y hoy ese dinero se pierde dentro del saldo de la cuenta de ahorro: no hay visibilidad de cuánto falta ni de si van en ritmo. Una meta con progreso visible convierte el ahorro en algo accionable y motiva a seguir aportando.
@@ -35,7 +35,9 @@ Las familias ahorran para cosas concretas ("vacaciones $30,000 para diciembre", 
 - TanStack Query: invalidar `goals` tras contribute/edit
 
 ### Infra
-- Sin cambios (la tabla nueva la crea `create_all` hoy, o la migración de Alembic si 01 ya está hecho)
+- Sin cambios: la tabla nueva entra por migración de Alembic
+  (`uv run alembic revision --autogenerate`), que el entrypoint aplica al
+  arrancar. Ya no existe `create_all` en producción.
 
 ## Criterios de aceptación
 - [ ] Se puede crear una meta con nombre, monto objetivo y fecha opcional

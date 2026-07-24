@@ -1,6 +1,6 @@
 # 🌐 Apertura multi-familia
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Baja · **Esfuerzo:** L (3+ días) · **Dependencias:** 01-alembic, 15-https-caddy (HTTPS obligatorio para exponer auth a internet)
+**Estado:** ⬜ Pendiente · **Prioridad:** Baja · **Esfuerzo:** L (3+ días) · **Dependencias:** 01-alembic ✅ (hecho), 15-https-caddy (HTTPS obligatorio para exponer auth a internet)
 
 ## Por qué
 Hoy la app sirve a una sola familia por despliegue, con acceso por IP local. Abrir el registro público convierte el proyecto en un producto que cualquier familia puede usar sin que el dev intervenga. Implica endurecer la superficie expuesta a internet: rate limiting, anti-abuso, mínimos legales. Es un cambio de postura de seguridad, no solo un endpoint nuevo.

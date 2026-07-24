@@ -53,8 +53,13 @@ Basado en la skill **Apple Design** (WWDC *Designing Fluid Interfaces* y princip
 ## Roadmap
 
 1. **MVP:** auth + hogares + cuentas + categorías + transacciones + dashboard. ✅ **HECHO** (+ escáner IA, adjuntos, modo oscuro)
-2. **Fase 2:** recurrencia, importación CSV, presupuestos mensuales. ⬜ Siguiente
-3. **Fase 3:** metas de ahorro, cuentas personales (privacidad entre miembros), offline-first con sincronización, apertura multi-familia. ⬜
+2. **Robustez:** migraciones, invitaciones desde la UI, onboarding, PWA, backups. 🚧 **En curso** — hechos Alembic, invitaciones y onboarding; faltan PWA y backups
+3. **Fase 2:** recurrencia, importación CSV, presupuestos mensuales. ⬜
+4. **Fase 3:** metas de ahorro, cuentas personales (privacidad entre miembros), offline-first con sincronización, apertura multi-familia. ⬜
+
+**Siguiente paso concreto:** HTTPS con Caddy ([15](roadmap/15-https-caddy.md)) →
+CI ([16](roadmap/16-ci-github-actions.md)) → recurrentes y presupuestos.
+Detalle y bitácora en [docs/roadmap/](roadmap/README.md).
 
 ## Estructura del repo
 
@@ -112,19 +117,22 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ✅ Secretos en `.env` (raíz y backend/, ignorados por git; plantillas en
   `.env.example`).
 - ✅ Dockerfiles limpios (lock regenerado tras fix de `pyproject.toml`).
+- ✅ **Migraciones con Alembic:** el contenedor corre `alembic upgrade head`
+  antes de uvicorn (`entrypoint.sh` → `app/db_bootstrap.py`); ya no hay
+  `create_all` en producción. El bootstrap incluye un puente temporal que
+  stampea bases creadas con el viejo `create_all`.
 
 ### Pendientes
 
 > Detalle completo en **[docs/roadmap/](roadmap/README.md)** — un archivo por
-> pendiente con porqué, alcance, diseño y criterios de aceptación.
+> pendiente con porqué, alcance, diseño y criterios de aceptación, más la
+> bitácora de lo ya hecho. Cerrados: 01 (Alembic), 02 (invitaciones),
+> 05 (onboarding).
 
 **Inmediato (robustez):**
 
-- ✅ [Alembic](roadmap/01-alembic-migraciones.md): migraciones formales, aplicadas al arrancar el contenedor (2026-07-24).
-- ✅ [Invitaciones end-to-end](roadmap/02-invitaciones-end-to-end.md): generar y compartir link desde Ajustes (2026-07-24).
 - ⬜ [PWA real](roadmap/03-pwa-instalable.md): manifest + service worker (instalable, shell offline).
 - ⬜ [Backups](roadmap/04-backups.md) de Postgres y MinIO.
-- ✅ [Onboarding estilo Plane](roadmap/05-onboarding.md): wizard post-registro (bienvenida → cuentas → invitar → listo) (2026-07-24).
 
 **Fase 2 (features):**
 
@@ -143,6 +151,8 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 
 **Producción:**
 
-- ⬜ [HTTPS con Caddy](roadmap/15-https-caddy.md) + dominio propio.
+- ⬜ [HTTPS con Caddy](roadmap/15-https-caddy.md) + dominio propio. **Siguiente.**
+  Además habilita `navigator.clipboard` en el celular (hoy el link de invitación
+  usa el fallback `execCommand` porque HTTP por IP no es contexto seguro).
 - ⬜ [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + build en cada push.
 - ⬜ [Monitoreo](roadmap/17-monitoreo.md): logs JSON, alertas de caída y disco.

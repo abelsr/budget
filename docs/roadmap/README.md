@@ -4,55 +4,78 @@ Un archivo por pendiente, con su porqué, alcance, diseño propuesto y criterios
 de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 🚧 En progreso y, al terminar, márcalo ✅ con la fecha.
 
+> **Progreso:** 3 de 17 hechos (01, 02, 05) · última actualización 2026-07-24
+
 ## Inmediato — robustez
 
-| # | Documento | Prioridad | Esfuerzo |
-|---|---|---|---|
-| 01 | [Alembic: migraciones](01-alembic-migraciones.md) ✅ | Alta | M |
-| 02 | [Invitaciones end-to-end](02-invitaciones-end-to-end.md) ✅ | Alta | S |
-| 03 | [PWA instalable](03-pwa-instalable.md) | Media | M |
-| 04 | [Backups](04-backups.md) | Media | S |
-| 05 | [Onboarding estilo Plane](05-onboarding.md) ✅ | Alta | M |
+| # | Documento | Estado | Prioridad | Esfuerzo |
+|---|---|---|---|---|
+| 01 | [Alembic: migraciones](01-alembic-migraciones.md) | ✅ 2026-07-24 | Alta | M |
+| 02 | [Invitaciones end-to-end](02-invitaciones-end-to-end.md) | ✅ 2026-07-24 | Alta | S |
+| 03 | [PWA instalable](03-pwa-instalable.md) | ⬜ | Media | M |
+| 04 | [Backups](04-backups.md) | ⬜ | Media | S |
+| 05 | [Onboarding estilo Plane](05-onboarding.md) | ✅ 2026-07-24 | Alta | M |
 
 ## Fase 2 — features
 
-| # | Documento | Prioridad | Esfuerzo |
-|---|---|---|---|
-| 06 | [Transacciones recurrentes](06-transacciones-recurrentes.md) | Alta | M |
-| 07 | [Presupuestos mensuales](07-presupuestos-mensuales.md) | Alta | M |
-| 08 | [Importación CSV](08-importacion-csv.md) | Media | L |
-| 09 | [Filtros y búsqueda](09-filtros-busqueda.md) | Media | S |
-| 10 | [Perfil y cambio de contraseña](10-perfil-y-password.md) | Media | S |
+| # | Documento | Estado | Prioridad | Esfuerzo |
+|---|---|---|---|---|
+| 06 | [Transacciones recurrentes](06-transacciones-recurrentes.md) | ⬜ | Alta | M |
+| 07 | [Presupuestos mensuales](07-presupuestos-mensuales.md) | ⬜ | Alta | M |
+| 08 | [Importación CSV](08-importacion-csv.md) | ⬜ | Media | L |
+| 09 | [Filtros y búsqueda](09-filtros-busqueda.md) | ⬜ | Media | S |
+| 10 | [Perfil y cambio de contraseña](10-perfil-y-password.md) | ⬜ | Media | S |
 
 ## Fase 3 — crecimiento
 
-| # | Documento | Prioridad | Esfuerzo |
-|---|---|---|---|
-| 11 | [Metas de ahorro](11-metas-de-ahorro.md) | Media | M |
-| 12 | [Cuentas personales](12-cuentas-personales.md) | Baja | M |
-| 13 | [Offline-first](13-offline-first.md) | Baja | L |
-| 14 | [Apertura multi-familia](14-multi-familia.md) | Baja | L |
+| # | Documento | Estado | Prioridad | Esfuerzo |
+|---|---|---|---|---|
+| 11 | [Metas de ahorro](11-metas-de-ahorro.md) | ⬜ | Media | M |
+| 12 | [Cuentas personales](12-cuentas-personales.md) | ⬜ | Baja | M |
+| 13 | [Offline-first](13-offline-first.md) | ⬜ | Baja | L |
+| 14 | [Apertura multi-familia](14-multi-familia.md) | ⬜ | Baja | L |
 
 ## Producción
 
-| # | Documento | Prioridad | Esfuerzo |
-|---|---|---|---|
-| 15 | [HTTPS con Caddy](15-https-caddy.md) | Alta | S |
-| 16 | [CI con GitHub Actions](16-ci-github-actions.md) | Media | S |
-| 17 | [Monitoreo](17-monitoreo.md) | Baja | S |
+| # | Documento | Estado | Prioridad | Esfuerzo |
+|---|---|---|---|---|
+| 15 | [HTTPS con Caddy](15-https-caddy.md) | ⬜ | Alta | S |
+| 16 | [CI con GitHub Actions](16-ci-github-actions.md) | ⬜ | Media | S |
+| 17 | [Monitoreo](17-monitoreo.md) | ⬜ | Baja | S |
 
 ## Orden sugerido de ataque
 
-`02 ✅ → 01 ✅ → 05 ✅ → 15 → 06 → 07` (invitaciones y onboarding completan la
-experiencia familiar; Alembic y HTTPS endurecen para producción; recurrentes
-y presupuestos son las features con más impacto diario).
+`02 ✅ → 01 ✅ → 05 ✅ → 15 → 06 → 07`
 
-**Nota de orden:** 01 se adelantó a 05 porque el wizard de onboarding agrega
-una columna a `users` y `create_all` no altera tablas existentes: sin
-migraciones, la base del despliegue actual se habría quedado sin la columna.
-El propio doc 05 ya listaba 01 como dependencia.
+Invitaciones y onboarding completaron la experiencia familiar; Alembic y HTTPS
+endurecen para producción; recurrentes y presupuestos son las features con más
+impacto diario.
 
-01, 02 y 05 quedaron verificados en navegador con el stack en Docker.
+**Siguiente: 15 — HTTPS con Caddy.** Además de cerrar el despliegue, habilita
+`navigator.clipboard` en el celular: hoy el link de invitación depende del
+fallback `document.execCommand('copy')` porque HTTP plano por IP no es contexto
+seguro (ver `lib/clipboard.ts`).
 
-**Siguiente:** 15 — HTTPS con Caddy (además habilita `navigator.clipboard` en el
-celular, hoy dependiente del fallback `execCommand`).
+Después conviene **16 (CI)** antes de acumular más features: ya hay 41 tests que
+nadie corre automáticamente.
+
+## Bitácora
+
+**2026-07-24 — 01, 02 y 05 hechos y verificados en navegador.**
+
+- **02** era casi todo UI: el backend de invitaciones ya existía con tests. Su
+  contenido terminó extraído en `components/InviteLink.tsx` para reusarlo en el
+  wizard, con `InviteSheet` como envoltorio del drawer.
+- **01 se adelantó a 05.** El wizard agrega una columna a `users` y `create_all`
+  no altera tablas existentes: sin migraciones, la base del despliegue se habría
+  quedado sin la columna. El doc 05 ya listaba 01 como dependencia, pero el orden
+  sugerido de este índice no lo reflejaba.
+- Como ya existía una base creada con `create_all`, `app/db_bootstrap.py` la
+  detecta (tablas sin `alembic_version`) y hace `stamp` en vez de re-crearla.
+  **Ese puente es temporal**: se borra cuando no queden bases pre-Alembic.
+- La migración de la columna hace **backfill** de los usuarios existentes; si no,
+  quien ya tenía su hogar armado vería un wizard que no le toca.
+
+**Lo único que quedó sin verificar:** `prefers-reduced-motion` en el wizard (doc
+05). Sale del `MotionConfig reducedMotion="user"` que ya envuelve la app, pero no
+se pudo emular la media query; conviene confirmarlo a mano en el sistema.
