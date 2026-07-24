@@ -9,7 +9,7 @@ de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 | # | Documento | Prioridad | Esfuerzo |
 |---|---|---|---|
 | 01 | [Alembic: migraciones](01-alembic-migraciones.md) | Alta | M |
-| 02 | [Invitaciones end-to-end](02-invitaciones-end-to-end.md) | Alta | S |
+| 02 | [Invitaciones end-to-end](02-invitaciones-end-to-end.md) ✅ | Alta | S |
 | 03 | [PWA instalable](03-pwa-instalable.md) | Media | M |
 | 04 | [Backups](04-backups.md) | Media | S |
 | 05 | [Onboarding estilo Plane](05-onboarding.md) | Alta | M |
@@ -43,6 +43,9 @@ de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 
 ## Orden sugerido de ataque
 
-`02 → 05 → 01 → 15 → 06 → 07` (invitaciones y onboarding completan la
+`02 ✅ → 05 → 01 → 15 → 06 → 07` (invitaciones y onboarding completan la
 experiencia familiar; Alembic y HTTPS endurecen para producción; recurrentes
 y presupuestos son las features con más impacto diario).
+
+**Siguiente:** 05 — onboarding estilo Plane (reusa el sheet de invitación
+construido en 02).

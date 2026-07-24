@@ -96,7 +96,8 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ✅ **Dashboard:** balance total y por cuenta, ingresos vs gastos del mes,
   dona por categoría, movimientos recientes; layout de 2 columnas en desktop.
 - ✅ **Hogar multi-miembro:** aislamiento estricto por `household_id`
-  (verificado), miembros en sidebar/ajustes, invitaciones por API.
+  (verificado), miembros en sidebar/ajustes, e **invitaciones desde la UI**
+  (Ajustes > Hogar → link con copiar/compartir, válido 7 días, un solo uso).
 - ✅ **UX Apple Design:** modo oscuro (claro/oscuro/sistema, anti-FOUC),
   materiales translúcidos, springs, feedback en pointer-down,
   `prefers-reduced-motion`, español.
@@ -117,7 +118,7 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 **Inmediato (robustez):**
 
 - ⬜ [Alembic](roadmap/01-alembic-migraciones.md): migraciones formales (hoy `create_all`).
-- ⬜ [Invitaciones end-to-end](roadmap/02-invitaciones-end-to-end.md): generar y compartir link desde Ajustes.
+- ✅ [Invitaciones end-to-end](roadmap/02-invitaciones-end-to-end.md): generar y compartir link desde Ajustes (2026-07-24).
 - ⬜ [PWA real](roadmap/03-pwa-instalable.md): manifest + service worker (instalable, shell offline).
 - ⬜ [Backups](roadmap/04-backups.md) de Postgres y MinIO.
 - ⬜ [Onboarding estilo Plane](roadmap/05-onboarding.md): wizard post-registro (bienvenida → cuentas → invitar → listo).

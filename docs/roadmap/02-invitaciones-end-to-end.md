@@ -1,6 +1,6 @@
 # ✉️ Invitaciones end-to-end
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Alta · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
+**Estado:** ✅ Implementado (2026-07-24, falta verificación manual en navegador) · **Prioridad:** Alta · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
 
 ## Por qué
 Es una app de finanzas **familiares**, pero hoy no hay forma de sumar miembros desde la UI: el botón "Invitar miembro" en Ajustes está deshabilitado con el texto "Próximamente". Sin embargo la API (`POST /households/me/invitations`) y la pantalla de unirse (`/login?invite=TOKEN`) ya existen y funcionan. Falta solo conectar los puntos en el frontend.
@@ -35,11 +35,36 @@ Es una app de finanzas **familiares**, pero hoy no hay forma de sumar miembros d
 - Sin cambios
 
 ## Criterios de aceptación
+
+> Código completo; los 5 criterios son de recorrido manual y quedan por
+> confirmar con el stack levantado.
+
 - [ ] Desde Ajustes > Hogar se puede generar un link de invitación con un click
 - [ ] El link se copia al portapapeles y, en móvil, se puede compartir por el sheet nativo
 - [ ] Abriendo el link en una ventana de incógnito se puede registrar un segundo usuario
 - [ ] Ajustes > Hogar muestra los 2 miembros tras el registro
 - [ ] Reusar un link ya consumido muestra un error claro al usuario
+
+## Qué se implementó (2026-07-24)
+
+Solo frontend; el backend (`POST /households/me/invitations`, `POST /auth/join`)
+ya estaba completo y con tests.
+
+- `frontend/src/lib/queries.ts`: tipo `Invitation` + hook `useCreateInvitation`.
+- `frontend/src/lib/clipboard.ts`: `copyText()` con fallback a
+  `document.execCommand('copy')` para HTTP plano por IP (sin contexto seguro).
+- `frontend/src/components/InviteSheet.tsx`: bottom sheet que genera el link al
+  abrirse, lo muestra en un campo de solo lectura (select-all al enfocar),
+  botones **Copiar** (feedback "Copiado" 2s), **Compartir** (solo si existe
+  `navigator.share`) y **Generar otro link**; texto de expiración con la fecha
+  real derivada de `expiresAt`; skeleton mientras carga y mensaje de error.
+- `frontend/src/pages/SettingsPage.tsx`: botón "Invitar miembro" habilitado
+  (se quitó `disabled` y "Próximamente") abriendo el sheet.
+
+**Verificado:** `tsc -b && vite build` limpio, `oxlint` sin nuevos warnings, los
+37 tests de pytest siguen pasando.
+**Pendiente:** recorrido manual en navegador (generar link → incógnito →
+registrar segundo usuario → ver 2 miembros → reusar link consumido).
 
 ## Notas
 - El registro vía invitación ya existe en el login (modo "Unirse" leyendo `?invite=TOKEN`); esta tarea es mayormente UI.
