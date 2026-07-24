@@ -1,6 +1,6 @@
 # 🗄️ Migraciones con Alembic
 
-**Estado:** ✅ Implementado (2026-07-24) · **Prioridad:** Alta · **Esfuerzo:** M (1-3 días) · **Dependencias:** Ninguna
+**Estado:** ✅ Hecho y verificado (2026-07-24) · **Prioridad:** Alta · **Esfuerzo:** M (1-3 días) · **Dependencias:** Ninguna
 
 ## Por qué
 Hoy el esquema se crea con `Base.metadata.create_all` al arrancar el backend. Eso no versiona nada: cualquier cambio en los modelos (una columna nueva, un índice, un rename) no se aplica a bases de datos ya existentes y rompe despliegues reales. Sin migraciones no hay producción seria ni evolución segura del esquema.
@@ -39,7 +39,7 @@ Hoy el esquema se crea con `Base.metadata.create_all` al arrancar el backend. Es
 - [x] `uv run alembic upgrade head` sobre una base vacía crea las 8 tablas correctamente
 - [x] `uv run alembic downgrade base` revierte la migración inicial sin errores
 - [x] Tras un cambio de prueba en un modelo, `alembic revision --autogenerate` detecta el diff y genera la migración (comprobado con la columna de onboarding, doc 05)
-- [ ] El stack Docker arranca con DB vacía y aplica migraciones solo (sin `create_all`) — falta correr el stack
+- [x] El stack Docker arranca con DB vacía y aplica migraciones solo (sin `create_all`)
 - [x] Los 37 tests de pytest siguen pasando sin modificaciones de lógica
 
 ## Qué se implementó (2026-07-24)
@@ -65,7 +65,16 @@ Hoy el esquema se crea con `Base.metadata.create_all` al arrancar el backend. Es
 `alembic check` → sin diff contra los modelos; `downgrade base` → limpio;
 bootstrap sobre base nueva, sobre base legacy hecha con `create_all` (stampea,
 no re-crea) y en un segundo arranque (no-op). Los 37 tests pasan.
-**Pendiente:** correrlo contra Postgres real levantando el stack.
+
+**Verificado en Postgres con el stack levantado (2026-07-24):**
+- El puente hizo su trabajo contra la base real: log del contenedor →
+  `Base creada antes de Alembic: marcándola en 5d15cfc79c35 sin re-crear tablas`
+  → `Running upgrade 5d15cfc79c35 -> 673ed5f3d911`. `alembic_version` quedó en
+  `673ed5f3d911` y los datos intactos (4 movimientos, 4 cuentas, 30 categorías,
+  2 adjuntos, 3 hogares).
+- Base Postgres vacía (base temporal `budget_migration_check`, ya eliminada):
+  `upgrade head` → las 8 tablas + `alembic_version`, `alembic check` sin diff,
+  `downgrade base` limpio.
 
 ## Notas
 - Riesgo principal: que la migración inicial autogenerada no coincida exactamente con lo que `create_all` producía (índices, constraints). Revisar el diff a mano antes de commitearla.

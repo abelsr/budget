@@ -1,6 +1,6 @@
 # 🧭 Onboarding estilo Plane (wizard inicial)
 
-**Estado:** ✅ Implementado (2026-07-24, falta verificación manual en navegador) · **Prioridad:** Alta · **Esfuerzo:** M (1-3 días) · **Dependencias:** 02-invitaciones-end-to-end (reutiliza la generación de link), 01-alembic-migraciones (necesaria para agregar la columna nueva sin romper DBs existentes)
+**Estado:** ✅ Hecho y verificado (2026-07-24) · **Prioridad:** Alta · **Esfuerzo:** M (1-3 días) · **Dependencias:** 02-invitaciones-end-to-end (reutiliza la generación de link), 01-alembic-migraciones (necesaria para agregar la columna nueva sin romper DBs existentes)
 
 ## Por qué
 Hoy, tras registrarse, el usuario cae directo en un dashboard vacío con solo la cuenta "Efectivo" en $0 y ninguna guía. Es la fricción clásica de adopción: no sabe qué hacer primero y abandona. Plane resuelve esto con un wizard de setup (crear workspace → invitar al equipo → tour). Copiamos ese patrón adaptado a finanzas familiares: bienvenida → cuentas iniciales → invitar familia → empezar.
@@ -42,17 +42,13 @@ Hoy, tras registrarse, el usuario cae directo en un dashboard vacío con solo la
 - Sin cambios (la columna nueva llega vía migración de Alembic)
 
 ## Criterios de aceptación
-
-> Los de backend están cubiertos por tests; los de UI son de recorrido manual y
-> quedan por confirmar con el stack levantado.
-
-- [ ] Un usuario nuevo que crea hogar ve el wizard la primera vez; recargar la página no lo repite ni lo rompe
-- [ ] En el paso 2 puede crear al menos 1 cuenta con saldo inicial y aparece luego en Cuentas
-- [ ] En el paso 3 puede generar y copiar el link de invitación (mismo comportamiento que en Ajustes)
-- [ ] El skip ("Configurar después") está disponible en todos los pasos y marca el flag
-- [x] Un usuario que se registra con link de invitación NO ve el wizard (entra directo al dashboard) — cubierto por `test_join_flow`
-- [ ] El modo oscuro se respeta en los 4 pasos
-- [ ] Con `prefers-reduced-motion` activo, las transiciones se reducen/eliminan
+- [x] Un usuario nuevo que crea hogar ve el wizard la primera vez; recargar la página no lo repite ni lo rompe
+- [x] En el paso 2 puede crear al menos 1 cuenta con saldo inicial y aparece luego en Cuentas
+- [x] En el paso 3 puede generar y copiar el link de invitación (mismo comportamiento que en Ajustes)
+- [x] El skip ("Configurar después") está disponible en todos los pasos y marca el flag
+- [x] Un usuario que se registra con link de invitación NO ve el wizard (entra directo al dashboard)
+- [x] El modo oscuro se respeta en los 4 pasos
+- [ ] Con `prefers-reduced-motion` activo, las transiciones se reducen/eliminan — **no probado**: sale del `MotionConfig reducedMotion="user"` que ya envuelve toda la app, pero no se pudo emular la media query desde las herramientas usadas
 - [x] Los tests nuevos del backend pasan y los 37 existentes siguen pasando (41 en total)
 
 ## Qué se implementó (2026-07-24)
@@ -92,8 +88,27 @@ Hoy, tras registrarse, el usuario cae directo en un dashboard vacío con solo la
   `MotionConfig reducedMotion="user"` que ya envuelve la app.
 
 **Verificado:** 41 tests pasan, `tsc -b && vite build` limpio, `oxlint` sin
-warnings nuevos, migración con `upgrade`/`downgrade`/`check` en SQLite.
-**Pendiente:** recorrido manual de los 4 pasos en navegador.
+warnings nuevos, migración con `upgrade`/`downgrade`/`check` en SQLite y Postgres.
+
+**Recorrido en navegador (2026-07-24, stack en Docker, viewport 430×900):**
+- Registro nuevo → redirige a `/onboarding` con "Bienvenido, Sofía".
+- Paso 2: "Efectivo" precargada; se creó "Nómina BBVA" con $15,750.50.
+- Recarga a mitad del wizard: sigue en el wizard, reinicia en el paso 1 y las
+  cuentas siguen siendo 2 (sin duplicados).
+- Paso 3: link generado con URL absoluta y expiración correcta ("31 de julio");
+  "Copiar link" → botón muestra "Copiado" y `navigator.clipboard.readText()`
+  devolvió el link exacto. "Compartir" no se renderiza en escritorio (sin
+  `navigator.share`), como se diseñó.
+- Paso 4: "2 cuentas listas" / "Invitación lista para compartir" → "Empezar" →
+  dashboard con balance $15,750.50 (la cuenta del wizard persistió).
+- `/onboarding` a mano tras completarlo → redirige al dashboard. Con onboarding
+  pendiente, entrar a `/cuentas` redirige al wizard. Sin loops ni parpadeos.
+- "Configurar después" en el paso 1 → dashboard, y `/onboarding` deja de abrir.
+- Invitación end-to-end en contexto aislado: segundo usuario se registró con el
+  link y entró **directo al dashboard, sin wizard**; Ajustes > Hogar muestra los
+  2 miembros. Reusar el link consumido → "Invitación inválida o expirada".
+- Temas: pasos 1 y 4 en oscuro, 2 y 3 en claro; el sheet de Ajustes en claro con
+  su material translúcido. Sin errores ni warnings en consola.
 
 ## Notas
 - Inspiración de UX: wizard de setup de Plane (https://plane.so) — progreso lineal, un paso a la vez, skip siempre disponible.

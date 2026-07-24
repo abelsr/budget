@@ -1,7 +1,7 @@
 # Plan: App de Finanzas Familiares
 
 > Documento vivo con las decisiones de diseño y arquitectura acordadas.
-> Última actualización: 2026-07-23
+> Última actualización: 2026-07-24
 
 ## Visión
 
@@ -67,7 +67,7 @@ budget/
 └── frontend/           ← React + Vite PWA (nginx en prod)
 ```
 
-## Estado actual (2026-07-23)
+## Estado actual (2026-07-24)
 
 **Repo publicado en GitHub.** Stack completo corriendo en Docker Compose
 (frontend nginx :8081, backend :8000, Postgres 17, MinIO :9000/:9001) y

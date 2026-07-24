@@ -52,5 +52,7 @@ una columna a `users` y `create_all` no altera tablas existentes: sin
 migraciones, la base del despliegue actual se habría quedado sin la columna.
 El propio doc 05 ya listaba 01 como dependencia.
 
-**Siguiente:** 15 — HTTPS con Caddy (además arregla el fallback de portapapeles
-del link de invitación: con HTTPS `navigator.clipboard` funciona en el celular).
+01, 02 y 05 quedaron verificados en navegador con el stack en Docker.
+
+**Siguiente:** 15 — HTTPS con Caddy (además habilita `navigator.clipboard` en el
+celular, hoy dependiente del fallback `execCommand`).

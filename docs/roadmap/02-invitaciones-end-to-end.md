@@ -1,6 +1,6 @@
 # ✉️ Invitaciones end-to-end
 
-**Estado:** ✅ Implementado (2026-07-24, falta verificación manual en navegador) · **Prioridad:** Alta · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
+**Estado:** ✅ Hecho y verificado (2026-07-24) · **Prioridad:** Alta · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
 
 ## Por qué
 Es una app de finanzas **familiares**, pero hoy no hay forma de sumar miembros desde la UI: el botón "Invitar miembro" en Ajustes está deshabilitado con el texto "Próximamente". Sin embargo la API (`POST /households/me/invitations`) y la pantalla de unirse (`/login?invite=TOKEN`) ya existen y funcionan. Falta solo conectar los puntos en el frontend.
@@ -35,15 +35,11 @@ Es una app de finanzas **familiares**, pero hoy no hay forma de sumar miembros d
 - Sin cambios
 
 ## Criterios de aceptación
-
-> Código completo; los 5 criterios son de recorrido manual y quedan por
-> confirmar con el stack levantado.
-
-- [ ] Desde Ajustes > Hogar se puede generar un link de invitación con un click
-- [ ] El link se copia al portapapeles y, en móvil, se puede compartir por el sheet nativo
-- [ ] Abriendo el link en una ventana de incógnito se puede registrar un segundo usuario
-- [ ] Ajustes > Hogar muestra los 2 miembros tras el registro
-- [ ] Reusar un link ya consumido muestra un error claro al usuario
+- [x] Desde Ajustes > Hogar se puede generar un link de invitación con un click
+- [x] El link se copia al portapapeles (en escritorio; el botón Compartir solo aparece si existe `navigator.share`, no verificado en móvil real)
+- [x] Abriendo el link en una ventana de incógnito se puede registrar un segundo usuario
+- [x] Ajustes > Hogar muestra los 2 miembros tras el registro
+- [x] Reusar un link ya consumido muestra un error claro al usuario ("Invitación inválida o expirada")
 
 ## Qué se implementó (2026-07-24)
 
@@ -62,9 +58,13 @@ ya estaba completo y con tests.
   (se quitó `disabled` y "Próximamente") abriendo el sheet.
 
 **Verificado:** `tsc -b && vite build` limpio, `oxlint` sin nuevos warnings, los
-37 tests de pytest siguen pasando.
-**Pendiente:** recorrido manual en navegador (generar link → incógnito →
-registrar segundo usuario → ver 2 miembros → reusar link consumido).
+37 tests de pytest siguen pasando. Recorrido en navegador con el stack en Docker
+(ver detalle en `05-onboarding.md`): link generado desde Ajustes, copiado al
+portapapeles, segundo usuario registrado en contexto aislado, 2 miembros en
+Ajustes y error claro al reusar el link.
+
+**Nota:** en el paso 05 este contenido se extrajo a `components/InviteLink.tsx`
+para reusarlo en el wizard; `InviteSheet` ahora solo lo envuelve en el drawer.
 
 ## Notas
 - El registro vía invitación ya existe en el login (modo "Unirse" leyendo `?invite=TOKEN`); esta tarea es mayormente UI.
