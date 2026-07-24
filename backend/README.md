@@ -13,25 +13,54 @@ uv run fastapi dev          # http://127.0.0.1:8000 (docs en /docs)
 Por defecto usa SQLite (`dev.db`). Para Postgres local, copia `.env.example`
 a `.env` y ajusta `DATABASE_URL`.
 
+## Migraciones (Alembic)
+
+El esquema **no** se crea al arrancar: lo gestiona Alembic. La URL sale de
+`settings.database_url` (o sea `DATABASE_URL`), no de `alembic.ini`.
+
+```bash
+uv run alembic upgrade head                          # poner la base al día
+uv run alembic revision --autogenerate -m "mensaje"  # tras tocar models.py
+uv run alembic check                                 # ¿hay diff sin migrar?
+uv run alembic downgrade -1                          # revertir la última
+uv run alembic history                               # historial
+```
+
+Flujo al cambiar `models.py`: autogenerate → **revisar la migración a mano**
+(autogenerate no detecta renames ni cambios de tipo sutiles, y renderiza los
+`server_default` con el literal del dialecto en uso) → `upgrade head` → commit
+del archivo en `alembic/versions/`.
+
+En Docker el `entrypoint.sh` corre `python -m app.db_bootstrap` antes de
+uvicorn: aplica las migraciones y, si encuentra una base creada con el viejo
+`create_all` (tablas sin `alembic_version`), la marca con `stamp` en la
+migración inicial en vez de re-crear nada. Ese puente es temporal y se puede
+borrar cuando no queden bases pre-Alembic.
+
+Los tests no usan Alembic: crean el esquema con `create_all` sobre SQLite en
+memoria (más rápido y aislado).
+
 ## Tests
 
 ```bash
-uv run pytest               # 26 tests, SQLite en memoria
+uv run pytest               # 37 tests, SQLite en memoria
 ```
 
 ## Docker (stack completo desde la raíz del repo)
 
 ```bash
-docker compose up --build   # frontend :8080, backend :8000, postgres :5432
+docker compose up --build   # frontend :8081, backend :8000, minio :9000/:9001
 ```
 
 ## Estructura
 
 ```
+alembic/               # migraciones (env.py lee Base y DATABASE_URL de la app)
 app/
 ├── main.py            # app factory, CORS, routers
 ├── config.py          # settings vía env (pydantic-settings)
 ├── database.py        # engine, sesión, Base
+├── db_bootstrap.py    # migra al arrancar (+ puente para bases pre-Alembic)
 ├── models.py          # Household, User, Invitation, Account, Category,
 │                      # Transaction, RecurringRule (fase 2, sin endpoints)
 ├── seed.py            # categorías por defecto de cada hogar nuevo
@@ -64,6 +93,4 @@ app/
 
 ## Pendiente (siguientes iteraciones)
 
-- Alembic para migraciones (hoy: `create_all` al arrancar, solo dev)
 - RecurringRule: endpoints de transacciones recurrentes (fase 2)
-- Conectar frontend a `/api` (hoy el frontend usa mocks)

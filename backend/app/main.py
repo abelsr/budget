@@ -12,10 +12,10 @@ from app.api.routes import (
     transactions,
 )
 from app.config import settings
-from app.database import Base, engine
 
-# Dev: crea tablas al arrancar. Alembic llegará en la siguiente iteración.
-Base.metadata.create_all(bind=engine)
+# El esquema lo gestiona Alembic: `python -m app.db_bootstrap` (lo corre el
+# entrypoint del contenedor) o `uv run alembic upgrade head` en local. Los
+# tests siguen usando `create_all` sobre SQLite en memoria (ver conftest).
 
 app = FastAPI(title="Finanzas Familiares API", version="0.1.0")
 

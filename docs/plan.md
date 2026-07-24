@@ -28,7 +28,7 @@ Self-hosted, pero con esquema multi-tenant preparado para crecer a producto mult
 
 | Capa | Tecnología |
 |---|---|
-| Backend | Python 3.14 + uv + **FastAPI**, SQLAlchemy, auth email/contraseña con JWT (Argon2 + PyJWT). Migraciones con Alembic: pendiente (hoy `create_all`) |
+| Backend | Python 3.14 + uv + **FastAPI**, SQLAlchemy, auth email/contraseña con JWT (Argon2 + PyJWT). Migraciones con Alembic |
 | Base de datos | **PostgreSQL**; todas las tablas con `household_id` (multi-tenant desde el día 1) |
 | Storage | **MinIO** (S3) para comprobantes adjuntos |
 | IA | **OpenRouter** (SDK OpenAI async) para el escáner de tickets; modelo configurable, default `google/gemini-3.6-flash` |
@@ -117,7 +117,7 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 
 **Inmediato (robustez):**
 
-- ⬜ [Alembic](roadmap/01-alembic-migraciones.md): migraciones formales (hoy `create_all`).
+- ✅ [Alembic](roadmap/01-alembic-migraciones.md): migraciones formales, aplicadas al arrancar el contenedor (2026-07-24).
 - ✅ [Invitaciones end-to-end](roadmap/02-invitaciones-end-to-end.md): generar y compartir link desde Ajustes (2026-07-24).
 - ⬜ [PWA real](roadmap/03-pwa-instalable.md): manifest + service worker (instalable, shell offline).
 - ⬜ [Backups](roadmap/04-backups.md) de Postgres y MinIO.
