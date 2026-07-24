@@ -57,8 +57,9 @@ Basado en la skill **Apple Design** (WWDC *Designing Fluid Interfaces* y princip
 3. **Fase 2:** recurrencia, importación CSV, presupuestos mensuales. ⬜
 4. **Fase 3:** metas de ahorro, cuentas personales (privacidad entre miembros), offline-first con sincronización, apertura multi-familia. ⬜
 
-**Siguiente paso concreto:** HTTPS con Caddy ([15](roadmap/15-https-caddy.md)) →
-CI ([16](roadmap/16-ci-github-actions.md)) → recurrentes y presupuestos.
+**Siguiente paso concreto:** HTTPS con Caddy ([15](roadmap/15-https-caddy.md),
+bloqueado en elegir dominio propio o Tailscale) → recurrentes y presupuestos.
+CI ([16](roadmap/16-ci-github-actions.md)) ya está escrito.
 Detalle y bitácora en [docs/roadmap/](roadmap/README.md).
 
 ## Estructura del repo
@@ -115,7 +116,9 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ✅ Backend FastAPI multi-tenant (41 tests pytest, SQLite en memoria).
 - ✅ Respuestas camelCase end-to-end; proxy `/api` en Vite (dev) y nginx (prod).
 - ✅ Secretos en `.env` (raíz y backend/, ignorados por git; plantillas en
-  `.env.example`).
+  `.env.example` en ambos).
+- 🚧 CI en GitHub Actions: pytest + lint + build del frontend + `docker compose
+  build`, en push a `main` y en PRs.
 - ✅ Dockerfiles limpios (lock regenerado tras fix de `pyproject.toml`).
 - ✅ **Migraciones con Alembic:** el contenedor corre `alembic upgrade head`
   antes de uvicorn (`entrypoint.sh` → `app/db_bootstrap.py`); ya no hay
@@ -154,5 +157,5 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ⬜ [HTTPS con Caddy](roadmap/15-https-caddy.md) + dominio propio. **Siguiente.**
   Además habilita `navigator.clipboard` en el celular (hoy el link de invitación
   usa el fallback `execCommand` porque HTTP por IP no es contexto seguro).
-- ⬜ [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + build en cada push.
+- 🚧 [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build en cada push y PR; falta el primer run en GitHub.
 - ⬜ [Monitoreo](roadmap/17-monitoreo.md): logs JSON, alertas de caída y disco.

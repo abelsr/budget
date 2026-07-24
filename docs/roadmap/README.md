@@ -4,7 +4,7 @@ Un archivo por pendiente, con su porqué, alcance, diseño propuesto y criterios
 de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 🚧 En progreso y, al terminar, márcalo ✅ con la fecha.
 
-> **Progreso:** 3 de 17 hechos (01, 02, 05) · última actualización 2026-07-24
+> **Progreso:** 3 de 17 hechos (01, 02, 05) · 16 en vuelo · última actualización 2026-07-24
 
 ## Inmediato — robustez
 
@@ -40,7 +40,7 @@ de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 | # | Documento | Estado | Prioridad | Esfuerzo |
 |---|---|---|---|---|
 | 15 | [HTTPS con Caddy](15-https-caddy.md) | ⬜ | Alta | S |
-| 16 | [CI con GitHub Actions](16-ci-github-actions.md) | ⬜ | Media | S |
+| 16 | [CI con GitHub Actions](16-ci-github-actions.md) | 🚧 falta el 1er run | Media | S |
 | 17 | [Monitoreo](17-monitoreo.md) | ⬜ | Baja | S |
 
 ## Orden sugerido de ataque
@@ -51,13 +51,16 @@ Invitaciones y onboarding completaron la experiencia familiar; Alembic y HTTPS
 endurecen para producción; recurrentes y presupuestos son las features con más
 impacto diario.
 
+**16 (CI) se hizo antes que 15** porque HTTPS está esperando una decisión de
+infraestructura (dominio propio vs Tailscale) y CI no dependía de nada.
+
 **Siguiente: 15 — HTTPS con Caddy.** Además de cerrar el despliegue, habilita
 `navigator.clipboard` en el celular: hoy el link de invitación depende del
 fallback `document.execCommand('copy')` porque HTTP plano por IP no es contexto
-seguro (ver `lib/clipboard.ts`).
-
-Después conviene **16 (CI)** antes de acumular más features: ya hay 41 tests que
-nadie corre automáticamente.
+seguro (ver `lib/clipboard.ts`). **Bloqueado en una decisión:** dominio propio
+con Let's Encrypt (requiere DNS + puertos 80/443 abiertos, imposible tras CGNAT)
+o Tailscale con `tailscale cert` (nada expuesto, ninguno de los dos está
+instalado en el host hoy).
 
 ## Bitácora
 
@@ -79,3 +82,11 @@ nadie corre automáticamente.
 **Lo único que quedó sin verificar:** `prefers-reduced-motion` en el wizard (doc
 05). Sale del `MotionConfig reducedMotion="user"` que ya envuelve la app, pero no
 se pudo emular la media query; conviene confirmarlo a mano en el sistema.
+
+**2026-07-24 (cont.) — 16 (CI) implementado, esperando el primer run.**
+
+- Aparecieron dos huecos al escribir el README: no había README en la raíz ni
+  `.env.example` en la raíz (y `plan.md` afirmaba que sí). Ambos creados.
+- `backend/.env` tiene un `JWT_SECRET` de 20 caracteres: es el origen del
+  `InsecureKeyLengthWarning` en los tests. Solo afecta al dev local (Docker usa
+  el de la raíz, de 41), y endurecerlo entra en el alcance de **15**.

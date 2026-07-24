@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un push nuevo cancela el run anterior de la misma rama: no tiene sentido
+# esperar resultados de un commit ya reemplazado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      # --locked falla si uv.lock no corresponde a pyproject.toml. Ya pasó una
+      # vez en este repo (lock desincronizado tras tocar pyproject), así que el
+      # CI lo vigila.
+      - name: Instalar dependencias
+        run: uv sync --locked
+
+      - name: Tests
+        run: uv run pytest -q
+
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # `npm run build` es `tsc -b && vite build`: el typecheck es el gate real
+      # del frontend mientras no haya tests.
+      - name: Typecheck y build
+        run: npm run build
+
+  docker:
+    name: Imágenes Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Valida que los Dockerfiles siguen construyendo (sin push). Cubre cosas
+      # que los otros jobs no ven: el lock congelado del backend, el entrypoint
+      # de migraciones y el build de nginx.
+      - name: Construir backend y frontend
+        run: docker compose build
