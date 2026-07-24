@@ -113,6 +113,8 @@ def test_join_flow(client, session: Session):
 
     user = session.scalar(select(User).where(User.email == "bob@example.com"))
     assert user.household_id == me["householdId"]
+    # Quien entra por invitación no pasa por el wizard: el hogar ya está listo
+    assert user.onboarding_completed_at is not None
 
     # Reintentar con el mismo token → 410 (ya usada)
     resp = client.post(
@@ -138,3 +140,54 @@ def test_join_flow(client, session: Session):
         },
     )
     assert resp.status_code == 404
+
+
+def _headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_register_leaves_onboarding_pending(client):
+    token = _register(client).json()["accessToken"]
+    resp = client.get("/auth/me", headers=_headers(token))
+    assert resp.json()["onboardingCompleted"] is False
+
+
+def test_complete_onboarding_is_idempotent(client, session: Session):
+    token = _register(client).json()["accessToken"]
+
+    resp = client.patch(
+        "/auth/me/onboarding", json={"completed": True}, headers=_headers(token)
+    )
+    assert resp.status_code == 200
+    assert resp.json()["onboardingCompleted"] is True
+
+    user = session.scalar(select(User).where(User.email == "ana@example.com"))
+    first = user.onboarding_completed_at
+    assert first is not None
+
+    # Repetir no mueve la fecha ya guardada
+    resp = client.patch(
+        "/auth/me/onboarding", json={"completed": True}, headers=_headers(token)
+    )
+    assert resp.status_code == 200
+    session.refresh(user)
+    assert user.onboarding_completed_at == first
+
+    # El flag persiste entre peticiones (recargar no repite el wizard)
+    resp = client.get("/auth/me", headers=_headers(token))
+    assert resp.json()["onboardingCompleted"] is True
+
+
+def test_reopen_onboarding(client):
+    token = _register(client).json()["accessToken"]
+    client.patch("/auth/me/onboarding", json={"completed": True}, headers=_headers(token))
+
+    resp = client.patch(
+        "/auth/me/onboarding", json={"completed": False}, headers=_headers(token)
+    )
+    assert resp.status_code == 200
+    assert resp.json()["onboardingCompleted"] is False
+
+
+def test_onboarding_requires_token(client):
+    assert client.patch("/auth/me/onboarding", json={"completed": True}).status_code == 401

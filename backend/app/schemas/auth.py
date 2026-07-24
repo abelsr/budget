@@ -47,3 +47,9 @@ class UserResponse(_CamelModel):
     email: str
     name: str
     household_id: str | None
+    #: False → el frontend manda al wizard de `/onboarding`.
+    onboarding_completed: bool
+
+
+class OnboardingRequest(_CamelModel):
+    completed: bool = True

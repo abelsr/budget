@@ -10,6 +10,7 @@ from app.models import Account, Category, Household, Invitation, User
 from app.schemas.auth import (
     JoinRequest,
     LoginRequest,
+    OnboardingRequest,
     RegisterRequest,
     TokenResponse,
     UserResponse,
@@ -63,14 +64,36 @@ def login(db: DbDep, body: Annotated[LoginRequest, Body()]):
     return TokenResponse(access_token=create_access_token(user.id))
 
 
+def _user_response(user: User) -> UserResponse:
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        household_id=user.household_id,
+        onboarding_completed=user.onboarding_completed_at is not None,
+    )
+
+
 @router.get("/me", response_model=UserResponse)
 def me(current_user: CurrentUserDep):
-    return UserResponse(
-        id=current_user.id,
-        email=current_user.email,
-        name=current_user.name,
-        household_id=current_user.household_id,
-    )
+    return _user_response(current_user)
+
+
+@router.patch("/me/onboarding", response_model=UserResponse)
+def set_onboarding(
+    db: DbDep,
+    current_user: CurrentUserDep,
+    body: Annotated[OnboardingRequest, Body()],
+):
+    """Marca el wizard inicial como completado (o lo reabre con `completed:
+    false`). Idempotente: repetir la llamada no mueve la fecha ya guardada."""
+    if body.completed:
+        if current_user.onboarding_completed_at is None:
+            current_user.onboarding_completed_at = _now()
+    else:
+        current_user.onboarding_completed_at = None
+    db.commit()
+    return _user_response(current_user)
 
 
 @router.post("/join", status_code=201, response_model=TokenResponse)
@@ -91,6 +114,8 @@ def join(db: DbDep, body: Annotated[JoinRequest, Body()]):
         hashed_password=hash_password(body.password),
         name=body.name,
         household_id=invitation.household_id,
+        # El hogar ya está configurado por quien invitó: sin wizard.
+        onboarding_completed_at=now,
     )
     db.add(user)
     invitation.used_at = now

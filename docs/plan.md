@@ -35,7 +35,7 @@ Self-hosted, pero con esquema multi-tenant preparado para crecer a producto mult
 | Frontend | **React + Vite** (TypeScript), Tailwind CSS + shadcn/ui, TanStack Query, Recharts, Motion (springs) |
 | Plataforma | **Web responsive / PWA** (un solo codebase para móvil y escritorio) |
 | Despliegue | **Docker Compose**: nginx (build estático) + FastAPI + PostgreSQL + MinIO; HTTPS con Caddy/reverse proxy (pendiente) |
-| Calidad | pytest para el backend (37 tests); frontend validado manualmente |
+| Calidad | pytest para el backend (41 tests); frontend validado manualmente |
 
 ## Lenguaje de diseño (frontend)
 
@@ -98,13 +98,16 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ✅ **Hogar multi-miembro:** aislamiento estricto por `household_id`
   (verificado), miembros en sidebar/ajustes, e **invitaciones desde la UI**
   (Ajustes > Hogar → link con copiar/compartir, válido 7 días, un solo uso).
+- ✅ **Onboarding:** wizard de 4 pasos tras registrarse (bienvenida → cuentas
+  → invitar familia → listo), con skip siempre disponible; quien entra por
+  invitación no lo ve.
 - ✅ **UX Apple Design:** modo oscuro (claro/oscuro/sistema, anti-FOUC),
   materiales translúcidos, springs, feedback en pointer-down,
   `prefers-reduced-motion`, español.
 
 **Infraestructura:**
 
-- ✅ Backend FastAPI multi-tenant (37 tests pytest, SQLite en memoria).
+- ✅ Backend FastAPI multi-tenant (41 tests pytest, SQLite en memoria).
 - ✅ Respuestas camelCase end-to-end; proxy `/api` en Vite (dev) y nginx (prod).
 - ✅ Secretos en `.env` (raíz y backend/, ignorados por git; plantillas en
   `.env.example`).
@@ -121,7 +124,7 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ✅ [Invitaciones end-to-end](roadmap/02-invitaciones-end-to-end.md): generar y compartir link desde Ajustes (2026-07-24).
 - ⬜ [PWA real](roadmap/03-pwa-instalable.md): manifest + service worker (instalable, shell offline).
 - ⬜ [Backups](roadmap/04-backups.md) de Postgres y MinIO.
-- ⬜ [Onboarding estilo Plane](roadmap/05-onboarding.md): wizard post-registro (bienvenida → cuentas → invitar → listo).
+- ✅ [Onboarding estilo Plane](roadmap/05-onboarding.md): wizard post-registro (bienvenida → cuentas → invitar → listo) (2026-07-24).
 
 **Fase 2 (features):**
 

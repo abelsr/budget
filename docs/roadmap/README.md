@@ -12,7 +12,7 @@ de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 | 02 | [Invitaciones end-to-end](02-invitaciones-end-to-end.md) ✅ | Alta | S |
 | 03 | [PWA instalable](03-pwa-instalable.md) | Media | M |
 | 04 | [Backups](04-backups.md) | Media | S |
-| 05 | [Onboarding estilo Plane](05-onboarding.md) | Alta | M |
+| 05 | [Onboarding estilo Plane](05-onboarding.md) ✅ | Alta | M |
 
 ## Fase 2 — features
 
@@ -43,7 +43,7 @@ de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 
 ## Orden sugerido de ataque
 
-`02 ✅ → 01 ✅ → 05 → 15 → 06 → 07` (invitaciones y onboarding completan la
+`02 ✅ → 01 ✅ → 05 ✅ → 15 → 06 → 07` (invitaciones y onboarding completan la
 experiencia familiar; Alembic y HTTPS endurecen para producción; recurrentes
 y presupuestos son las features con más impacto diario).
 
@@ -52,5 +52,5 @@ una columna a `users` y `create_all` no altera tablas existentes: sin
 migraciones, la base del despliegue actual se habría quedado sin la columna.
 El propio doc 05 ya listaba 01 como dependencia.
 
-**Siguiente:** 05 — onboarding estilo Plane (reusa el sheet de invitación
-construido en 02).
+**Siguiente:** 15 — HTTPS con Caddy (además arregla el fallback de portapapeles
+del link de invitación: con HTTPS `navigator.clipboard` funciona en el celular).

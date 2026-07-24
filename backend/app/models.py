@@ -35,6 +35,12 @@ class User(Base):
         ForeignKey("households.id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # NULL = el wizard inicial está pendiente. Vive en User (no en Household)
+    # porque es una experiencia de quien se registra creando hogar nuevo; quien
+    # entra por invitación se marca como completado al registrarse.
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
 
     household: Mapped[Household | None] = relationship(back_populates="members")
 

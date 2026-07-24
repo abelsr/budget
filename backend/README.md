@@ -80,8 +80,9 @@ app/
 |---|---|---|
 | POST | `/auth/register` | Crea usuario + hogar (siembra categorías default) |
 | POST | `/auth/login` | Login email+password → JWT |
-| GET | `/auth/me` | Usuario actual |
-| POST | `/auth/join` | Registro con token de invitación |
+| GET | `/auth/me` | Usuario actual (incluye `onboardingCompleted`) |
+| PATCH | `/auth/me/onboarding` | Marca/reabre el wizard inicial (idempotente) |
+| POST | `/auth/join` | Registro con token de invitación (sin wizard) |
 | GET | `/households/me` | Hogar actual |
 | GET | `/households/me/members` | Miembros del hogar |
 | POST | `/households/me/invitations` | Crea invitación (7 días) |

@@ -9,8 +9,16 @@ import { AccountsPage } from "@/pages/AccountsPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { CategoriesPage } from "@/pages/CategoriesPage"
 import { LoginPage } from "@/pages/LoginPage"
+import { OnboardingPage } from "@/pages/OnboardingPage"
 
-/** Rutas que requieren sesión; redirige a /login recordando el destino. */
+const ONBOARDING_PATH = "/onboarding"
+
+/**
+ * Rutas que requieren sesión; redirige a /login recordando el destino.
+ * Además encamina el wizard inicial: sin onboarding completado, todo lleva a
+ * `/onboarding`; ya completado, `/onboarding` deja de existir. Ninguna decisión
+ * se toma antes de que `/auth/me` resuelva, así no hay loops ni parpadeos.
+ */
 function RequireAuth() {
   const { session, isLoading } = useAuth()
   const location = useLocation()
@@ -20,6 +28,13 @@ function RequireAuth() {
   }
   if (!session) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+  const onOnboarding = location.pathname === ONBOARDING_PATH
+  if (!session.onboardingCompleted && !onOnboarding) {
+    return <Navigate to={ONBOARDING_PATH} replace />
+  }
+  if (session.onboardingCompleted && onOnboarding) {
+    return <Navigate to="/" replace />
   }
   return <Outlet />
 }
@@ -50,6 +65,8 @@ function App() {
             }
           />
           <Route element={<RequireAuth />}>
+            {/* Fuera del AppShell: el wizard ocupa la pantalla completa */}
+            <Route path="onboarding" element={<OnboardingPage />} />
             <Route element={<AppShell />}>
               <Route index element={<DashboardPage />} />
               <Route path="transacciones" element={<TransactionsPage />} />

@@ -24,6 +24,8 @@ export interface Session {
   email: string
   name: string
   householdId: string | null
+  /** false → el wizard de `/onboarding` está pendiente. */
+  onboardingCompleted: boolean
 }
 
 interface TokenResponse {
@@ -48,6 +50,8 @@ interface AuthContextValue {
     password: string,
     name: string,
   ) => Promise<void>
+  /** Marca el wizard inicial como terminado (o saltado). */
+  completeOnboarding: () => Promise<void>
   logout: () => void
 }
 
@@ -134,6 +138,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [authenticate],
   )
 
+  const completeOnboarding = useCallback(async () => {
+    const me = await apiFetch<Session>("/auth/me/onboarding", {
+      method: "PATCH",
+      body: JSON.stringify({ completed: true }),
+    })
+    setSession(me)
+  }, [])
+
   const logout = useCallback(() => {
     setToken(null)
     setSession(null)
@@ -141,7 +153,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, isLoading, login, register, join, logout }}
+      value={{
+        session,
+        isLoading,
+        login,
+        register,
+        join,
+        completeOnboarding,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>
