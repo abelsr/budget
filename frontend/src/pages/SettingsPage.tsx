@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
   ChevronRight,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react"
 import { motion } from "motion/react"
 
+import { InviteSheet } from "@/components/InviteSheet"
 import { useAuth } from "@/lib/auth"
 import { useMembers } from "@/lib/queries"
 import { useTheme, type Theme } from "@/lib/theme"
@@ -28,6 +30,7 @@ export function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { data: members = [] } = useMembers()
   const navigate = useNavigate()
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   function onLogout() {
     logout()
@@ -116,15 +119,14 @@ export function SettingsPage() {
           </div>
         ))}
         <button
-          disabled
-          className="flex w-full items-center gap-3 border-t border-border/60 px-4 py-3 text-left opacity-50"
-          title="Disponible con el backend"
+          onClick={() => setInviteOpen(true)}
+          className="pressable flex w-full items-center gap-3 border-t border-border/60 px-4 py-3 text-left"
         >
-          <span className="flex size-9 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+          <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
             <UserPlus size={16} />
           </span>
           <p className="flex-1 text-[15px] font-medium">Invitar miembro</p>
-          <span className="text-[12px] text-muted-foreground">Próximamente</span>
+          <ChevronRight size={16} className="text-muted-foreground/50" />
         </button>
       </Section>
 
@@ -166,6 +168,8 @@ export function SettingsPage() {
       <p className="text-center text-[12px] text-muted-foreground">
         Finanzas Familiares · v0.1.0 · datos de demostración
       </p>
+
+      <InviteSheet open={inviteOpen} onOpenChange={setInviteOpen} />
     </motion.div>
   )
 }

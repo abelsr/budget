@@ -37,6 +37,13 @@ export interface Household {
   currencyCode: string
 }
 
+export interface Invitation {
+  token: string
+  /** Ruta relativa (`/login?invite=TOKEN`); el link absoluto se arma en la UI. */
+  inviteUrl: string
+  expiresAt: string
+}
+
 /** Respuesta cruda del backend para un miembro (sin initials). */
 interface MemberDto {
   id: string
@@ -99,6 +106,14 @@ export function useHousehold() {
   return useQuery({
     queryKey: keys.household,
     queryFn: () => apiFetch<Household>("/households/me"),
+  })
+}
+
+/** Crea un link de invitación al hogar (válido 7 días, un solo uso). */
+export function useCreateInvitation() {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<Invitation>("/households/me/invitations", { method: "POST" }),
   })
 }
 
