@@ -36,6 +36,55 @@ jobs:
       - name: Tests
         run: uv run pytest -q
 
+  migraciones:
+    name: Migraciones (Postgres real)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    # Los tests del job `backend` corren sobre SQLite y no prueban nada de
+    # Alembic. Aquí sí hay Postgres, la misma versión que en producción.
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: budget
+          POSTGRES_PASSWORD: budget
+          POSTGRES_DB: budget
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U budget"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      # Base de mantenimiento: cada test crea y borra la suya a partir de aquí.
+      MIGRATIONS_TEST_DATABASE_URL: postgresql+psycopg://budget:budget@localhost:5432/postgres
+      # Sin esto, si la variable de arriba faltara los tests se saltarían y el
+      # job quedaría verde sin haber probado nada.
+      MIGRATIONS_TEST_REQUIRED: "1"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Instalar dependencias
+        run: uv sync --locked
+
+      # Cubre: esquema completo sobre base vacía, esquema == modelos
+      # (`alembic check`), reversibilidad, que los datos sobrevivan a un
+      # upgrade, y que el puente pre-Alembic stampee sin re-crear tablas.
+      - name: Tests de migraciones
+        run: uv run pytest tests/test_migrations.py -v
+
   frontend:
     name: Frontend (typecheck + build)
     runs-on: ubuntu-latest

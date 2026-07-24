@@ -8,6 +8,7 @@ El repo ya está en GitHub y tiene 37 tests, pero nada los corre automáticament
 ## Alcance
 **Incluye:**
 - Workflow de GitHub Actions con 2 jobs: backend (uv + pytest) y frontend (node + build)
+- *(añadido sobre el alcance original)* job de migraciones contra Postgres real
 - Cache de dependencias (uv y npm) para runs rápidos
 - Badge de estado en el README
 - Opcional: job que construye ambas imágenes Docker sin push (valida los Dockerfiles)
@@ -15,7 +16,7 @@ El repo ya está en GitHub y tiene 37 tests, pero nada los corre automáticament
 **No incluye:**
 - Deploy automático (CD) al servidor self-hosted
 - Lint/typecheck estricto como gate (puede añadirse después; no bloquear el CI inicial con deuda existente)
-- Tests de integración con Postgres real en CI (los tests actuales corren con SQLite; suficiente por ahora)
+- ~~Tests de integración con Postgres real en CI~~ → **sí se incluyó**, pero solo para migraciones: los tests de negocio siguen en SQLite. Ver abajo.
 - Publicación de imágenes a un registry
 
 ## Diseño propuesto
@@ -57,6 +58,8 @@ El repo ya está en GitHub y tiene 37 tests, pero nada los corre automáticament
   - **docker:** `docker compose build`, que cubre lo que los otros jobs no ven
     (el `--frozen` del Dockerfile, el entrypoint de migraciones, el build nginx).
     Quedó bloqueante; si molesta el tiempo, limitarlo a PRs.
+  - **migraciones:** servicio `postgres:17-alpine` (la misma versión que
+    producción) + `pytest tests/test_migrations.py`. Ver la sección siguiente.
 - **Lint activado como gate:** `oxlint` sale con código 0 (sus 4 avisos son
   warnings), así que entra sin generar ruido rojo. Ruff no se agregó: no es
   dependencia del proyecto y el doc lo dejaba opcional.
@@ -82,3 +85,48 @@ para merges a `main` (configuración web, un clic).
 - El job de docker build puede tardar varios minutos (imágenes de Python + node); si resulta molesto, limitarlo a PRs y no a cada push.
 - No meter secretos en CI: este workflow no necesita ninguno (no hay deploy ni registry).
 - Referencia: https://docs.astral.sh/uv/guides/integration/github/
+
+## Verificación de migraciones (añadido el 2026-07-24)
+
+El job `docker` construye la imagen pero nunca corría una migración: el riesgo
+real —romper la base al desplegar— quedaba sin cubrir. `tests/test_migrations.py`
+lo cierra con 8 tests contra Postgres real:
+
+| Test | Qué protege |
+|---|---|
+| `upgrade_head_crea_el_esquema_completo` | Base vacía → las 8 tablas + `alembic_version` en head |
+| `esquema_migrado_coincide_con_los_modelos` | `alembic check`: tocar `models.py` sin generar la migración falla el CI |
+| `downgrade_base_deja_la_base_limpia` | El downgrade no deja tablas huérfanas |
+| `upgrade_downgrade_upgrade_es_reversible` | Un rollback en producción no es un viaje sin retorno |
+| `los_datos_sobreviven_a_las_migraciones` | Datos insertados en la revisión inicial siguen ahí en head, con el backfill del flag aplicado |
+| `puente_pre_alembic_no_recrea_ni_borra_nada` | El bootstrap stampea y migra sin destruir la base del despliegue viejo |
+| `bootstrap_es_idempotente` | Cada arranque del contenedor lo ejecuta: dos veces no rompe nada |
+| `base_vacia_no_se_confunde_con_pre_alembic` | Una base nueva no dispara el puente |
+
+Detalles de diseño:
+
+- **Aislamiento:** cada test crea su propia base (`CREATE DATABASE`) y la borra
+  al terminar. La URL de la variable es solo la base de mantenimiento; los tests
+  nunca escriben en ella.
+- **Se saltan sin Postgres**, así que `uv run pytest` en local sigue siendo
+  rápido y offline (41 pasan, 8 se saltan). Para correrlos:
+  ```bash
+  docker run --rm -d --name pg-migtest -p 55432:5432 \
+    -e POSTGRES_USER=budget -e POSTGRES_PASSWORD=budget -e POSTGRES_DB=budget postgres:17-alpine
+  MIGRATIONS_TEST_DATABASE_URL=postgresql+psycopg://budget:budget@localhost:55432/postgres \
+    uv run pytest tests/test_migrations.py
+  ```
+  (el Postgres del compose no publica el 5432 al host, de ahí el contenedor aparte)
+- **`MIGRATIONS_TEST_REQUIRED=1` en el job:** sin eso, si el servicio de Postgres
+  no llegara, los 8 tests se saltarían y el job quedaría **verde sin haber
+  probado nada**. Con la variable, la falta de base revienta al recolectar.
+- Para hacerlo posible: `alembic/env.py` ahora acepta `sqlalchemy.url` inyectada
+  por Config (antes solo leía `settings`), y `db_bootstrap.main()` recibe una URL
+  opcional. El entrypoint del contenedor no cambia de comportamiento.
+
+**Probado que los gates atrapan de verdad, no solo que pasan en verde:**
+
+- Columna `telefono` agregada a `User` sin migración → falla con el diff exacto:
+  `New upgrade operations detected: [('add_column', ..., 'users', Column('telefono'...))]`.
+- Migración destructiva (`DELETE FROM users`) encadenada tras head → la atrapan
+  dos tests distintos (`los_datos_sobreviven` y `puente_pre_alembic`).

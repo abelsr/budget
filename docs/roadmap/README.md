@@ -40,7 +40,7 @@ de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 | # | Documento | Estado | Prioridad | Esfuerzo |
 |---|---|---|---|---|
 | 15 | [HTTPS con Caddy](15-https-caddy.md) | ⬜ | Alta | S |
-| 16 | [CI con GitHub Actions](16-ci-github-actions.md) | 🚧 falta el 1er run | Media | S |
+| 16 | [CI con GitHub Actions](16-ci-github-actions.md) | 🚧 falta el 1er run | Media | M |
 | 17 | [Monitoreo](17-monitoreo.md) | ⬜ | Baja | S |
 
 ## Orden sugerido de ataque
@@ -90,3 +90,8 @@ se pudo emular la media query; conviene confirmarlo a mano en el sistema.
 - `backend/.env` tiene un `JWT_SECRET` de 20 caracteres: es el origen del
   `InsecureKeyLengthWarning` en los tests. Solo afecta al dev local (Docker usa
   el de la raíz, de 41), y endurecerlo entra en el alcance de **15**.
+- Se añadió al CI un **job de migraciones contra Postgres real** (8 tests) que
+  no estaba en el alcance del doc 16: el job de docker construía la imagen pero
+  nadie corría una migración, y ese es justo el riesgo de romper la base al
+  desplegar. Incluye que los datos sobrevivan al upgrade y que el puente
+  pre-Alembic no re-cree tablas. Por eso 16 pasó de esfuerzo S a M.

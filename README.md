@@ -53,9 +53,19 @@ cd backend  && uv run pytest      # 41 tests (SQLite en memoria)
 cd frontend && npm run build      # tsc -b + vite build
 ```
 
-Cada push a `main` y cada pull request corre lo mismo en GitHub Actions, más un
-`docker compose build` que valida los Dockerfiles. Ver
-[.github/workflows/ci.yml](.github/workflows/ci.yml).
+Los tests de migraciones necesitan Postgres y se saltan sin él:
+
+```bash
+docker run --rm -d --name pg-migtest -p 55432:5432 \
+  -e POSTGRES_USER=budget -e POSTGRES_PASSWORD=budget -e POSTGRES_DB=budget postgres:17-alpine
+cd backend && MIGRATIONS_TEST_DATABASE_URL=postgresql+psycopg://budget:budget@localhost:55432/postgres \
+  uv run pytest tests/test_migrations.py
+```
+
+Cada push a `main` y cada pull request corre todo en GitHub Actions, en 4 jobs:
+tests del backend, typecheck + build del frontend, `docker compose build` y
+migraciones contra Postgres real (esquema == modelos, reversibilidad, y que los
+datos sobrevivan al upgrade). Ver [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## Documentación
 

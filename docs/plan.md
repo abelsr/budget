@@ -35,7 +35,7 @@ Self-hosted, pero con esquema multi-tenant preparado para crecer a producto mult
 | Frontend | **React + Vite** (TypeScript), Tailwind CSS + shadcn/ui, TanStack Query, Recharts, Motion (springs) |
 | Plataforma | **Web responsive / PWA** (un solo codebase para móvil y escritorio) |
 | Despliegue | **Docker Compose**: nginx (build estático) + FastAPI + PostgreSQL + MinIO; HTTPS con Caddy/reverse proxy (pendiente) |
-| Calidad | pytest para el backend (41 tests); frontend validado manualmente |
+| Calidad | pytest para el backend (41 tests + 8 de migraciones contra Postgres); frontend validado con typecheck y build; CI en GitHub Actions |
 
 ## Lenguaje de diseño (frontend)
 
@@ -117,8 +117,10 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ✅ Respuestas camelCase end-to-end; proxy `/api` en Vite (dev) y nginx (prod).
 - ✅ Secretos en `.env` (raíz y backend/, ignorados por git; plantillas en
   `.env.example` en ambos).
-- 🚧 CI en GitHub Actions: pytest + lint + build del frontend + `docker compose
-  build`, en push a `main` y en PRs.
+- 🚧 CI en GitHub Actions (4 jobs): pytest, lint + build del frontend,
+  `docker compose build` y **migraciones contra Postgres 17 real** (esquema ==
+  modelos, reversibilidad, que los datos sobrevivan al upgrade y que el puente
+  pre-Alembic no re-cree tablas).
 - ✅ Dockerfiles limpios (lock regenerado tras fix de `pyproject.toml`).
 - ✅ **Migraciones con Alembic:** el contenedor corre `alembic upgrade head`
   antes de uvicorn (`entrypoint.sh` → `app/db_bootstrap.py`); ya no hay
@@ -157,5 +159,5 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ⬜ [HTTPS con Caddy](roadmap/15-https-caddy.md) + dominio propio. **Siguiente.**
   Además habilita `navigator.clipboard` en el celular (hoy el link de invitación
   usa el fallback `execCommand` porque HTTP por IP no es contexto seguro).
-- 🚧 [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build en cada push y PR; falta el primer run en GitHub.
+- 🚧 [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build + **migraciones contra Postgres real** en cada push y PR; falta el primer run en GitHub.
 - ⬜ [Monitoreo](roadmap/17-monitoreo.md): logs JSON, alertas de caída y disco.
