@@ -1,36 +1,36 @@
-# 🔒 HTTPS con Caddy
+# 🔒 HTTPS with Caddy
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Alta · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna (desbloquea 03-pwa en producción y 14-multi-familia)
+**Status:** ⬜ Pending · **Priority:** High · **Effort:** S (<1 day) · **Dependencies:** None (unblocks 03-pwa in production and 14-multi-familia)
 
-## Por qué
-El acceso actual es por IP local en HTTP plano: credenciales JWT y datos financieros viajan sin cifrar, y los service workers (PWA) exigen contexto seguro. Además, cualquier apertura futura a internet (multi-familia, monitoreo externo) requiere TLS. Es la pieza de infraestructura con mejor relación esfuerzo/impacto de todo el roadmap.
+## Why
+Current access is over a local IP on plain HTTP: JWT credentials and financial data travel unencrypted, and service workers (PWA) require a secure context. Also, any future opening to the internet (multi-family, external monitoring) requires TLS. This is the infrastructure piece with the best effort/impact ratio in the whole roadmap.
 
-## Alcance
-**Incluye:**
-- Caddy como reverse proxy delante del compose con certificados automáticos de Let's Encrypt
-- Redirección 80→443 y headers de seguridad (HSTS, X-Content-Type-Options, etc.)
-- Ruta alternativa documentada para uso LAN sin dominio público: Tailscale (HTTPS en la tailnet) o mkcert (CA local)
-- Endurecer secretos: `JWT_SECRET` de al menos 32 bytes aleatorios
-- Actualizar CORS del backend al dominio real
+## Scope
+**Includes:**
+- Caddy as a reverse proxy in front of the compose stack with automatic Let's Encrypt certificates
+- 80→443 redirect and security headers (HSTS, X-Content-Type-Options, etc.)
+- Documented alternative route for LAN use without a public domain: Tailscale (HTTPS on the tailnet) or mkcert (local CA)
+- Harden secrets: `JWT_SECRET` of at least 32 random bytes
+- Update backend CORS to the real domain
 
-**No incluye:**
-- Autenticación a nivel de proxy (Caddy/basic-auth delante de la app)
-- Rotación automática de secretos ni gestión con Vault/similares
-- Certificados internos entre servicios del compose (la red Docker interna sigue en HTTP)
+**Excludes:**
+- Proxy-level authentication (Caddy/basic-auth in front of the app)
+- Automatic secret rotation or management with Vault/similar
+- Internal certificates between compose services (the internal Docker network stays on HTTP)
 
-## Diseño propuesto
+## Proposed design
 
 ### Backend
-- `settings.cors_origins`: del valor actual al dominio real (`https://finanzas.dominio.com`)
-- Validar al arranque que `JWT_SECRET` tiene >= 32 bytes; fallar ruidosamente si no (mejor caerse que correr inseguro)
-- Generar el secreto nuevo: `openssl rand -hex 32` → `.env` (invalida los tokens existentes, aceptable: los usuarios re-login)
+- `settings.cors_origins`: from the current value to the real domain (`https://finanzas.dominio.com`)
+- Validate at startup that `JWT_SECRET` has >= 32 bytes; fail loudly if not (better to crash than run insecurely)
+- Generate the new secret: `openssl rand -hex 32` → `.env` (invalidates existing tokens, acceptable: users re-login)
 
 ### Frontend
-- Sin cambios de código; verificar que el build no asume `http://` en ningún lado (el proxy `/api` de nginx lo hace agnóstico)
+- No code changes; verify the build doesn't assume `http://` anywhere (nginx's `/api` proxy makes it agnostic)
 
 ### Infra
-- Servicio `caddy` en `docker-compose.yml` con imagen `caddy:2`, puertos 80/443 publicados, volúmenes `caddy_data` y `caddy_config` (persistencia de certificados)
-- `Caddyfile` mínimo:
+- `caddy` service in `docker-compose.yml` with the `caddy:2` image, ports 80/443 published, `caddy_data` and `caddy_config` volumes (certificate persistence)
+- Minimal `Caddyfile`:
   ```
   finanzas.dominio.com {
       reverse_proxy frontend:80
@@ -43,21 +43,21 @@ El acceso actual es por IP local en HTTP plano: credenciales JWT y datos financi
       }
   }
   ```
-  (el proxy `/api` ya lo maneja nginx del frontend; Caddy solo apunta al frontend)
-- DNS: registro A del dominio apuntando al host; puertos 80/443 abiertos en el router/firewall
-- Ruta LAN documentada en README: opción A) Tailscale en el host + `tailscale cert` para HTTPS en `https://host.tailnet.ts.net`; opción B) mkcert con CA instalada en los dispositivos de la familia; ambas evitan exponer nada a internet
-- Documentar en README: flujo completo con dominio propio y flujo LAN, y cómo verificar la renovación automática
+  (the `/api` proxy is already handled by the frontend's nginx; Caddy only points to the frontend)
+- DNS: an A record for the domain pointing to the host; ports 80/443 open on the router/firewall
+- LAN route documented in the README: option A) Tailscale on the host + `tailscale cert` for HTTPS at `https://host.tailnet.ts.net`; option B) mkcert with the CA installed on the family's devices; both avoid exposing anything to the internet
+- Document in the README: the full flow with a real domain and the LAN flow, and how to verify automatic renewal
 
-## Criterios de aceptación
-- [ ] `https://finanzas.dominio.com` carga con candado válido (certificado Let's Encrypt real)
-- [ ] `http://` redirige a `https://` (301)
-- [ ] La app funciona igual sobre HTTPS: login, escáner IA y subida/descarga de adjuntos incluidos
-- [ ] Los headers de seguridad están presentes (verificable con securityheaders.com o curl)
-- [ ] El backend arranca solo con `JWT_SECRET` >= 32 bytes y rechaza uno débil
-- [ ] README documenta la ruta con dominio y la ruta LAN (Tailscale/mkcert)
+## Acceptance criteria
+- [ ] `https://finanzas.dominio.com` loads with a valid lock icon (real Let's Encrypt certificate)
+- [ ] `http://` redirects to `https://` (301)
+- [ ] The app works the same over HTTPS: login, AI scanner, and attachment upload/download included
+- [ ] Security headers are present (verifiable with securityheaders.com or curl)
+- [ ] The backend only starts with a `JWT_SECRET` >= 32 bytes and rejects a weak one
+- [ ] README documents both the domain route and the LAN route (Tailscale/mkcert)
 
-## Notas
-- Let's Encrypt exige que el dominio resuelva al host y que el puerto 80 sea alcanzable para el challenge HTTP-01; si el host está tras CGNAT (común en ISPs residenciales), la ruta LAN con Tailscale es la única viable — documentarlo claramente para no frustrar al usuario.
-- Riesgo: olvidar persistir `caddy_data` y pegarle al rate limit de Let's Encrypt en cada reinicio del contenedor. El volumen es obligatorio, no opcional.
-- Cambiar `JWT_SECRET` invalida todas las sesiones activas: hacerlo una sola vez y avisar a los usuarios (la familia) de que tendrán que re-login.
-- Referencia: https://caddyserver.com/docs/quick-starts/reverse-proxy
+## Notes
+- Let's Encrypt requires the domain to resolve to the host and port 80 to be reachable for the HTTP-01 challenge; if the host is behind CGNAT (common with residential ISPs), the LAN route with Tailscale is the only viable one — document this clearly to avoid frustrating the user.
+- Risk: forgetting to persist `caddy_data` and hitting Let's Encrypt's rate limit on every container restart. The volume is mandatory, not optional.
+- Changing `JWT_SECRET` invalidates all active sessions: do it only once and let users (the family) know they'll need to re-login.
+- Reference: https://caddyserver.com/docs/quick-starts/reverse-proxy

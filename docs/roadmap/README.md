@@ -1,145 +1,145 @@
-# 🗺️ Roadmap — Finanzas Familiares
+# 🗺️ Roadmap — Family Finances
 
-Un archivo por pendiente, con su porqué, alcance, diseño propuesto y criterios
-de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
-🚧 En progreso y, al terminar, márcalo ✅ con la fecha.
+One file per pending item, with its why, scope, proposed design, and acceptance
+criteria. When tackling one: read it in full, update its **Status** to
+🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progreso:** 5 de 17 hechos (01, 02, 05, 06, 16) · última actualización 2026-07-25
+> **Progress:** 5 of 17 done (01, 02, 05, 06, 16) · last updated 2026-07-25
 
-## Inmediato — robustez
+## Immediate — robustness
 
-| # | Documento | Estado | Prioridad | Esfuerzo |
+| # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
-| 01 | [Alembic: migraciones](01-alembic-migraciones.md) | ✅ 2026-07-24 | Alta | M |
-| 02 | [Invitaciones end-to-end](02-invitaciones-end-to-end.md) | ✅ 2026-07-24 | Alta | S |
-| 03 | [PWA instalable](03-pwa-instalable.md) | ⬜ | Media | M |
-| 04 | [Backups](04-backups.md) | ⬜ | Media | S |
-| 05 | [Onboarding estilo Plane](05-onboarding.md) | ✅ 2026-07-24 | Alta | M |
+| 01 | [Alembic: migrations](01-alembic-migraciones.md) | ✅ 2026-07-24 | High | M |
+| 02 | [Invitations end-to-end](02-invitaciones-end-to-end.md) | ✅ 2026-07-24 | High | S |
+| 03 | [Installable PWA](03-pwa-instalable.md) | ⬜ | Medium | M |
+| 04 | [Backups](04-backups.md) | ⬜ | Medium | S |
+| 05 | [Plane-style onboarding](05-onboarding.md) | ✅ 2026-07-24 | High | M |
 
-## Fase 2 — features
+## Phase 2 — features
 
-| # | Documento | Estado | Prioridad | Esfuerzo |
+| # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
-| 06 | [Transacciones recurrentes](06-transacciones-recurrentes.md) | ✅ 2026-07-25 | Alta | M |
-| 07 | [Presupuestos mensuales](07-presupuestos-mensuales.md) | ⬜ | Alta | M |
-| 08 | [Importación CSV](08-importacion-csv.md) | ⬜ | Media | L |
-| 09 | [Filtros y búsqueda](09-filtros-busqueda.md) | ⬜ | Media | S |
-| 10 | [Perfil y cambio de contraseña](10-perfil-y-password.md) | ⬜ | Media | S |
+| 06 | [Recurring transactions](06-transacciones-recurrentes.md) | ✅ 2026-07-25 | High | M |
+| 07 | [Monthly budgets](07-presupuestos-mensuales.md) | ⬜ | High | M |
+| 08 | [CSV import](08-importacion-csv.md) | ⬜ | Medium | L |
+| 09 | [Filters and search](09-filtros-busqueda.md) | ⬜ | Medium | S |
+| 10 | [Profile and password change](10-perfil-y-password.md) | ⬜ | Medium | S |
 
-## Fase 3 — crecimiento
+## Phase 3 — growth
 
-| # | Documento | Estado | Prioridad | Esfuerzo |
+| # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
-| 11 | [Metas de ahorro](11-metas-de-ahorro.md) | ⬜ | Media | M |
-| 12 | [Cuentas personales](12-cuentas-personales.md) | ⬜ | Baja | M |
-| 13 | [Offline-first](13-offline-first.md) | ⬜ | Baja | L |
-| 14 | [Apertura multi-familia](14-multi-familia.md) | ⬜ | Baja | L |
+| 11 | [Savings goals](11-metas-de-ahorro.md) | ⬜ | Medium | M |
+| 12 | [Personal accounts](12-cuentas-personales.md) | ⬜ | Low | M |
+| 13 | [Offline-first](13-offline-first.md) | ⬜ | Low | L |
+| 14 | [Multi-family opening](14-multi-familia.md) | ⬜ | Low | L |
 
-## Producción
+## Production
 
-| # | Documento | Estado | Prioridad | Esfuerzo |
+| # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
-| 15 | [HTTPS con Caddy](15-https-caddy.md) | ⬜ | Alta | S |
-| 16 | [CI con GitHub Actions](16-ci-github-actions.md) | ✅ 2026-07-24 | Media | M |
-| 17 | [Monitoreo](17-monitoreo.md) | ⬜ | Baja | S |
+| 15 | [HTTPS with Caddy](15-https-caddy.md) | ⬜ | High | S |
+| 16 | [CI with GitHub Actions](16-ci-github-actions.md) | ✅ 2026-07-24 | Medium | M |
+| 17 | [Monitoring](17-monitoreo.md) | ⬜ | Low | S |
 
-## Orden sugerido de ataque
+## Suggested attack order
 
 `02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 → 15 → 04`
 
-Invitaciones y onboarding completaron la experiencia familiar; Alembic y HTTPS
-endurecen para producción; recurrentes y presupuestos son las features con más
-impacto diario.
+Invitations and onboarding completed the family experience; Alembic and HTTPS
+harden it for production; recurring transactions and budgets are the features with the most
+daily impact.
 
-**16 (CI) se hizo antes que 15** porque HTTPS está esperando una decisión de
-infraestructura (dominio propio vs Tailscale) y CI no dependía de nada.
-**06 también se adelantó a 15** por lo mismo: la decisión sigue pendiente y
-recurrentes no dependía de nada.
+**16 (CI) was done before 15** because HTTPS is waiting on an infrastructure
+decision (custom domain vs. Tailscale) and CI didn't depend on anything.
+**06 was also moved ahead of 15** for the same reason: the decision is still
+pending and recurring transactions didn't depend on anything.
 
-**Siguiente: 07 — Presupuestos mensuales.** Es la otra feature de impacto diario
-y se apoya en categorías y transacciones, ya cerradas.
+**Next: 07 — Monthly budgets.** It's the other feature with daily impact
+and it builds on categories and transactions, already closed.
 
-**15 (HTTPS con Caddy) sigue bloqueado en una decisión, con la ruta ya elegida:
-Tailscale** (`tailscale cert` sobre la tailnet, nada expuesto a internet,
-funciona tras CGNAT). Falta instalarlo en el host y en los dispositivos de la
-familia — hoy no hay `tailscale`, `caddy` ni `mkcert` en el host. Además de
-cerrar el despliegue, habilita `navigator.clipboard` en el celular: el link de
-invitación depende del fallback `document.execCommand('copy')` porque HTTP plano
-por IP no es contexto seguro (ver `lib/clipboard.ts`).
+**15 (HTTPS with Caddy) is still blocked on a decision, with the path already
+chosen: Tailscale** (`tailscale cert` over the tailnet, nothing exposed to the internet,
+works behind CGNAT). It still needs to be installed on the host and on the
+family's devices — today there's no `tailscale`, `caddy`, or `mkcert` on the host. Besides
+closing out the deployment, it enables `navigator.clipboard` on mobile: the
+invitation link relies on the `document.execCommand('copy')` fallback because plain HTTP
+over IP is not a secure context (see `lib/clipboard.ts`).
 
-## Bitácora
+## Log
 
-**2026-07-25 — 06 (recurrentes) implementado y verificado contra Postgres real.**
+**2026-07-25 — 06 (recurring) implemented and verified against a real Postgres.**
 
-- **El diseño del doc perdía el día 31.** Decía "31 de enero → 28 de febrero",
-  pero guardar el 28 en `next_run_date` hace que marzo parta de ahí: la renta se
-  movería al 28 para siempre. Hubo que guardar el **día ancla** en la regla.
-  Moraleja: al recortar una fecha, la fecha recortada no puede ser el estado.
-- **La materialización lazy no puede vivir en un solo endpoint.** El doc la
-  ponía en `GET /transactions`, pero el Dashboard dispara cuentas, movimientos y
-  resumen **en paralelo**: el saldo salía desfasado en la primera carga. Está en
-  los tres (y en el listado de reglas). El servicio es idempotente, así que no
-  cuesta nada.
-- **La no-duplicación necesitaba `SELECT ... FOR UPDATE`.** El doc razonaba con
-  peticiones secuenciales ("releer no duplica"), y eso es cierto; el hueco eran
-  las **concurrentes**, que en esta app son la norma, no la excepción — tres por
-  cada carga del Dashboard. Verificado con 8 peticiones simultáneas contra
-  Postgres 17: 4 ocurrencias, cero duplicados.
-- **"Reanudar desde la fecha correcta" no estaba definido.** Se eligió saltar
-  hacia adelante: quien pausó en marzo no quiere cuatro meses de renta de golpe
-  al reanudar en julio.
-- Se agregó un tope: `next_run_date` no puede estar a más de un año atrás. Sin
-  él, una fecha de hace años generaba cientos de transacciones en la primera
-  lectura.
-- Se añadió un test de migraciones para el **backfill de `created_by_id`**: era
-  la única rama que ningún test tocaba y corre en cada despliegue.
-- **Desplegado y verificado en navegador.** Antes de migrar se respaldaron
-  `pgdata` y `minio_data` a `./backups/` (ignorado por git) — la base real no
-  tiene red de seguridad hasta que se haga el doc 04. La migración corrió sola
-  en el arranque del contenedor y los datos quedaron intactos. La verificación
-  usó un **hogar de prueba aparte**, borrado al terminar dejando la base con los
-  mismos conteos que el respaldo. Confirmado en móvil (440px): registro con
-  "Repetir", catch-up de 4 semanas atrasadas al recargar, icono en la lista,
-  badge en el detalle, pausar/reanudar/eliminar, y cero duplicados tras tres
-  cargas (nueve peticiones concurrentes). Sin errores de consola.
-- `recurring_rules` estaba vacía en la base real, como asumía la migración.
+- **The doc's design lost track of the 31st.** It said "January 31 → February 28",
+  but storing 28 in `next_run_date` makes March start from there: rent
+  would move to the 28th forever. The **anchor day** had to be stored in the rule.
+  Moral: when clamping a date, the clamped date can't be the stored state.
+- **Lazy materialization can't live in a single endpoint.** The doc put it
+  in `GET /transactions`, but the Dashboard fires accounts, transactions, and
+  summary **in parallel**: the balance came out stale on first load. It's now in
+  all three (and in the rule listing). The service is idempotent, so it
+  costs nothing.
+- **Avoiding duplication needed `SELECT ... FOR UPDATE`.** The doc reasoned about
+  sequential requests ("re-reading doesn't duplicate"), and that's true; the gap was
+  **concurrent** requests, which in this app are the norm, not the exception — three per
+  Dashboard load. Verified with 8 simultaneous requests against
+  Postgres 17: 4 occurrences, zero duplicates.
+- **"Resuming from the correct date" wasn't defined.** Jumping forward was
+  the choice made: someone who paused in March doesn't want four months of rent
+  all at once when resuming in July.
+- A cap was added: `next_run_date` can't be more than a year in the past. Without
+  it, a date from years ago would generate hundreds of transactions on the first
+  read.
+- A migration test was added for the **`created_by_id` backfill**: it was
+  the only branch no test touched, and it runs on every deployment.
+- **Deployed and verified in the browser.** Before migrating, `pgdata` and
+  `minio_data` were backed up to `./backups/` (ignored by git) — the real database has
+  no safety net until doc 04 is done. The migration ran on its own
+  at container startup and the data remained intact. Verification
+  used a **separate test household**, deleted afterward, leaving the database with the
+  same counts as the backup. Confirmed on mobile (440px): entry with
+  "Repeat", catch-up of 4 overdue weeks on reload, icon in the list,
+  badge in the detail view, pause/resume/delete, and zero duplicates after three
+  loads (nine concurrent requests). No console errors.
+- `recurring_rules` was empty in the real database, as the migration assumed.
 
-**2026-07-24 — 01, 02 y 05 hechos y verificados en navegador.**
+**2026-07-24 — 01, 02, and 05 done and verified in the browser.**
 
-- **02** era casi todo UI: el backend de invitaciones ya existía con tests. Su
-  contenido terminó extraído en `components/InviteLink.tsx` para reusarlo en el
-  wizard, con `InviteSheet` como envoltorio del drawer.
-- **01 se adelantó a 05.** El wizard agrega una columna a `users` y `create_all`
-  no altera tablas existentes: sin migraciones, la base del despliegue se habría
-  quedado sin la columna. El doc 05 ya listaba 01 como dependencia, pero el orden
-  sugerido de este índice no lo reflejaba.
-- Como ya existía una base creada con `create_all`, `app/db_bootstrap.py` la
-  detecta (tablas sin `alembic_version`) y hace `stamp` en vez de re-crearla.
-  **Ese puente es temporal**: se borra cuando no queden bases pre-Alembic.
-- La migración de la columna hace **backfill** de los usuarios existentes; si no,
-  quien ya tenía su hogar armado vería un wizard que no le toca.
+- **02** was almost entirely UI: the invitations backend already existed with tests. Its
+  content ended up extracted into `components/InviteLink.tsx` to reuse in the
+  wizard, with `InviteSheet` as the drawer wrapper.
+- **01 was moved ahead of 05.** The wizard adds a column to `users` and `create_all`
+  doesn't alter existing tables: without migrations, the deployment's database would have
+  ended up without the column. Doc 05 already listed 01 as a dependency, but the suggested
+  order in this index didn't reflect it.
+- Since a database created with `create_all` already existed, `app/db_bootstrap.py`
+  detects it (tables without `alembic_version`) and stamps it instead of re-creating it.
+  **This bridge is temporary**: it will be removed once no pre-Alembic databases remain.
+- The column migration **backfills** existing users; otherwise,
+  anyone who already had their household set up would see a wizard that doesn't apply to them.
 
-**Lo único que quedó sin verificar:** `prefers-reduced-motion` en el wizard (doc
-05). Sale del `MotionConfig reducedMotion="user"` que ya envuelve la app, pero no
-se pudo emular la media query; conviene confirmarlo a mano en el sistema.
+**The only thing left unverified:** `prefers-reduced-motion` in the wizard (doc
+05). It comes from the `MotionConfig reducedMotion="user"` that already wraps the app, but the
+media query couldn't be emulated; it's worth confirming manually on the system.
 
-**2026-07-24 (cont.) — 16 (CI) implementado, esperando el primer run.**
+**2026-07-24 (cont.) — 16 (CI) implemented, awaiting the first run.**
 
-- Aparecieron dos huecos al escribir el README: no había README en la raíz ni
-  `.env.example` en la raíz (y `plan.md` afirmaba que sí). Ambos creados.
-- `backend/.env` tiene un `JWT_SECRET` de 20 caracteres: es el origen del
-  `InsecureKeyLengthWarning` en los tests. Solo afecta al dev local (Docker usa
-  el de la raíz, de 41), y endurecerlo entra en el alcance de **15**.
-- Se añadió al CI un **job de migraciones contra Postgres real** (8 tests) que
-  no estaba en el alcance del doc 16: el job de docker construía la imagen pero
-  nadie corría una migración, y ese es justo el riesgo de romper la base al
-  desplegar. Incluye que los datos sobrevivan al upgrade y que el puente
-  pre-Alembic no re-cree tablas. Por eso 16 pasó de esfuerzo S a M.
-- **El primer run salió rojo:** `setup-uv` no publica tag mayor más allá de
-  `v7`, aunque sus releases van en `v9`. Para pinear una action hay que verificar
-  el **ref del tag**, no el release. Corregido con `@v9.0.0` exacto; el segundo
-  run quedó en verde en los 4 jobs y el badge responde `passing`.
-- **Branch protection activa en `main` (2026-07-25)**, estricta e incluyendo al
-  dueño: los 4 checks son obligatorios y ya no se puede empujar directo a
-  `main`. El flujo pasa a ser rama → PR → merge en verde. Se aplicó con
-  `gh api`, no por la web. Detalle y cómo revertirla en el doc 16.
+- Two gaps showed up while writing the README: there was no README at the root nor
+  a root `.env.example` (and `plan.md` claimed there was). Both were created.
+- `backend/.env` has a 20-character `JWT_SECRET`: that's the source of the
+  `InsecureKeyLengthWarning` in the tests. It only affects local dev (Docker uses
+  the root one, which is 41 characters), and hardening it falls within the scope of **15**.
+- A **migrations-against-real-Postgres job** (8 tests) was added to CI that
+  wasn't in doc 16's scope: the docker job built the image but
+  no one ran a migration, and that's exactly the risk of breaking the database when
+  deploying. It includes verifying data survives the upgrade and that the
+  pre-Alembic bridge doesn't re-create tables. That's why 16 went from effort S to M.
+- **The first run failed:** `setup-uv` doesn't publish a major tag beyond
+  `v7`, even though its releases are up to `v9`. To pin an action you have to check
+  the **tag ref**, not the release. Fixed with the exact `@v9.0.0`; the second
+  run passed all 4 jobs and the badge reads `passing`.
+- **Branch protection active on `main` (2026-07-25)**, strict and including the
+  owner: the 4 checks are required and it's no longer possible to push directly to
+  `main`. The workflow is now branch → PR → merge when green. It was applied with
+  `gh api`, not via the web UI. Details and how to revert it are in doc 16.

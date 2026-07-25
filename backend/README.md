@@ -1,69 +1,70 @@
-# Backend — Finanzas Familiares
+# Backend — Family Finances
 
-API REST en FastAPI + SQLAlchemy (sync) + PostgreSQL (SQLite en dev/tests).
-Multi-tenant: todos los datos se aíslan por `household_id`.
+REST API in FastAPI + SQLAlchemy (sync) + PostgreSQL (SQLite in dev/tests).
+Multi-tenant: all data is isolated by `household_id`.
 
-## Desarrollo local
+## Local development
 
 ```bash
 uv sync
-uv run fastapi dev          # http://127.0.0.1:8000 (docs en /docs)
+uv run fastapi dev          # http://127.0.0.1:8000 (docs at /docs)
 ```
 
-Por defecto usa SQLite (`dev.db`). Para Postgres local, copia `.env.example`
-a `.env` y ajusta `DATABASE_URL`.
+Uses SQLite (`dev.db`) by default. For local Postgres, copy `.env.example`
+to `.env` and adjust `DATABASE_URL`.
 
-## Migraciones (Alembic)
+## Migrations (Alembic)
 
-El esquema **no** se crea al arrancar: lo gestiona Alembic. La URL sale de
-`settings.database_url` (o sea `DATABASE_URL`), no de `alembic.ini`.
+The schema is **not** created on startup: it's managed by Alembic. The URL
+comes from `settings.database_url` (i.e. `DATABASE_URL`), not from
+`alembic.ini`.
 
 ```bash
-uv run alembic upgrade head                          # poner la base al día
-uv run alembic revision --autogenerate -m "mensaje"  # tras tocar models.py
-uv run alembic check                                 # ¿hay diff sin migrar?
-uv run alembic downgrade -1                          # revertir la última
-uv run alembic history                               # historial
+uv run alembic upgrade head                          # bring the database up to date
+uv run alembic revision --autogenerate -m "message"  # after touching models.py
+uv run alembic check                                 # any diff not yet migrated?
+uv run alembic downgrade -1                          # revert the last one
+uv run alembic history                               # history
 ```
 
-Flujo al cambiar `models.py`: autogenerate → **revisar la migración a mano**
-(autogenerate no detecta renames ni cambios de tipo sutiles, y renderiza los
-`server_default` con el literal del dialecto en uso) → `upgrade head` → commit
-del archivo en `alembic/versions/`.
+Workflow when changing `models.py`: autogenerate → **review the migration by
+hand** (autogenerate doesn't detect renames or subtle type changes, and
+renders `server_default` with the literal of the dialect in use) →
+`upgrade head` → commit the file in `alembic/versions/`.
 
-En Docker el `entrypoint.sh` corre `python -m app.db_bootstrap` antes de
-uvicorn: aplica las migraciones y, si encuentra una base creada con el viejo
-`create_all` (tablas sin `alembic_version`), la marca con `stamp` en la
-migración inicial en vez de re-crear nada. Ese puente es temporal y se puede
-borrar cuando no queden bases pre-Alembic.
+In Docker, `entrypoint.sh` runs `python -m app.db_bootstrap` before uvicorn:
+it applies migrations and, if it finds a database created with the old
+`create_all` (tables without `alembic_version`), it `stamp`s it at the
+initial migration instead of recreating anything. That bridge is temporary
+and can be removed once no pre-Alembic databases remain.
 
-Los tests no usan Alembic: crean el esquema con `create_all` sobre SQLite en
-memoria (más rápido y aislado).
+Tests don't use Alembic: they create the schema with `create_all` on an
+in-memory SQLite database (faster and isolated).
 
 ## Tests
 
 ```bash
-uv run pytest               # 65 tests, SQLite en memoria
+uv run pytest               # 65 tests, in-memory SQLite
 ```
 
-## Docker (stack completo desde la raíz del repo)
+## Docker (full stack from the repo root)
 
 ```bash
 docker compose up --build   # frontend :8081, backend :8000, minio :9000/:9001
 ```
 
-## Estructura
+## Structure
 
 ```
-alembic/               # migraciones (env.py lee Base y DATABASE_URL de la app)
+alembic/               # migrations (env.py reads Base and DATABASE_URL from the app)
 app/
 ├── main.py            # app factory, CORS, routers
-├── config.py          # settings vía env (pydantic-settings)
-├── database.py        # engine, sesión, Base
-├── db_bootstrap.py    # migra al arrancar (+ puente para bases pre-Alembic)
+├── config.py          # settings via env (pydantic-settings)
+├── database.py        # engine, session, Base
+├── db_bootstrap.py    # migrates on startup (+ bridge for pre-Alembic databases)
 ├── models.py          # Household, User, Invitation, Account, Category,
 │                      # Transaction, Attachment, RecurringRule
-├── seed.py            # categorías por defecto de cada hogar nuevo
+├── seed.py            # default categories for each new household
 ├── core/security.py   # Argon2 + JWT
 ├── api/
 │   ├── deps.py        # get_db, get_current_user (Bearer JWT)
@@ -71,53 +72,57 @@ app/
 │                      # transactions, recurring, attachments,
 │                      # summary, tickets
 ├── services/
-│   ├── vision.py      # escáner de tickets (OpenRouter vía SDK OpenAI
-│   │                  # async; sin OPENROUTER_API_KEY → 501)
-│   ├── storage.py     # comprobantes en MinIO (S3)
-│   └── recurring.py   # materialización lazy de reglas recurrentes
-└── schemas/           # Pydantic, respuestas camelCase
+│   ├── vision.py      # receipt scanner (OpenRouter via async OpenAI
+│   │                  # SDK; without OPENROUTER_API_KEY → 501)
+│   ├── storage.py     # attachments in MinIO (S3)
+│   └── recurring.py   # lazy materialization of recurring rules
+└── schemas/           # Pydantic, camelCase responses
 ```
 
-## Recurrentes: materialización lazy
+## Recurring transactions: lazy materialization
 
-Las transacciones de una regla recurrente **no** las genera un cron: se
-materializan al leer. Cualquiera de `GET /transactions`, `/accounts`,
-`/summary/month` y `/recurring-rules` llama a
-`services.recurring.materialize_due()` antes de responder, que crea las
-ocurrencias pendientes (`active` y `next_run_date <= hoy`) y avanza la fecha.
+Transactions from a recurring rule are **not** generated by a cron job: they
+are materialized on read. Any of `GET /transactions`, `/accounts`,
+`/summary/month`, and `/recurring-rules` calls
+`services.recurring.materialize_due()` before responding, which creates the
+pending occurrences (`active` and `next_run_date <= today`) and advances the
+date.
 
-Por qué así:
+Why this approach:
 
-- **Sin scheduler.** En self-hosted no hay cron garantizado, y un contenedor
-  apagado tres días no debe perder la renta. El catch-up genera todas las
-  ocurrencias atrasadas de golpe, cada una con su propia fecha.
-- **En cuatro endpoints, no en uno.** El Dashboard dispara cuentas, movimientos
-  y resumen en paralelo: si solo materializara uno, los otros responderían con
-  datos desfasados en la primera carga tras vencer una regla.
-- **`SELECT ... FOR UPDATE` para no duplicar.** La lectura de reglas vencidas
-  toma el lock y la inserción va en la misma transacción de DB. Con peticiones
-  concurrentes la segunda se bloquea; al liberarse, Postgres re-evalúa el `WHERE`
-  contra la fila ya avanzada, la regla no califica y no genera nada. En SQLite
-  (tests) el `FOR UPDATE` no se renderiza, pero ahí no hay concurrencia.
-- **`anchor_day` guarda el día que la regla quiere.** Una regla del 31 se recorta
-  a 28 en febrero pero vuelve al 31 en marzo; sin el ancla se quedaría en 28.
+- **No scheduler.** In self-hosted setups there's no guaranteed cron, and a
+  container that's down for three days shouldn't miss the rent. The catch-up
+  generates all overdue occurrences at once, each with its own date.
+- **On four endpoints, not just one.** The Dashboard fires accounts,
+  transactions, and summary in parallel: if only one materialized, the
+  others would respond with stale data on the first load after a rule comes
+  due.
+- **`SELECT ... FOR UPDATE` to avoid duplicates.** Reading overdue rules
+  takes the lock, and the insert happens in the same DB transaction. With
+  concurrent requests, the second one blocks; once released, Postgres
+  re-evaluates the `WHERE` against the already-advanced row, the rule no
+  longer qualifies, and nothing is generated. In SQLite (tests) `FOR UPDATE`
+  isn't rendered, but there's no concurrency there either.
+- **`anchor_day` stores the day the rule wants.** A rule for the 31st gets
+  clipped to 28 in February but returns to 31 in March; without the anchor
+  it would stay stuck at 28.
 
 ## Endpoints
 
-| Método | Ruta | Descripción |
+| Method | Route | Description |
 |---|---|---|
-| POST | `/auth/register` | Crea usuario + hogar (siembra categorías default) |
-| POST | `/auth/login` | Login email+password → JWT |
-| GET | `/auth/me` | Usuario actual (incluye `onboardingCompleted`) |
-| PATCH | `/auth/me/onboarding` | Marca/reabre el wizard inicial (idempotente) |
-| POST | `/auth/join` | Registro con token de invitación (sin wizard) |
-| GET | `/households/me` | Hogar actual |
-| GET | `/households/me/members` | Miembros del hogar |
-| POST | `/households/me/invitations` | Crea invitación (7 días) |
-| GET/POST/PATCH/DELETE | `/accounts` | CRUD cuentas (balance calculado) |
-| GET/POST/PATCH/DELETE | `/categories` | CRUD categorías |
-| GET/POST/PATCH/DELETE | `/transactions` | CRUD movimientos (`?month=YYYY-MM`). `POST` acepta `repeat: weekly\|monthly` y crea la regla ligada |
-| GET/POST/PATCH/DELETE | `/recurring-rules` | CRUD reglas recurrentes. `PATCH` solo `amount`, `note` y `active`; `DELETE` conserva las transacciones ya generadas |
-| GET | `/summary/month` | Ingresos/gastos/dona del mes |
-| POST/GET/DELETE | `/transactions/{id}/attachments`, `/attachments/{id}` | Comprobantes (máx 10MB) |
-| POST | `/tickets/scan` | Análisis de ticket con IA (multipart) |
+| POST | `/auth/register` | Creates user + household (seeds default categories) |
+| POST | `/auth/login` | Login with email+password → JWT |
+| GET | `/auth/me` | Current user (includes `onboardingCompleted`) |
+| PATCH | `/auth/me/onboarding` | Marks/reopens the initial wizard (idempotent) |
+| POST | `/auth/join` | Registration with invitation token (no wizard) |
+| GET | `/households/me` | Current household |
+| GET | `/households/me/members` | Household members |
+| POST | `/households/me/invitations` | Creates an invitation (7 days) |
+| GET/POST/PATCH/DELETE | `/accounts` | Account CRUD (computed balance) |
+| GET/POST/PATCH/DELETE | `/categories` | Category CRUD |
+| GET/POST/PATCH/DELETE | `/transactions` | Transaction CRUD (`?month=YYYY-MM`). `POST` accepts `repeat: weekly\|monthly` and creates the linked rule |
+| GET/POST/PATCH/DELETE | `/recurring-rules` | Recurring rule CRUD. `PATCH` only `amount`, `note`, and `active`; `DELETE` keeps the transactions already generated |
+| GET | `/summary/month` | Monthly income/expenses/donut chart |
+| POST/GET/DELETE | `/transactions/{id}/attachments`, `/attachments/{id}` | Attachments (max 10MB) |
+| POST | `/tickets/scan` | AI receipt analysis (multipart) |

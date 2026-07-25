@@ -1,72 +1,72 @@
-# ✉️ Invitaciones end-to-end
+# ✉️ Invitations end-to-end
 
-**Estado:** ✅ Hecho y verificado (2026-07-24) · **Prioridad:** Alta · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
+**Status:** ✅ Done and verified (2026-07-24) · **Priority:** High · **Effort:** S (<1 day) · **Dependencies:** None
 
-## Por qué
-Es una app de finanzas **familiares**, pero hoy no hay forma de sumar miembros desde la UI: el botón "Invitar miembro" en Ajustes está deshabilitado con el texto "Próximamente". Sin embargo la API (`POST /households/me/invitations`) y la pantalla de unirse (`/login?invite=TOKEN`) ya existen y funcionan. Falta solo conectar los puntos en el frontend.
+## Why
+This is a **family** finance app, but today there's no way to add members from the UI: the "Invite member" button in Settings is disabled with the text "Coming soon". However the API (`POST /households/me/invitations`) and the join screen (`/login?invite=TOKEN`) already exist and work. All that's missing is connecting the dots on the frontend.
 
-## Alcance
-**Incluye:**
-- Habilitar el botón "Invitar miembro" en Ajustes > Hogar
-- Mostrar el link de invitación completo con botones de copiar y compartir
-- Indicar la expiración del link (7 días)
+## Scope
+**Includes:**
+- Enable the "Invite member" button in Settings > Household
+- Show the full invitation link with copy and share buttons
+- Indicate the link's expiration (7 days)
 
-**No incluye:**
-- Revocar invitaciones activas
-- Roles/permisos por miembro (todos son iguales hoy)
-- Envío del link por email (self-hosted sin SMTP; el usuario comparte el link por su canal)
+**Doesn't include:**
+- Revoking active invitations
+- Roles/permissions per member (everyone is equal today)
+- Sending the link by email (self-hosted without SMTP; the user shares the link through their own channel)
 
-## Diseño propuesto
+## Proposed design
 
 ### Backend
-- Sin cambios obligatorios: `POST /households/me/invitations` ya crea la invitación y devuelve el token
-- *(Opcional)* `GET /households/me/invitations` para listar invitaciones activas (útil para mostrar "links pendientes" en la UI). Si se implementa, marcar expiradas y usadas en la respuesta
+- No mandatory changes: `POST /households/me/invitations` already creates the invitation and returns the token
+- *(Optional)* `GET /households/me/invitations` to list active invitations (useful for showing "pending links" in the UI). If implemented, mark expired and used ones in the response
 
 ### Frontend
-- Ajustes > Hogar: habilitar el botón "Invitar miembro" (quitar estado deshabilitado y texto "Próximamente")
-- Al hacer click: llamar `POST /households/me/invitations`, construir el link completo `https://<host>/login?invite=<TOKEN>` usando `window.location.origin`
-- Mostrar el link en un campo de solo lectura con:
-  - Botón **Copiar** (`navigator.clipboard.writeText`) con feedback visual ("Copiado")
-  - Botón **Compartir** si `navigator.share` existe (móvil); ocultarlo si no
-- Mostrar texto de expiración: "Válido por 7 días"
-- Verificar que el flujo existente de `/login?invite=TOKEN` (modo "Unirse") sigue funcionando sin cambios
+- Settings > Household: enable the "Invite member" button (remove the disabled state and the "Coming soon" text)
+- On click: call `POST /households/me/invitations`, build the full link `https://<host>/login?invite=<TOKEN>` using `window.location.origin`
+- Show the link in a read-only field with:
+  - **Copy** button (`navigator.clipboard.writeText`) with visual feedback ("Copied")
+  - **Share** button if `navigator.share` exists (mobile); hide it otherwise
+- Show expiration text: "Valid for 7 days"
+- Verify that the existing `/login?invite=TOKEN` flow ("Join" mode) still works without changes
 
 ### Infra
-- Sin cambios
+- No changes
 
-## Criterios de aceptación
-- [x] Desde Ajustes > Hogar se puede generar un link de invitación con un click
-- [x] El link se copia al portapapeles (en escritorio; el botón Compartir solo aparece si existe `navigator.share`, no verificado en móvil real)
-- [x] Abriendo el link en una ventana de incógnito se puede registrar un segundo usuario
-- [x] Ajustes > Hogar muestra los 2 miembros tras el registro
-- [x] Reusar un link ya consumido muestra un error claro al usuario ("Invitación inválida o expirada")
+## Acceptance criteria
+- [x] From Settings > Household you can generate an invitation link with one click
+- [x] The link gets copied to the clipboard (on desktop; the Share button only appears if `navigator.share` exists, not verified on a real mobile device)
+- [x] Opening the link in an incognito window lets you register a second user
+- [x] Settings > Household shows the 2 members after registration
+- [x] Reusing an already-consumed link shows the user a clear error ("Invalid or expired invitation")
 
-## Qué se implementó (2026-07-24)
+## What was implemented (2026-07-24)
 
-Solo frontend; el backend (`POST /households/me/invitations`, `POST /auth/join`)
-ya estaba completo y con tests.
+Frontend only; the backend (`POST /households/me/invitations`, `POST /auth/join`)
+was already complete and had tests.
 
-- `frontend/src/lib/queries.ts`: tipo `Invitation` + hook `useCreateInvitation`.
-- `frontend/src/lib/clipboard.ts`: `copyText()` con fallback a
-  `document.execCommand('copy')` para HTTP plano por IP (sin contexto seguro).
-- `frontend/src/components/InviteSheet.tsx`: bottom sheet que genera el link al
-  abrirse, lo muestra en un campo de solo lectura (select-all al enfocar),
-  botones **Copiar** (feedback "Copiado" 2s), **Compartir** (solo si existe
-  `navigator.share`) y **Generar otro link**; texto de expiración con la fecha
-  real derivada de `expiresAt`; skeleton mientras carga y mensaje de error.
-- `frontend/src/pages/SettingsPage.tsx`: botón "Invitar miembro" habilitado
-  (se quitó `disabled` y "Próximamente") abriendo el sheet.
+- `frontend/src/lib/queries.ts`: `Invitation` type + `useCreateInvitation` hook.
+- `frontend/src/lib/clipboard.ts`: `copyText()` with a fallback to
+  `document.execCommand('copy')` for plain HTTP over IP (no secure context).
+- `frontend/src/components/InviteSheet.tsx`: a bottom sheet that generates the link
+  when opened, shows it in a read-only field (select-all on focus),
+  **Copy** button (2s "Copied" feedback), **Share** button (only if
+  `navigator.share` exists), and **Generate another link**; expiration text with the
+  real date derived from `expiresAt`; skeleton while loading and error message.
+- `frontend/src/pages/SettingsPage.tsx`: "Invite member" button enabled
+  (`disabled` and "Coming soon" removed) opening the sheet.
 
-**Verificado:** `tsc -b && vite build` limpio, `oxlint` sin nuevos warnings, los
-37 tests de pytest siguen pasando. Recorrido en navegador con el stack en Docker
-(ver detalle en `05-onboarding.md`): link generado desde Ajustes, copiado al
-portapapeles, segundo usuario registrado en contexto aislado, 2 miembros en
-Ajustes y error claro al reusar el link.
+**Verified:** `tsc -b && vite build` clean, `oxlint` with no new warnings, the
+37 pytest tests still pass. Browser walkthrough with the stack in Docker
+(see detail in `05-onboarding.md`): link generated from Settings, copied to the
+clipboard, second user registered in an isolated context, 2 members shown in
+Settings, and a clear error when reusing the link.
 
-**Nota:** en el paso 05 este contenido se extrajo a `components/InviteLink.tsx`
-para reusarlo en el wizard; `InviteSheet` ahora solo lo envuelve en el drawer.
+**Note:** in step 05 this content was extracted into `components/InviteLink.tsx`
+to reuse it in the wizard; `InviteSheet` now just wraps it in the drawer.
 
-## Notas
-- El registro vía invitación ya existe en el login (modo "Unirse" leyendo `?invite=TOKEN`); esta tarea es mayormente UI.
-- Riesgo menor: `navigator.clipboard` requiere contexto seguro (HTTPS o localhost); en HTTP plano por IP puede fallar. Prever fallback con `document.execCommand('copy')` o selección manual del campo.
-- Esta funcionalidad se reutiliza en el paso 3 del wizard de onboarding (ver `05-onboarding.md`).
+## Notes
+- Registration via invitation already exists on the login screen ("Join" mode reading `?invite=TOKEN`); this task is mostly UI.
+- Minor risk: `navigator.clipboard` requires a secure context (HTTPS or localhost); over plain HTTP by IP it may fail. Provide a fallback with `document.execCommand('copy')` or manual selection of the field.
+- This functionality is reused in step 3 of the onboarding wizard (see `05-onboarding.md`).

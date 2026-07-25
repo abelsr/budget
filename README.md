@@ -1,61 +1,63 @@
-# 💸 Finanzas Familiares
+# 💸 Family Finances
 
 [![CI](https://github.com/abelsr/budget/actions/workflows/ci.yml/badge.svg)](https://github.com/abelsr/budget/actions/workflows/ci.yml)
 
-App web (PWA) self-hosted para que una familia registre y entienda sus gastos e
-ingresos. Cuentas individuales por persona que se unen a un **hogar** por link de
-invitación; todo el hogar comparte cuentas, categorías y movimientos.
+Self-hosted web app (PWA) for a family to track and understand their expenses
+and income. Individual accounts per person that join a **household** via an
+invitation link; the whole household shares accounts, categories, and
+transactions.
 
-- **Registro rápido:** monto, categoría, cuenta y fecha en menos de 10 segundos.
-- **Escáner de tickets con IA:** foto → extracción → revisión editable → gasto.
-- **Movimientos recurrentes:** renta, sueldo o suscripciones se capturan una vez
-  (semanal o mensual) y se generan solos al abrir la app.
-- **Comprobantes adjuntos** por movimiento (MinIO).
-- **Dashboard:** balance por cuenta, ingresos vs gastos del mes, dona por categoría.
-- **Onboarding** guiado al crear el hogar y modo claro/oscuro.
+- **Quick entry:** amount, category, account, and date in under 10 seconds.
+- **AI receipt scanner:** photo → extraction → editable review → expense.
+- **Recurring transactions:** rent, salary, or subscriptions are captured once
+  (weekly or monthly) and generate themselves when the app is opened.
+- **Attachments** per transaction (MinIO).
+- **Dashboard:** balance per account, monthly income vs. expenses, category
+  donut chart.
+- **Guided onboarding** when creating the household, plus light/dark mode.
 
 ## Stack
 
-| Capa | Tecnología |
+| Layer | Technology |
 |---|---|
 | Backend | Python 3.14 + uv, FastAPI, SQLAlchemy, Alembic, JWT (Argon2) |
-| Base de datos | PostgreSQL (multi-tenant por `household_id`) |
-| Storage | MinIO (S3) para comprobantes |
-| IA | OpenRouter (SDK OpenAI async) para el escáner de tickets |
+| Database | PostgreSQL (multi-tenant via `household_id`) |
+| Storage | MinIO (S3) for attachments |
+| AI | OpenRouter (async OpenAI SDK) for the receipt scanner |
 | Frontend | React + Vite (TypeScript), Tailwind, TanStack Query, Recharts, Motion |
-| Despliegue | Docker Compose: nginx + FastAPI + PostgreSQL + MinIO |
+| Deployment | Docker Compose: nginx + FastAPI + PostgreSQL + MinIO |
 
-## Arrancar el stack
+## Starting the stack
 
 ```bash
-cp .env.example .env        # define JWT_SECRET, MinIO y OPENROUTER_API_KEY
+cp .env.example .env        # define JWT_SECRET, MinIO and OPENROUTER_API_KEY
 docker compose up -d --build
 ```
 
 - Frontend: http://localhost:8081
-- API (docs en `/docs`): http://localhost:8000
-- Consola de MinIO: http://localhost:9001
+- API (docs at `/docs`): http://localhost:8000
+- MinIO console: http://localhost:9001
 
-El backend aplica las migraciones de Alembic al arrancar (`entrypoint.sh`), así
-que una base vacía queda lista sola.
+The backend applies Alembic migrations on startup (`entrypoint.sh`), so an
+empty database is ready to go on its own.
 
-## Desarrollo local
+## Local development
 
 ```bash
 cd backend  && uv sync && uv run alembic upgrade head && uv run fastapi dev
 cd frontend && npm install && npm run dev
 ```
 
-El backend usa SQLite (`dev.db`) por defecto; Vite proxifica `/api` al :8000.
+The backend uses SQLite (`dev.db`) by default; Vite proxies `/api` to :8000.
 
-## Tests y CI
+## Tests and CI
 
 ```bash
-cd backend  && uv run pytest      # 65 tests (SQLite en memoria)
+cd backend  && uv run pytest      # 65 tests (in-memory SQLite)
 cd frontend && npm run build      # tsc -b + vite build
 ```
 
-Los tests de migraciones necesitan Postgres y se saltan sin él:
+Migration tests need Postgres and are skipped without it:
 
 ```bash
 docker run --rm -d --name pg-migtest -p 55432:5432 \
@@ -64,13 +66,14 @@ cd backend && MIGRATIONS_TEST_DATABASE_URL=postgresql+psycopg://budget:budget@lo
   uv run pytest tests/test_migrations.py
 ```
 
-Cada push a `main` y cada pull request corre todo en GitHub Actions, en 4 jobs:
-tests del backend, typecheck + build del frontend, `docker compose build` y
-migraciones contra Postgres real (esquema == modelos, reversibilidad, y que los
-datos sobrevivan al upgrade). Ver [.github/workflows/ci.yml](.github/workflows/ci.yml).
+Every push to `main` and every pull request runs everything in GitHub Actions,
+across 4 jobs: backend tests, frontend typecheck + build, `docker compose
+build`, and migrations against real Postgres (schema == models, reversibility,
+and that data survives the upgrade). See
+[.github/workflows/ci.yml](.github/workflows/ci.yml).
 
-## Documentación
+## Documentation
 
-- **[docs/plan.md](docs/plan.md)** — decisiones de producto y arquitectura, estado actual.
-- **[docs/roadmap/](docs/roadmap/README.md)** — un archivo por pendiente con alcance, diseño y criterios de aceptación.
-- **[backend/README.md](backend/README.md)** — endpoints, flujo de migraciones y estructura.
+- **[docs/plan.md](docs/plan.md)** — product and architecture decisions, current status.
+- **[docs/roadmap/](docs/roadmap/README.md)** — one file per pending item with scope, design, and acceptance criteria.
+- **[backend/README.md](backend/README.md)** — endpoints, migration workflow, and structure.
