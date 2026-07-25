@@ -78,9 +78,11 @@ export interface NewTransaction {
 }
 
 /**
- * Plantilla de un movimiento que se repite. El backend materializa las
- * transacciones pendientes al leer, así que `nextRunDate` siempre está en el
- * futuro después de cualquier lectura.
+ * Plantilla de un movimiento que se repite.
+ *
+ * Para reglas activas, el backend materializa las transacciones pendientes al leer,
+ * así que `nextRunDate` queda en el futuro después de cualquier lectura.
+ * En reglas pausadas puede quedar en el pasado hasta reanudarlas.
  */
 export interface RecurringRule {
   id: string
