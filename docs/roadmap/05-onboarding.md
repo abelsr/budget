@@ -67,7 +67,7 @@ Today, after registering, the user lands directly on an empty dashboard with onl
   reopening, and 401 without a token. `test_join_flow` covers the invitation case.
 
 **Frontend**
-- `pages/OnboardingPage.tsx`: 4-step wizard (welcome → accounts → family
+- `frontend/src/pages/OnboardingPage.tsx`: 4-step wizard (welcome → accounts → family
   → done), 4-segment progress bar, directional horizontal transition
   (enters and exits along the same path) with `AnimatePresence` and
   springs, "Set up later" always visible in the header.
