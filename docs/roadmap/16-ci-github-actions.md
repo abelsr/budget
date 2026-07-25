@@ -139,7 +139,7 @@ Design details:
 - **`MIGRATIONS_TEST_REQUIRED=1` in the job:** without it, if the Postgres service
   failed to come up, the 8 tests would just be skipped and the job would end up **green without having
   tested anything**. With the variable, a missing database blows up at collection time.
-- To make this possible: `alembic/env.py` now accepts an `sqlalchemy.url` injected
+- To make this possible: `backend/alembic/env.py` now accepts an `sqlalchemy.url` injected
   via Config (before it only read `settings`), and `db_bootstrap.main()` accepts an optional
   URL. The container entrypoint's behavior doesn't change.
 
