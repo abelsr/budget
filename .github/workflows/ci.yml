@@ -21,8 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Versión exacta a propósito: setup-uv no publica tag mayor flotante más
+      # allá de v7 aunque sus releases vayan en v9, así que `@v9` no resuelve.
       - name: Instalar uv
-        uses: astral-sh/setup-uv@v9
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
@@ -71,7 +73,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Instalar uv
-        uses: astral-sh/setup-uv@v9
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
