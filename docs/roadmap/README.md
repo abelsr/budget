@@ -93,9 +93,16 @@ por IP no es contexto seguro (ver `lib/clipboard.ts`).
   lectura.
 - Se añadió un test de migraciones para el **backfill de `created_by_id`**: era
   la única rama que ningún test tocaba y corre en cada despliegue.
-- **Pendiente de verificar en navegador:** el stack en Docker sigue con la
-  imagen anterior. La migración está probada contra Postgres real (ida, vuelta y
-  vuelta a ir), pero no se ha aplicado a la base del despliegue.
+- **Desplegado y verificado en navegador.** Antes de migrar se respaldaron
+  `pgdata` y `minio_data` a `./backups/` (ignorado por git) — la base real no
+  tiene red de seguridad hasta que se haga el doc 04. La migración corrió sola
+  en el arranque del contenedor y los datos quedaron intactos. La verificación
+  usó un **hogar de prueba aparte**, borrado al terminar dejando la base con los
+  mismos conteos que el respaldo. Confirmado en móvil (440px): registro con
+  "Repetir", catch-up de 4 semanas atrasadas al recargar, icono en la lista,
+  badge en el detalle, pausar/reanudar/eliminar, y cero duplicados tras tres
+  cargas (nueve peticiones concurrentes). Sin errores de consola.
+- `recurring_rules` estaba vacía en la base real, como asumía la migración.
 
 **2026-07-24 — 01, 02 y 05 hechos y verificados en navegador.**
 
