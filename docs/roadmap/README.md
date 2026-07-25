@@ -4,7 +4,7 @@ Un archivo por pendiente, con su porqué, alcance, diseño propuesto y criterios
 de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 🚧 En progreso y, al terminar, márcalo ✅ con la fecha.
 
-> **Progreso:** 3 de 17 hechos (01, 02, 05) · 16 en vuelo · última actualización 2026-07-24
+> **Progreso:** 4 de 17 hechos (01, 02, 05, 16) · última actualización 2026-07-24
 
 ## Inmediato — robustez
 
@@ -40,7 +40,7 @@ de aceptación. Al atacar uno: léelo completo, actualiza su **Estado** a
 | # | Documento | Estado | Prioridad | Esfuerzo |
 |---|---|---|---|---|
 | 15 | [HTTPS con Caddy](15-https-caddy.md) | ⬜ | Alta | S |
-| 16 | [CI con GitHub Actions](16-ci-github-actions.md) | 🚧 falta el 1er run | Media | M |
+| 16 | [CI con GitHub Actions](16-ci-github-actions.md) | ✅ 2026-07-24 | Media | M |
 | 17 | [Monitoreo](17-monitoreo.md) | ⬜ | Baja | S |
 
 ## Orden sugerido de ataque
@@ -95,3 +95,9 @@ se pudo emular la media query; conviene confirmarlo a mano en el sistema.
   nadie corría una migración, y ese es justo el riesgo de romper la base al
   desplegar. Incluye que los datos sobrevivan al upgrade y que el puente
   pre-Alembic no re-cree tablas. Por eso 16 pasó de esfuerzo S a M.
+- **El primer run salió rojo:** `setup-uv` no publica tag mayor más allá de
+  `v7`, aunque sus releases van en `v9`. Para pinear una action hay que verificar
+  el **ref del tag**, no el release. Corregido con `@v9.0.0` exacto; el segundo
+  run quedó en verde en los 4 jobs y el badge responde `passing`.
+- Falta un paso manual que no se puede hacer desde el repo: **branch protection**
+  exigiendo los checks verdes para merges a `main`.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Copy, Link2, RefreshCw, Share2, UserPlus } from "lucide-react"
 import { motion } from "motion/react"
 
@@ -28,28 +28,30 @@ interface InviteLinkProps {
  */
 export function InviteLink({ autoGenerate = false, onGenerated }: InviteLinkProps) {
   const createInvitation = useCreateInvitation()
+  const { mutate: createInvite } = createInvitation
   const [invitation, setInvitation] = useState<Invitation | null>(null)
   const [copied, setCopied] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
   const autoRequested = useRef(false)
 
-  function generate() {
+  const generate = useCallback(() => {
     setCopied(false)
     setCopyFailed(false)
-    createInvitation.mutate(undefined, {
+    createInvite(undefined, {
       onSuccess: (created) => {
         setInvitation(created)
         onGenerated?.()
       },
     })
-  }
+  }, [createInvite, onGenerated])
 
-  // El ref evita un segundo POST con el doble montaje de StrictMode.
+  // El ref evita un segundo POST, tanto con el doble montaje de StrictMode como
+  // si `generate` cambia de identidad porque el padre pasa un `onGenerated` nuevo.
   useEffect(() => {
     if (!autoGenerate || autoRequested.current) return
     autoRequested.current = true
     generate()
-  }, [autoGenerate])
+  }, [autoGenerate, generate])
 
   const inviteLink = invitation
     ? new URL(invitation.inviteUrl, window.location.origin).toString()

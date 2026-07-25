@@ -1,6 +1,6 @@
 # ⚙️ CI con GitHub Actions
 
-**Estado:** 🚧 Implementado, falta el primer run en GitHub (2026-07-24) · **Prioridad:** Media · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
+**Estado:** ✅ Hecho y verificado (2026-07-24) · **Prioridad:** Media · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
 
 ## Por qué
 El repo ya está en GitHub y tiene 37 tests, pero nada los corre automáticamente: un push puede romper el backend o el build del frontend sin que nadie se entere hasta el siguiente despliegue. CI básico convierte "creo que pasa" en "está verde", y es la base para cualquier colaboración futura (incluso con uno mismo en otra máquina).
@@ -38,11 +38,11 @@ El repo ya está en GitHub y tiene 37 tests, pero nada los corre automáticament
 - Branch protection en GitHub: exigir el check verde antes de merge a `main` (configuración web, un clic)
 
 ## Criterios de aceptación
-- [ ] Un push a `main` dispara el workflow y termina en verde — **requiere push**
+- [x] Un push a `main` dispara el workflow y termina en verde (run 30137793763: los 4 jobs en success)
 - [x] Un test roto en backend hace fallar el job y marca el commit en rojo (canary local: `pytest` salió con código 1)
 - [x] Un error de TypeScript/build en frontend hace fallar su job (error TS2322 inyectado: `npm run build` salió con código 2)
-- [ ] Los runs con cache tardan claramente menos que el primer run — requiere dos runs reales
-- [ ] El badge del README refleja el estado real del último run en `main` — requiere el primer run
+- [x] Los runs con cache tardan claramente menos que el primer run (frontend: 27s en frío → 19s con cache npm)
+- [x] El badge del README refleja el estado real del último run en `main` (el SVG responde `passing`)
 
 ## Qué se implementó (2026-07-24)
 
@@ -76,9 +76,9 @@ El repo ya está en GitHub y tiene 37 tests, pero nada los corre automáticament
 + `lint` + `build` limpios; `docker compose build` construye ambas imágenes.
 Gates probados inyectando fallos y revirtiéndolos.
 
-**Pendiente:** el primer run real en GitHub (el badge queda en "no status"
-hasta entonces) y, después, activar branch protection exigiendo el check verde
-para merges a `main` (configuración web, un clic).
+**Pendiente:** activar branch protection exigiendo los checks verdes para
+merges a `main` (configuración web de GitHub, un clic; no se puede hacer desde
+el repo).
 
 ## Notas
 - Decisión abierta: ¿lint con ruff (backend) y eslint (frontend) como gates? Recomendado añadirlos en el mismo archivo pero en pasos separados, activados solo cuando la base de código ya pase limpia — activarlos antes genera ruido y tentación de ignorar el CI.
@@ -130,3 +130,34 @@ Detalles de diseño:
   `New upgrade operations detected: [('add_column', ..., 'users', Column('telefono'...))]`.
 - Migración destructiva (`DELETE FROM users`) encadenada tras head → la atrapan
   dos tests distintos (`los_datos_sobreviven` y `puente_pre_alembic`).
+
+## Primer run en verde (2026-07-24)
+
+**El primer run salió rojo** por un error mío: fijé `astral-sh/setup-uv@v9`
+después de comprobar en la API que el release más nuevo era `v9.0.0`, pero
+**nunca comprobé que existiera el tag mayor flotante `v9`**. Esa action solo
+publica majors hasta `v7`, a diferencia de `checkout` y `setup-node` que sí
+llegan a v7. Los dos jobs que usan uv fallaron con
+`Unable to resolve action astral-sh/setup-uv@v9`; frontend y docker pasaron.
+
+Corregido fijando la versión exacta `@v9.0.0` (con un comentario explicando por
+qué no es un major flotante, para que nadie lo "arregle" de vuelta). Lección:
+para pinear una action hay que verificar el **ref del tag**, no el release.
+
+Run 30137793763 — los 4 jobs en verde:
+
+| Job | Duración |
+|---|---|
+| Backend (pytest) | 20s |
+| Migraciones (Postgres real) | 31s |
+| Frontend (typecheck + build) | 19s (27s en el run sin cache) |
+| Imágenes Docker | 48s |
+
+Confirmado en el log del job que los 8 tests de migraciones **corrieron**
+(`8 passed`), no que se saltaran: era el riesgo de falso verde que cubre
+`MIGRATIONS_TEST_REQUIRED=1`.
+
+El run también expuso un aviso de lint propio (`react-hooks(exhaustive-deps)`
+en `InviteLink.tsx`) que existía en local desde el refactor del wizard y no vi
+por filtrar la salida con `tail`. Arreglado con `useCallback` en vez de
+silenciarlo: el lint vuelve a los 4 avisos preexistentes de `only-export-components`.

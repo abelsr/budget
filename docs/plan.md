@@ -117,7 +117,7 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ✅ Respuestas camelCase end-to-end; proxy `/api` en Vite (dev) y nginx (prod).
 - ✅ Secretos en `.env` (raíz y backend/, ignorados por git; plantillas en
   `.env.example` en ambos).
-- 🚧 CI en GitHub Actions (4 jobs): pytest, lint + build del frontend,
+- ✅ CI en GitHub Actions (4 jobs, en verde): pytest, lint + build del frontend,
   `docker compose build` y **migraciones contra Postgres 17 real** (esquema ==
   modelos, reversibilidad, que los datos sobrevivan al upgrade y que el puente
   pre-Alembic no re-cree tablas).
@@ -159,5 +159,5 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ⬜ [HTTPS con Caddy](roadmap/15-https-caddy.md) + dominio propio. **Siguiente.**
   Además habilita `navigator.clipboard` en el celular (hoy el link de invitación
   usa el fallback `execCommand` porque HTTP por IP no es contexto seguro).
-- 🚧 [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build + **migraciones contra Postgres real** en cada push y PR; falta el primer run en GitHub.
+- ✅ [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build + **migraciones contra Postgres real** en cada push y PR, en verde (2026-07-24). Falta activar branch protection.
 - ⬜ [Monitoreo](roadmap/17-monitoreo.md): logs JSON, alertas de caída y disco.
