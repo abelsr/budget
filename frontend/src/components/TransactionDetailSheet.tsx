@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
-import { Eye, FileText, Image as ImageIcon, Trash2 } from "lucide-react"
+import { Eye, FileText, Image as ImageIcon, Repeat, Trash2 } from "lucide-react"
 import { motion } from "motion/react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
@@ -176,6 +177,12 @@ function ViewMode({
         <p className="text-[15px] font-medium text-muted-foreground">
           {transaction.note || category?.name || "Movimiento"}
         </p>
+        {transaction.recurringRuleId && (
+          <Badge variant="secondary" className="gap-1">
+            <Repeat aria-hidden="true" />
+            Recurrente
+          </Badge>
+        )}
       </div>
 
       {/* Filas de detalle estilo lista iOS */}

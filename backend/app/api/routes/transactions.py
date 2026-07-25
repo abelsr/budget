@@ -5,12 +5,13 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Account, Category, Transaction, User
+from app.models import Account, Category, RecurringRule, Transaction, User
 from app.schemas.transactions import (
     TransactionCreate,
     TransactionOut,
     TransactionUpdate,
 )
+from app.services.recurring import advance, materialize_due
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -50,6 +51,7 @@ def _tx_out(tx: Transaction) -> TransactionOut:
         member_id=tx.member_id,
         date=tx.date,
         note=tx.note,
+        recurring_rule_id=tx.recurring_rule_id,
         attachments=tx.attachments,
     )
 
@@ -63,6 +65,7 @@ def list_transactions(
     month: Annotated[str | None, Query(pattern=_MONTH_PATTERN)] = None,
 ) -> list[TransactionOut]:
     household_id = _household_id(user)
+    materialize_due(db, household_id)
     stmt = select(Transaction).where(Transaction.household_id == household_id)
     if month is not None:
         year, mon = int(month[:4]), int(month[5:7])
@@ -93,6 +96,35 @@ def create_transaction(
         date=payload.date,
         note=payload.note,
     )
+    if payload.repeat is not None:
+        from datetime import timedelta
+
+        from app.services.recurring import MAX_BACKFILL_DAYS
+
+        anchor_day = payload.date.day if payload.repeat == "monthly" else None
+        next_run_date = advance(payload.date, payload.repeat, anchor_day)
+        if next_run_date < date.today() - timedelta(days=MAX_BACKFILL_DAYS):
+            raise HTTPException(
+                status_code=422,
+                detail="La próxima fecha no puede estar a más de un año en el pasado",
+            )
+        rule = RecurringRule(
+            household_id=household_id,
+            type=payload.type,
+            amount=payload.amount,
+            category_id=payload.category_id,
+            account_id=payload.account_id,
+            created_by_id=user.id,
+            frequency=payload.repeat,
+            # Esta transacción es la primera ocurrencia: la regla arranca en la
+            # siguiente, o la materialización la duplicaría hoy mismo.
+            next_run_date=next_run_date,
+            anchor_day=anchor_day,
+            note=payload.note,
+        )
+        db.add(rule)
+        db.flush()  # el id se asigna al flush y hace falta para ligar
+        tx.recurring_rule_id = rule.id
     db.add(tx)
     db.commit()
     db.refresh(tx)

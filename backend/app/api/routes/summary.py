@@ -7,6 +7,7 @@ from sqlalchemy import extract, func, select
 from app.api.deps import CurrentUserDep, DbDep
 from app.models import Transaction
 from app.schemas.summary import CategoryTotal, MonthSummaryResponse
+from app.services.recurring import materialize_due
 
 router = APIRouter(prefix="/summary", tags=["summary"])
 
@@ -25,6 +26,8 @@ def get_month_summary(
 ) -> MonthSummaryResponse:
     if user.household_id is None:
         raise HTTPException(status_code=400, detail="El usuario no pertenece a un hogar")
+
+    materialize_due(db, user.household_id)
 
     if month is None:
         now = _now()

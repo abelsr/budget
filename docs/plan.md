@@ -1,7 +1,7 @@
 # Plan: App de Finanzas Familiares
 
 > Documento vivo con las decisiones de diseño y arquitectura acordadas.
-> Última actualización: 2026-07-24
+> Última actualización: 2026-07-25
 
 ## Visión
 
@@ -21,7 +21,7 @@ Self-hosted, pero con esquema multi-tenant preparado para crecer a producto mult
 | Moneda | **Una por hogar**, elegida al crearlo; montos en `NUMERIC(19,4)` |
 | Captura | **Solo manual** en MVP; formulario móvil rápido (<10 segundos): monto, categoría, cuenta, fecha, nota opcional. **Más:** escaneo de ticket con IA (subir/tomar foto → extracción → revisión editable → guardar) |
 | Dashboard MVP | Saldo total y por cuenta + ingresos vs gastos del mes + dona de gastos por categoría + transacciones recientes |
-| Recurrencia | **Fase 2**; el esquema incluye tabla de reglas recurrentes desde el inicio |
+| Recurrencia | **Hecha** (fase 2): reglas semanales/mensuales, materialización lazy al leer (sin scheduler: en self-hosted no hay cron garantizado) |
 | Offline | **Online-first**; la PWA es instalable y carga su shell offline, pero registrar requiere conexión |
 
 ## Stack técnico
@@ -35,7 +35,7 @@ Self-hosted, pero con esquema multi-tenant preparado para crecer a producto mult
 | Frontend | **React + Vite** (TypeScript), Tailwind CSS + shadcn/ui, TanStack Query, Recharts, Motion (springs) |
 | Plataforma | **Web responsive / PWA** (un solo codebase para móvil y escritorio) |
 | Despliegue | **Docker Compose**: nginx (build estático) + FastAPI + PostgreSQL + MinIO; HTTPS con Caddy/reverse proxy (pendiente) |
-| Calidad | pytest para el backend (41 tests + 8 de migraciones contra Postgres); frontend validado con typecheck y build; CI en GitHub Actions |
+| Calidad | pytest para el backend (65 tests + 9 de migraciones contra Postgres); frontend validado con typecheck y build; CI en GitHub Actions |
 
 ## Lenguaje de diseño (frontend)
 
@@ -54,13 +54,13 @@ Basado en la skill **Apple Design** (WWDC *Designing Fluid Interfaces* y princip
 
 1. **MVP:** auth + hogares + cuentas + categorías + transacciones + dashboard. ✅ **HECHO** (+ escáner IA, adjuntos, modo oscuro)
 2. **Robustez:** migraciones, invitaciones desde la UI, onboarding, PWA, backups. 🚧 **En curso** — hechos Alembic, invitaciones y onboarding; faltan PWA y backups
-3. **Fase 2:** recurrencia, importación CSV, presupuestos mensuales. ⬜
+3. **Fase 2:** recurrencia, importación CSV, presupuestos mensuales. 🚧 **En curso** — hecha la recurrencia; faltan presupuestos, CSV, filtros y perfil
 4. **Fase 3:** metas de ahorro, cuentas personales (privacidad entre miembros), offline-first con sincronización, apertura multi-familia. ⬜
 
-**Siguiente paso concreto:** HTTPS con Caddy ([15](roadmap/15-https-caddy.md),
-bloqueado en elegir dominio propio o Tailscale) → recurrentes y presupuestos.
-CI ([16](roadmap/16-ci-github-actions.md)) ya está escrito.
-Detalle y bitácora en [docs/roadmap/](roadmap/README.md).
+**Siguiente paso concreto:** presupuestos mensuales
+([07](roadmap/07-presupuestos-mensuales.md)). HTTPS
+([15](roadmap/15-https-caddy.md)) sigue bloqueado en instalar Tailscale en el
+host (ruta ya elegida). Detalle y bitácora en [docs/roadmap/](roadmap/README.md).
 
 ## Estructura del repo
 
@@ -107,13 +107,19 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ✅ **Onboarding:** wizard de 4 pasos tras registrarse (bienvenida → cuentas
   → invitar familia → listo), con skip siempre disponible; quien entra por
   invitación no lo ve.
+- ✅ **Transacciones recurrentes:** selector "Repetir" (semanal/mensual) en el
+  registro rápido, que crea la regla ligada en una sola operación; página de
+  gestión en Ajustes (pausar/reanudar/eliminar) y badge en los movimientos
+  generados. Materialización **lazy al leer** (sin scheduler), con día ancla
+  para que el mensual del 31 no se clave en 28 al pasar por febrero, y
+  `SELECT ... FOR UPDATE` para no duplicar con peticiones concurrentes.
 - ✅ **UX Apple Design:** modo oscuro (claro/oscuro/sistema, anti-FOUC),
   materiales translúcidos, springs, feedback en pointer-down,
   `prefers-reduced-motion`, español.
 
 **Infraestructura:**
 
-- ✅ Backend FastAPI multi-tenant (41 tests pytest, SQLite en memoria).
+- ✅ Backend FastAPI multi-tenant (65 tests pytest, SQLite en memoria).
 - ✅ Respuestas camelCase end-to-end; proxy `/api` en Vite (dev) y nginx (prod).
 - ✅ Secretos en `.env` (raíz y backend/, ignorados por git; plantillas en
   `.env.example` en ambos).
@@ -132,7 +138,7 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 > Detalle completo en **[docs/roadmap/](roadmap/README.md)** — un archivo por
 > pendiente con porqué, alcance, diseño y criterios de aceptación, más la
 > bitácora de lo ya hecho. Cerrados: 01 (Alembic), 02 (invitaciones),
-> 05 (onboarding).
+> 05 (onboarding), 06 (recurrentes), 16 (CI).
 
 **Inmediato (robustez):**
 
@@ -141,8 +147,7 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 
 **Fase 2 (features):**
 
-- ⬜ [Transacciones recurrentes](roadmap/06-transacciones-recurrentes.md) (tabla `recurring_rules` ya existe).
-- ⬜ [Presupuestos mensuales](roadmap/07-presupuestos-mensuales.md) por categoría con barras semáforo.
+- ⬜ [Presupuestos mensuales](roadmap/07-presupuestos-mensuales.md) por categoría con barras semáforo. **Siguiente.**
 - ⬜ [Importación CSV](roadmap/08-importacion-csv.md) de estados de cuenta.
 - ⬜ [Filtros y búsqueda](roadmap/09-filtros-busqueda.md) en Movimientos.
 - ⬜ [Perfil y cambio de contraseña](roadmap/10-perfil-y-password.md).

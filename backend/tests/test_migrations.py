@@ -123,6 +123,37 @@ def _seed_household_and_user(database_url: str, email: str = "ana@example.com") 
         engine.dispose()
 
 
+def _seed_recurring_rule(database_url: str) -> None:
+    """Una regla recurrente con SQL crudo en la revisión previa a la de
+    recurrentes: la tabla existía pero sin `created_by_id` ni `anchor_day`."""
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO accounts (id, household_id, name, kind, opening_balance) "
+                    "VALUES ('a1', 'h1', 'Débito', 'debit', 0)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO categories (id, household_id, name, icon, color, type, active) "
+                    "VALUES ('c1', 'h1', 'Casa', 'home', '#30b0c7', 'expense', true)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO recurring_rules "
+                    "(id, household_id, type, amount, category_id, account_id, "
+                    " frequency, next_run_date, active) "
+                    "VALUES ('r1', 'h1', 'expense', 1200, 'c1', 'a1', "
+                    " 'monthly', '2026-07-01', true)"
+                )
+            )
+    finally:
+        engine.dispose()
+
+
 def test_upgrade_head_crea_el_esquema_completo(database_url: str) -> None:
     command.upgrade(alembic_config(database_url), "head")
 
@@ -182,6 +213,24 @@ def test_los_datos_sobreviven_a_las_migraciones(database_url: str) -> None:
     assert _scalar(
         database_url, "SELECT onboarding_completed_at FROM users WHERE id = 'u1'"
     ) is not None
+
+
+def test_el_backfill_de_recurrentes_no_deja_reglas_sin_autor(database_url: str) -> None:
+    """`created_by_id` es NOT NULL. La tabla nunca fue escribible, así que en la
+    práctica está vacía, pero si una base tuviera filas el backfill tiene que
+    resolverlas al miembro más antiguo del hogar en vez de tumbar el arranque."""
+    config = alembic_config(database_url)
+    command.upgrade(config, "673ed5f3d911")
+    _seed_household_and_user(database_url)
+    _seed_recurring_rule(database_url)
+
+    command.upgrade(config, "head")
+
+    assert _scalar(database_url, "SELECT count(*) FROM recurring_rules") == 1
+    assert _scalar(database_url, "SELECT created_by_id FROM recurring_rules") == "u1"
+    # anchor_day queda NULL: la regla vieja no declaraba día ancla y el avance
+    # cae en el día de next_run_date.
+    assert _scalar(database_url, "SELECT anchor_day FROM recurring_rules") is None
 
 
 def test_puente_pre_alembic_no_recrea_ni_borra_nada(database_url: str) -> None:

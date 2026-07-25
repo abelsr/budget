@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.schemas.attachments import AttachmentResponse
+from app.schemas.recurring import Frequency
 
 TransactionType = Literal["expense", "income"]
 
@@ -20,6 +21,10 @@ class TransactionCreate(_CamelModel):
     account_id: str
     date: date_t
     note: str | None = None
+    #: Si viene, crea además la regla recurrente y liga esta transacción como su
+    #: primera ocurrencia. En la misma operación: partirlo en dos llamadas
+    #: dejaría transacciones huérfanas o reglas sin primera ocurrencia.
+    repeat: Frequency | None = None
 
 
 class TransactionUpdate(_CamelModel):
@@ -41,4 +46,6 @@ class TransactionOut(_CamelModel):
     member_id: str
     date: date_t
     note: str | None
+    #: Regla que la generó, o NULL si se capturó a mano.
+    recurring_rule_id: str | None = None
     attachments: list[AttachmentResponse] = []

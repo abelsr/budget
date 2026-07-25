@@ -1,0 +1,137 @@
+from datetime import date, timedelta
+
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import select, update
+
+from app.api.deps import CurrentUserDep, DbDep
+from app.models import Account, Category, RecurringRule, Transaction, User
+from app.schemas.recurring import (
+    RecurringRuleCreate,
+    RecurringRuleOut,
+    RecurringRuleUpdate,
+)
+from app.services.recurring import MAX_BACKFILL_DAYS, materialize_due, next_future_run
+
+router = APIRouter(prefix="/recurring-rules", tags=["recurring"])
+
+
+def _household_id(user: User) -> str:
+    if user.household_id is None:
+        raise HTTPException(status_code=400, detail="El usuario no pertenece a un hogar")
+    return user.household_id
+
+
+def _get_rule(db, household_id: str, rule_id: str) -> RecurringRule:
+    rule = db.get(RecurringRule, rule_id)
+    if rule is None or rule.household_id != household_id:
+        raise HTTPException(status_code=404, detail="Regla no encontrada")
+    return rule
+
+
+def _validate_refs(db, household_id: str, category_id: str, account_id: str) -> None:
+    category = db.get(Category, category_id)
+    if category is None or category.household_id != household_id:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    account = db.get(Account, account_id)
+    if account is None or account.household_id != household_id:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+
+
+def _validate_next_run_date(next_run_date: date) -> None:
+    if next_run_date < date.today() - timedelta(days=MAX_BACKFILL_DAYS):
+        raise HTTPException(
+            status_code=422,
+            detail="La próxima fecha no puede estar a más de un año en el pasado",
+        )
+
+
+def _rule_out(rule: RecurringRule) -> RecurringRuleOut:
+    return RecurringRuleOut(
+        id=rule.id,
+        household_id=rule.household_id,
+        type=rule.type,
+        amount=float(rule.amount),
+        category_id=rule.category_id,
+        account_id=rule.account_id,
+        created_by_id=rule.created_by_id,
+        frequency=rule.frequency,
+        next_run_date=rule.next_run_date,
+        note=rule.note,
+        active=rule.active,
+    )
+
+
+@router.get("")
+def list_rules(db: DbDep, user: CurrentUserDep) -> list[RecurringRuleOut]:
+    household_id = _household_id(user)
+    # Materializa antes de listar: si no, la pantalla mostraría "próxima" en
+    # una fecha que ya pasó, que es justo lo que el usuario viene a revisar.
+    materialize_due(db, household_id)
+    rules = db.scalars(
+        select(RecurringRule)
+        .where(RecurringRule.household_id == household_id)
+        .order_by(RecurringRule.next_run_date, RecurringRule.id)
+    ).all()
+    return [_rule_out(rule) for rule in rules]
+
+
+@router.post("", status_code=201)
+def create_rule(
+    payload: RecurringRuleCreate, db: DbDep, user: CurrentUserDep
+) -> RecurringRuleOut:
+    household_id = _household_id(user)
+    _validate_refs(db, household_id, payload.category_id, payload.account_id)
+    _validate_next_run_date(payload.next_run_date)
+    rule = RecurringRule(
+        household_id=household_id,
+        type=payload.type,
+        amount=payload.amount,
+        category_id=payload.category_id,
+        account_id=payload.account_id,
+        created_by_id=user.id,
+        frequency=payload.frequency,
+        next_run_date=payload.next_run_date,
+        anchor_day=(
+            payload.next_run_date.day if payload.frequency == "monthly" else None
+        ),
+        note=payload.note,
+    )
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    return _rule_out(rule)
+
+
+@router.patch("/{rule_id}")
+def update_rule(
+    rule_id: str, payload: RecurringRuleUpdate, db: DbDep, user: CurrentUserDep
+) -> RecurringRuleOut:
+    household_id = _household_id(user)
+    rule = _get_rule(db, household_id, rule_id)
+    data = payload.model_dump(exclude_unset=True)
+    reactivating = data.get("active") is True and not rule.active
+    for field, value in data.items():
+        setattr(rule, field, value)
+    # Reanudar salta lo que estuvo pausado: quien apagó la regla en marzo no
+    # quiere que al prenderla en julio le caigan cuatro meses de renta.
+    if reactivating:
+        rule.next_run_date = next_future_run(rule, date.today())
+    db.commit()
+    db.refresh(rule)
+    return _rule_out(rule)
+
+
+@router.delete("/{rule_id}", status_code=204)
+def delete_rule(rule_id: str, db: DbDep, user: CurrentUserDep) -> None:
+    household_id = _household_id(user)
+    rule = _get_rule(db, household_id, rule_id)
+    # Las transacciones ya generadas se quedan: son dinero que se movió. Solo
+    # sueltan el enlace (pierden el badge) para que la FK deje borrar la regla.
+    db.execute(
+        update(Transaction)
+        .where(Transaction.recurring_rule_id == rule.id)
+        .values(recurring_rule_id=None)
+        .execution_options(synchronize_session=False)
+    )
+    db.delete(rule)
+    db.commit()
