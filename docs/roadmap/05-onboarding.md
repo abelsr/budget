@@ -75,7 +75,7 @@ Today, after registering, the user lands directly on an empty dashboard with onl
     shows up and reloading mid-wizard doesn't duplicate anything; the inline form
     creates via `useCreateAccount`.
   - Step 4 summarizes accounts created and invitation generated or pending.
-- `components/InviteLink.tsx`: the content of task 02's `InviteSheet` was
+- `frontend/src/components/InviteLink.tsx`: the content of task 02's `InviteSheet` was
   extracted to reuse it. `autoGenerate` distinguishes the two uses: in the sheet,
   opening it is already the gesture, in the wizard there's an explicit button so
   as not to leave stray invitations when passing through the step.
