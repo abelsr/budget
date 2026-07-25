@@ -107,7 +107,7 @@ over IP is not a secure context (see `frontend/src/lib/clipboard.ts`).
 **2026-07-24 — 01, 02, and 05 done and verified in the browser.**
 
 - **02** was almost entirely UI: the invitations backend already existed with tests. Its
-  content ended up extracted into `components/InviteLink.tsx` to reuse in the
+  content ended up extracted into `frontend/src/components/InviteLink.tsx` to reuse in the
   wizard, with `InviteSheet` as the drawer wrapper.
 - **01 was moved ahead of 05.** The wizard adds a column to `users` and `create_all`
   doesn't alter existing tables: without migrations, the deployment's database would have
