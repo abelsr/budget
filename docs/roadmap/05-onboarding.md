@@ -79,7 +79,7 @@ Today, after registering, the user lands directly on an empty dashboard with onl
   extracted to reuse it. `autoGenerate` distinguishes the two uses: in the sheet,
   opening it is already the gesture, in the wizard there's an explicit button so
   as not to leave stray invitations when passing through the step.
-- `lib/auth.tsx`: `Session.onboardingCompleted` + `completeOnboarding()`.
+- `frontend/src/lib/auth.tsx`: `Session.onboardingCompleted` + `completeOnboarding()`.
 - `App.tsx`: `/onboarding` route outside the `AppShell` (full screen) and
   a guard in `RequireAuth` in both directions — without the flag completed everything
   redirects to the wizard, with the flag completed `/onboarding` redirects to the dashboard. Nothing

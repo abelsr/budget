@@ -113,7 +113,7 @@ over IP is not a secure context (see `frontend/src/lib/clipboard.ts`).
   doesn't alter existing tables: without migrations, the deployment's database would have
   ended up without the column. Doc 05 already listed 01 as a dependency, but the suggested
   order in this index didn't reflect it.
-- Since a database created with `create_all` already existed, `app/db_bootstrap.py`
+- Since a database created with `create_all` already existed, `backend/app/db_bootstrap.py`
   detects it (tables without `alembic_version`) and stamps it instead of re-creating it.
   **This bridge is temporary**: it will be removed once no pre-Alembic databases remain.
 - The column migration **backfills** existing users; otherwise,

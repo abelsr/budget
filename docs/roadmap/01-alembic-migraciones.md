@@ -53,7 +53,7 @@ Today the schema is created with `Base.metadata.create_all` on backend startup. 
   the indexes in batch mode; these were changed to `sa.func.now()` and `op.create_index`
   so the result is identical on Postgres and SQLite.
 - `backend/app/main.py`: `create_all` removed.
-- `app/db_bootstrap.py` + `entrypoint.sh`: the container migrates before uvicorn.
+- `backend/app/db_bootstrap.py` + `backend/entrypoint.sh`: the container migrates before uvicorn.
   **Bridge for pre-Alembic databases:** if it finds the tables without
   `alembic_version` (created by the old `create_all`), it stamps the
   initial migration instead of re-creating them — without this, the current
