@@ -97,7 +97,17 @@ def create_transaction(
         note=payload.note,
     )
     if payload.repeat is not None:
+        from datetime import timedelta
+
+        from app.services.recurring import MAX_BACKFILL_DAYS
+
         anchor_day = payload.date.day if payload.repeat == "monthly" else None
+        next_run_date = advance(payload.date, payload.repeat, anchor_day)
+        if next_run_date < date.today() - timedelta(days=MAX_BACKFILL_DAYS):
+            raise HTTPException(
+                status_code=422,
+                detail="La próxima fecha no puede estar a más de un año en el pasado",
+            )
         rule = RecurringRule(
             household_id=household_id,
             type=payload.type,
@@ -108,7 +118,7 @@ def create_transaction(
             frequency=payload.repeat,
             # Esta transacción es la primera ocurrencia: la regla arranca en la
             # siguiente, o la materialización la duplicaría hoy mismo.
-            next_run_date=advance(payload.date, payload.repeat, anchor_day),
+            next_run_date=next_run_date,
             anchor_day=anchor_day,
             note=payload.note,
         )
