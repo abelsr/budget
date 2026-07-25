@@ -63,7 +63,7 @@ was already complete and had tests.
 clipboard, second user registered in an isolated context, 2 members shown in
 Settings, and a clear error when reusing the link.
 
-**Note:** in step 05 this content was extracted into `components/InviteLink.tsx`
+**Note:** in step 05 this content was extracted into `frontend/src/components/InviteLink.tsx`
 to reuse it in the wizard; `InviteSheet` now just wraps it in the drawer.
 
 ## Notes
