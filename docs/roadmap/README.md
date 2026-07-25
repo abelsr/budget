@@ -65,7 +65,7 @@ works behind CGNAT). It still needs to be installed on the host and on the
 family's devices — today there's no `tailscale`, `caddy`, or `mkcert` on the host. Besides
 closing out the deployment, it enables `navigator.clipboard` on mobile: the
 invitation link relies on the `document.execCommand('copy')` fallback because plain HTTP
-over IP is not a secure context (see `lib/clipboard.ts`).
+over IP is not a secure context (see `frontend/src/lib/clipboard.ts`).
 
 ## Log
 
