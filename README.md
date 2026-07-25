@@ -38,7 +38,7 @@ docker compose up -d --build
 - API (docs at `/docs`): http://localhost:8000
 - MinIO console: http://localhost:9001
 
-The backend applies Alembic migrations on startup (`entrypoint.sh`), so an
+The backend applies Alembic migrations on startup (`backend/entrypoint.sh`), so an
 empty database is ready to go on its own.
 
 ## Local development
