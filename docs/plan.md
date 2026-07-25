@@ -164,5 +164,5 @@ verificado de punta a punta, incluyendo acceso desde celular por IP local.
 - ⬜ [HTTPS con Caddy](roadmap/15-https-caddy.md) + dominio propio. **Siguiente.**
   Además habilita `navigator.clipboard` en el celular (hoy el link de invitación
   usa el fallback `execCommand` porque HTTP por IP no es contexto seguro).
-- ✅ [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build + **migraciones contra Postgres real** en cada push y PR, en verde (2026-07-24). Falta activar branch protection.
+- ✅ [CI con GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build + **migraciones contra Postgres real** en cada push y PR, en verde (2026-07-24). Branch protection estricta en `main` desde 2026-07-25: los 4 checks son obligatorios (también para el dueño), así que los cambios entran por rama + PR.
 - ⬜ [Monitoreo](roadmap/17-monitoreo.md): logs JSON, alertas de caída y disco.

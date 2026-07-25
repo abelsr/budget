@@ -139,5 +139,7 @@ se pudo emular la media query; conviene confirmarlo a mano en el sistema.
   `v7`, aunque sus releases van en `v9`. Para pinear una action hay que verificar
   el **ref del tag**, no el release. Corregido con `@v9.0.0` exacto; el segundo
   run quedó en verde en los 4 jobs y el badge responde `passing`.
-- Falta un paso manual que no se puede hacer desde el repo: **branch protection**
-  exigiendo los checks verdes para merges a `main`.
+- **Branch protection activa en `main` (2026-07-25)**, estricta e incluyendo al
+  dueño: los 4 checks son obligatorios y ya no se puede empujar directo a
+  `main`. El flujo pasa a ser rama → PR → merge en verde. Se aplicó con
+  `gh api`, no por la web. Detalle y cómo revertirla en el doc 16.

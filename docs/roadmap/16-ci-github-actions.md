@@ -76,9 +76,28 @@ El repo ya está en GitHub y tiene 37 tests, pero nada los corre automáticament
 + `lint` + `build` limpios; `docker compose build` construye ambas imágenes.
 Gates probados inyectando fallos y revirtiéndolos.
 
-**Pendiente:** activar branch protection exigiendo los checks verdes para
-merges a `main` (configuración web de GitHub, un clic; no se puede hacer desde
-el repo).
+**Branch protection activa desde 2026-07-25** (aplicada con
+`gh api -X PUT repos/abelsr/budget/branches/main/protection`, no hace falta la
+web). Configuración en `main`:
+
+| Ajuste | Valor |
+|---|---|
+| Checks obligatorios | `Backend (pytest)`, `Migraciones (Postgres real)`, `Frontend (typecheck + build)`, `Imágenes Docker` (por su `name:` exacto) |
+| `strict` (rama al día antes de merge) | sí |
+| `enforce_admins` | **sí — aplica también al dueño del repo** |
+| Force-push y borrado de la rama | bloqueados |
+| Resolver conversaciones antes de merge | sí |
+| Reviews obligatorias | no (GitHub no permite aprobar tus propios PRs; con 1 review el repo quedaría bloqueado para un solo mantenedor) |
+
+**Consecuencia práctica: se acabó el push directo a `main`.** El flujo ahora es
+rama → push → PR → esperar los 4 checks → merge. Un `git push` a `main` se
+rechaza con `GH006: Protected branch update failed` / `required status checks
+are expected`, porque los checks no pueden haber corrido para un commit que
+todavía no existe en remoto.
+
+Si los jobs se renombran en `ci.yml`, hay que actualizar los `contexts` de la
+protección o `main` queda esperando checks que nunca llegan. Para revertirla:
+`gh api -X DELETE repos/abelsr/budget/branches/main/protection`.
 
 ## Notas
 - Decisión abierta: ¿lint con ruff (backend) y eslint (frontend) como gates? Recomendado añadirlos en el mismo archivo pero en pasos separados, activados solo cuando la base de código ya pase limpia — activarlos antes genera ruido y tentación de ignorar el CI.
