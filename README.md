@@ -8,6 +8,8 @@ invitación; todo el hogar comparte cuentas, categorías y movimientos.
 
 - **Registro rápido:** monto, categoría, cuenta y fecha en menos de 10 segundos.
 - **Escáner de tickets con IA:** foto → extracción → revisión editable → gasto.
+- **Movimientos recurrentes:** renta, sueldo o suscripciones se capturan una vez
+  (semanal o mensual) y se generan solos al abrir la app.
 - **Comprobantes adjuntos** por movimiento (MinIO).
 - **Dashboard:** balance por cuenta, ingresos vs gastos del mes, dona por categoría.
 - **Onboarding** guiado al crear el hogar y modo claro/oscuro.
@@ -49,7 +51,7 @@ El backend usa SQLite (`dev.db`) por defecto; Vite proxifica `/api` al :8000.
 ## Tests y CI
 
 ```bash
-cd backend  && uv run pytest      # 41 tests (SQLite en memoria)
+cd backend  && uv run pytest      # 65 tests (SQLite en memoria)
 cd frontend && npm run build      # tsc -b + vite build
 ```
 

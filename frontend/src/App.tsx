@@ -8,6 +8,7 @@ import { TransactionsPage } from "@/pages/TransactionsPage"
 import { AccountsPage } from "@/pages/AccountsPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { CategoriesPage } from "@/pages/CategoriesPage"
+import { RecurringPage } from "@/pages/RecurringPage"
 import { LoginPage } from "@/pages/LoginPage"
 import { OnboardingPage } from "@/pages/OnboardingPage"
 
@@ -73,6 +74,7 @@ function App() {
               <Route path="cuentas" element={<AccountsPage />} />
               <Route path="ajustes" element={<SettingsPage />} />
               <Route path="ajustes/categorias" element={<CategoriesPage />} />
+              <Route path="ajustes/recurrentes" element={<RecurringPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

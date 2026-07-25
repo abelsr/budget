@@ -100,6 +100,12 @@ class Transaction(Base):
     member_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     date: Mapped[date] = mapped_column(Date, index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # NULL = capturada a mano. Si viene de una regla recurrente guarda cuál,
+    # para el badge y la trazabilidad. Borrar la regla la deja en NULL: la
+    # transacción sobrevive (ya es dinero que se movió), pierde la etiqueta.
+    recurring_rule_id: Mapped[str | None] = mapped_column(
+        ForeignKey("recurring_rules.id"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     attachments: Mapped[list["Attachment"]] = relationship(lazy="selectin")
@@ -121,7 +127,11 @@ class Attachment(Base):
 
 
 class RecurringRule(Base):
-    """Fase 2: esquema preparado, sin endpoints todavía."""
+    """Plantilla de un movimiento que se repite (renta, sueldo, suscripción).
+
+    Las transacciones se materializan de forma lazy al leer, no con un
+    scheduler: en self-hosted no hay cron garantizado (ver
+    `app.services.recurring`)."""
 
     __tablename__ = "recurring_rules"
 
@@ -131,7 +141,15 @@ class RecurringRule(Base):
     amount: Mapped[float] = mapped_column(Numeric(19, 4))
     category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"))
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
+    # Autor de la regla. Las transacciones que genera se le atribuyen: nadie
+    # las captura, y achacárselas a quien casualmente abrió la app haría que el
+    # mismo gasto cambiara de miembro según quién entrara primero.
+    created_by_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     frequency: Mapped[str] = mapped_column(String(10))  # weekly | monthly
     next_run_date: Mapped[date] = mapped_column(Date)
+    # Día del mes que la regla "quiere" (solo mensual; NULL en semanal). Sin él
+    # una regla del 31 se clavaría en 28 al pasar por febrero: next_run_date
+    # guarda la fecha ya recortada y el mes siguiente partiría de ahí.
+    anchor_day: Mapped[int | None] = mapped_column(nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(default=True)

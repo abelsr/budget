@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Paperclip } from "lucide-react"
+import { Paperclip, Repeat } from "lucide-react"
 
 import { formatMoney, formatShortDate } from "@/lib/format"
 import type { Account, Category, Member, Transaction } from "@/lib/types"
@@ -30,6 +30,7 @@ export function TransactionItem({
   const [open, setOpen] = useState(false)
   const isIncome = transaction.type === "income"
   const hasAttachments = transaction.attachments.length > 0
+  const isRecurring = Boolean(transaction.recurringRuleId)
 
   return (
     <>
@@ -58,6 +59,13 @@ export function TransactionItem({
                 .filter(Boolean)
                 .join(" · ")}
             </span>
+            {isRecurring && (
+              <Repeat
+                size={13}
+                className="shrink-0"
+                aria-label="Movimiento recurrente"
+              />
+            )}
             {hasAttachments && <Paperclip size={13} className="shrink-0" />}
           </p>
         </div>

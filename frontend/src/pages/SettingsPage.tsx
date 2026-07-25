@@ -5,6 +5,7 @@ import {
   LogOut,
   Monitor,
   Moon,
+  Repeat,
   ScanLine,
   Sun,
   Tags,
@@ -136,6 +137,11 @@ export function SettingsPage() {
           icon={<Tags size={16} />}
           label="Categorías"
           to="/ajustes/categorias"
+        />
+        <Row
+          icon={<Repeat size={16} />}
+          label="Recurrentes"
+          to="/ajustes/recurrentes"
         />
         <Row
           icon={<ScanLine size={16} />}

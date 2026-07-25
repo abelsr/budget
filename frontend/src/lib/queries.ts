@@ -7,6 +7,7 @@ import type {
   Category,
   Member,
   NewTransaction,
+  RecurringRule,
   Transaction,
 } from "@/lib/types"
 
@@ -23,6 +24,7 @@ export const keys = {
   transactions: ["transactions"] as const,
   summary: ["summary", "month"] as const,
   household: ["household", "me"] as const,
+  recurringRules: ["recurring-rules"] as const,
 }
 
 export interface MonthSummary {
@@ -129,6 +131,8 @@ export function useAddTransaction() {
       queryClient.invalidateQueries({ queryKey: keys.transactions })
       queryClient.invalidateQueries({ queryKey: keys.accounts })
       queryClient.invalidateQueries({ queryKey: keys.summary })
+      // Con `repeat` el backend crea también la regla
+      queryClient.invalidateQueries({ queryKey: keys.recurringRules })
     },
   })
 }
@@ -243,6 +247,63 @@ export function useDeleteTransaction() {
   const invalidate = useInvalidator(keys.transactions, keys.accounts, keys.summary)
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/transactions/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Reglas recurrentes
+// ---------------------------------------------------------------------------
+
+/**
+ * Lista las reglas del hogar. Ojo: el GET materializa las transacciones
+ * pendientes en el backend, así que puede cambiar saldos y movimientos.
+ */
+export function useRecurringRules() {
+  return useQuery({
+    queryKey: keys.recurringRules,
+    queryFn: () => apiFetch<RecurringRule[]>("/recurring-rules"),
+  })
+}
+
+/**
+ * Pausar/reanudar o corregir monto y nota. Reanudar mueve `nextRunDate` hacia
+ * adelante en el backend, y borrar/pausar cambia lo que se materializa: de ahí
+ * que también se invaliden movimientos, saldos y resumen.
+ */
+export function useUpdateRecurringRule() {
+  const invalidate = useInvalidator(
+    keys.recurringRules,
+    keys.transactions,
+    keys.accounts,
+    keys.summary,
+  )
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...input
+    }: Partial<Pick<RecurringRule, "amount" | "note" | "active">> & {
+      id: string
+    }) =>
+      apiFetch<RecurringRule>(`/recurring-rules/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: invalidate,
+  })
+}
+
+/** Borra la regla. Las transacciones ya generadas se quedan, sin el badge. */
+export function useDeleteRecurringRule() {
+  const invalidate = useInvalidator(
+    keys.recurringRules,
+    keys.transactions,
+    keys.accounts,
+    keys.summary,
+  )
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/recurring-rules/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
   })
 }

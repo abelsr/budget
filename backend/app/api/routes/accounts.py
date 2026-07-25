@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from app.api.deps import CurrentUserDep, DbDep
 from app.models import Account, Transaction, User
 from app.schemas.accounts import AccountCreate, AccountOut, AccountUpdate
+from app.services.recurring import materialize_due
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -35,6 +36,10 @@ def _account_out(account: Account, balance: float) -> AccountOut:
 @router.get("")
 def list_accounts(db: DbDep, user: CurrentUserDep) -> list[AccountOut]:
     household_id = _household_id(user)
+    # El Dashboard dispara cuentas, movimientos y resumen en paralelo: si solo
+    # materializara el de movimientos, los saldos saldrían desfasados en la
+    # primera carga después de que una regla vence.
+    materialize_due(db, household_id)
     accounts = db.scalars(
         select(Account)
         .where(Account.household_id == household_id)

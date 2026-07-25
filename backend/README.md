@@ -43,7 +43,7 @@ memoria (más rápido y aislado).
 ## Tests
 
 ```bash
-uv run pytest               # 37 tests, SQLite en memoria
+uv run pytest               # 65 tests, SQLite en memoria
 ```
 
 ## Docker (stack completo desde la raíz del repo)
@@ -62,17 +62,45 @@ app/
 ├── database.py        # engine, sesión, Base
 ├── db_bootstrap.py    # migra al arrancar (+ puente para bases pre-Alembic)
 ├── models.py          # Household, User, Invitation, Account, Category,
-│                      # Transaction, RecurringRule (fase 2, sin endpoints)
+│                      # Transaction, Attachment, RecurringRule
 ├── seed.py            # categorías por defecto de cada hogar nuevo
 ├── core/security.py   # Argon2 + JWT
 ├── api/
 │   ├── deps.py        # get_db, get_current_user (Bearer JWT)
 │   └── routes/        # auth, households, accounts, categories,
-│                      # transactions, summary, tickets
-├── services/vision.py # escáner de tickets (OpenRouter vía SDK OpenAI
-│                      # async; sin OPENROUTER_API_KEY → 501)
+│                      # transactions, recurring, attachments,
+│                      # summary, tickets
+├── services/
+│   ├── vision.py      # escáner de tickets (OpenRouter vía SDK OpenAI
+│   │                  # async; sin OPENROUTER_API_KEY → 501)
+│   ├── storage.py     # comprobantes en MinIO (S3)
+│   └── recurring.py   # materialización lazy de reglas recurrentes
 └── schemas/           # Pydantic, respuestas camelCase
 ```
+
+## Recurrentes: materialización lazy
+
+Las transacciones de una regla recurrente **no** las genera un cron: se
+materializan al leer. Cualquiera de `GET /transactions`, `/accounts`,
+`/summary/month` y `/recurring-rules` llama a
+`services.recurring.materialize_due()` antes de responder, que crea las
+ocurrencias pendientes (`active` y `next_run_date <= hoy`) y avanza la fecha.
+
+Por qué así:
+
+- **Sin scheduler.** En self-hosted no hay cron garantizado, y un contenedor
+  apagado tres días no debe perder la renta. El catch-up genera todas las
+  ocurrencias atrasadas de golpe, cada una con su propia fecha.
+- **En cuatro endpoints, no en uno.** El Dashboard dispara cuentas, movimientos
+  y resumen en paralelo: si solo materializara uno, los otros responderían con
+  datos desfasados en la primera carga tras vencer una regla.
+- **`SELECT ... FOR UPDATE` para no duplicar.** La lectura de reglas vencidas
+  toma el lock y la inserción va en la misma transacción de DB. Con peticiones
+  concurrentes la segunda se bloquea; al liberarse, Postgres re-evalúa el `WHERE`
+  contra la fila ya avanzada, la regla no califica y no genera nada. En SQLite
+  (tests) el `FOR UPDATE` no se renderiza, pero ahí no hay concurrencia.
+- **`anchor_day` guarda el día que la regla quiere.** Una regla del 31 se recorta
+  a 28 en febrero pero vuelve al 31 en marzo; sin el ancla se quedaría en 28.
 
 ## Endpoints
 
@@ -88,10 +116,8 @@ app/
 | POST | `/households/me/invitations` | Crea invitación (7 días) |
 | GET/POST/PATCH/DELETE | `/accounts` | CRUD cuentas (balance calculado) |
 | GET/POST/PATCH/DELETE | `/categories` | CRUD categorías |
-| GET/POST/PATCH/DELETE | `/transactions` | CRUD movimientos (`?month=YYYY-MM`) |
+| GET/POST/PATCH/DELETE | `/transactions` | CRUD movimientos (`?month=YYYY-MM`). `POST` acepta `repeat: weekly\|monthly` y crea la regla ligada |
+| GET/POST/PATCH/DELETE | `/recurring-rules` | CRUD reglas recurrentes. `PATCH` solo `amount`, `note` y `active`; `DELETE` conserva las transacciones ya generadas |
 | GET | `/summary/month` | Ingresos/gastos/dona del mes |
+| POST/GET/DELETE | `/transactions/{id}/attachments`, `/attachments/{id}` | Comprobantes (máx 10MB) |
 | POST | `/tickets/scan` | Análisis de ticket con IA (multipart) |
-
-## Pendiente (siguientes iteraciones)
-
-- RecurringRule: endpoints de transacciones recurrentes (fase 2)

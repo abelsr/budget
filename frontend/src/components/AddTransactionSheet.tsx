@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react"
-import { FileText, Paperclip, Plus, X } from "lucide-react"
+import { FileText, Paperclip, Plus, Repeat, X } from "lucide-react"
 import { motion } from "motion/react"
 
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,14 @@ import {
 } from "@/lib/queries"
 import { springIndicator } from "@/lib/springs"
 import { toISODate } from "@/lib/format"
-import type { TransactionType } from "@/lib/types"
+import type { Frequency, TransactionType } from "@/lib/types"
+
+/** Opciones del selector "Repetir". `null` = movimiento de una sola vez. */
+const repeatOptions: { value: Frequency | null; label: string }[] = [
+  { value: null, label: "No repetir" },
+  { value: "weekly", label: "Semanal" },
+  { value: "monthly", label: "Mensual" },
+]
 
 /**
  * Registro rápido: la interacción más importante de la app.
@@ -59,6 +66,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   const [accountId, setAccountId] = useState<string | null>(null)
   const [date, setDate] = useState(() => toISODate(new Date()))
   const [note, setNote] = useState("")
+  const [repeat, setRepeat] = useState<Frequency | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -81,6 +89,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
         accountId: effectiveAccountId,
         date,
         note: note.trim() || undefined,
+        repeat: repeat ?? undefined,
       },
       {
         onSuccess: (created) => {
@@ -222,6 +231,35 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
           className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none [color-scheme:light] dark:[color-scheme:dark]"
           aria-label="Fecha del movimiento"
         />
+      </div>
+
+      {/* Repetir: renta, sueldo y suscripciones se capturan una vez */}
+      <div>
+        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
+          Repetir
+        </p>
+        <div className="flex gap-2">
+          {repeatOptions.map((option) => (
+            <button
+              key={option.label}
+              onClick={() => setRepeat(option.value)}
+              aria-pressed={repeat === option.value}
+              className={`pressable flex-1 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                repeat === option.value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {repeat && (
+          <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[12px] text-muted-foreground">
+            <Repeat size={12} className="shrink-0" />
+            Este movimiento es el primero; el siguiente se generará solo.
+          </p>
+        )}
       </div>
 
       {/* Comprobante opcional */}
