@@ -82,7 +82,7 @@ web). Configuración en `main`:
 
 | Ajuste | Valor |
 |---|---|
-| Checks obligatorios | los 4 jobs, por su `name:` exacto |
+| Checks obligatorios | `Backend (pytest)`, `Migraciones (Postgres real)`, `Frontend (typecheck + build)`, `Imágenes Docker` (por su `name:` exacto) |
 | `strict` (rama al día antes de merge) | sí |
 | `enforce_admins` | **sí — aplica también al dueño del repo** |
 | Force-push y borrado de la rama | bloqueados |
