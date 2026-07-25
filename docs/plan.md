@@ -129,7 +129,7 @@ verified end-to-end, including access from a phone over the local IP.
   not re-creating tables).
 - ✅ Clean Dockerfiles (lockfile regenerated after fixing `pyproject.toml`).
 - ✅ **Migrations with Alembic:** the container runs `alembic upgrade head`
-  before uvicorn (`entrypoint.sh` → `app/db_bootstrap.py`); there's no more
+  before uvicorn (`backend/entrypoint.sh` → `backend/app/db_bootstrap.py`); there's no more
   `create_all` in production. The bootstrap includes a temporary bridge that
   stamps databases created with the old `create_all`.
 
