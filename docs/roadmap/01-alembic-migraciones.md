@@ -44,7 +44,7 @@ Today the schema is created with `Base.metadata.create_all` on backend startup. 
 
 ## What was implemented (2026-07-24)
 
-- `alembic/env.py`: reads `Base.metadata` from `app.database` and imports `app.models`;
+- `backend/alembic/env.py`: reads `Base.metadata` from `app.database` and imports `app.models`;
   the URL comes from `settings.database_url` (`alembic.ini` is left with
   an empty `sqlalchemy.url`, the file is committed). `render_as_batch` only on SQLite.
 - `alembic/versions/5d15cfc79c35_esquema_inicial.py`: the 8 tables. Reviewed
