@@ -77,3 +77,17 @@ and that data survives the upgrade). See
 - **[docs/plan.md](docs/plan.md)** — product and architecture decisions, current status.
 - **[docs/roadmap/](docs/roadmap/README.md)** — one file per pending item with scope, design, and acceptance criteria.
 - **[backend/README.md](backend/README.md)** — endpoints, migration workflow, and structure.
+
+## Contributing
+
+All commits, pull requests, issues, and other repository communication
+(titles, descriptions, comments, code comments) must be written in **English**,
+using an **LLM-friendly format**:
+
+- Clear, literal, unambiguous language — avoid idioms, sarcasm, or slang that
+  don't translate well for automated tooling or code-review agents.
+- Commit messages: imperative mood, concise summary line, optional body
+  explaining the *why* rather than the *what*.
+- PRs and issues: structured with explicit sections (e.g. `Summary`,
+  `Changes`, `Test plan`) instead of free-form prose, so both humans and
+  agents can parse them quickly.
