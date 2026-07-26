@@ -22,6 +22,7 @@
     --color-sidebar: var(--sidebar);
     --color-income: var(--income);
     --color-expense: var(--expense);
+    --color-warning: var(--warning);
     --color-system-blue: var(--system-blue);
     --color-ring: var(--ring);
     --color-input: var(--input);
@@ -72,6 +73,7 @@
     --ring: #007aff;
     --income: #34c759;
     --expense: #ff3b30;
+    --warning: #ff9500;
     --system-blue: #007aff;
     --radius: 1rem;
     --sidebar: #f7f7fa;
@@ -108,6 +110,7 @@
     --ring: #0a84ff;
     --income: #30d158;
     --expense: #ff453a;
+    --warning: #ff9f0a;
     --system-blue: #0a84ff;
     --sidebar: #000000;
     --sidebar-foreground: #f2f2f7;

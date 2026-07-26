@@ -12,6 +12,8 @@ transactions.
 - **Recurring transactions:** rent, salary, or subscriptions are captured once
   (weekly or monthly) and generate themselves when the app is opened.
 - **Attachments** per transaction (MinIO).
+- **Monthly budgets:** a limit per expense category with traffic-light
+  progress bars.
 - **Dashboard:** balance per account, monthly income vs. expenses, category
   donut chart.
 - **Guided onboarding** when creating the household, plus light/dark mode.
@@ -53,7 +55,7 @@ The backend uses SQLite (`dev.db`) by default; Vite proxies `/api` to :8000.
 ## Tests and CI
 
 ```bash
-cd backend  && uv run pytest      # 65 tests (in-memory SQLite)
+cd backend  && uv run pytest      # 78 tests (in-memory SQLite)
 cd frontend && npm run build      # tsc -b + vite build
 ```
 

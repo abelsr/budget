@@ -1,18 +1,31 @@
+import { useState } from "react"
 import { Link } from "react-router-dom"
 import { motion } from "motion/react"
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts"
-import { CreditCard, Landmark, PiggyBank, TrendingDown, TrendingUp, Wallet } from "lucide-react"
+import {
+  CreditCard,
+  Landmark,
+  Plus,
+  PiggyBank,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react"
 
 import { formatMoney, monthLabel } from "@/lib/format"
 import {
   useAccounts,
+  useBudgets,
+  useBudgetsStatus,
   useCategories,
   useMembers,
   useMonthSummary,
   useTransactions,
 } from "@/lib/queries"
 import { springAppear } from "@/lib/springs"
-import type { Account, Category, Member, Transaction } from "@/lib/types"
+import type { Account, Budget, BudgetStatus, Category, Member, Transaction } from "@/lib/types"
+import { BudgetBar } from "@/components/BudgetBar"
+import { BudgetFormSheet } from "@/components/BudgetFormSheet"
 import { TransactionItem } from "@/components/TransactionItem"
 import { TicketScannerButton } from "@/components/TicketScanner"
 
@@ -37,6 +50,8 @@ export function DashboardPage() {
   const { data: members = [] } = useMembers()
   const { data: transactions = [] } = useTransactions()
   const { data: summary } = useMonthSummary()
+  const { data: budgets = [] } = useBudgets()
+  const { data: budgetsStatus = [] } = useBudgetsStatus()
 
   const donutData = (summary?.byCategory ?? [])
     .map((row) => ({
@@ -44,6 +59,8 @@ export function DashboardPage() {
       category: categories.find((c) => c.id === row.categoryId),
     }))
     .filter((row) => row.category)
+
+  const overBudgetCount = budgetsStatus.filter((s) => s.percentage >= 100).length
 
   return (
     <motion.div
@@ -78,7 +95,10 @@ export function DashboardPage() {
             <TicketScannerButton />
           </motion.div>
           <div className="lg:hidden">
-            <DonutCard data={donutData} />
+            <DonutCard data={donutData} overBudgetCount={overBudgetCount} />
+          </div>
+          <div className="lg:hidden">
+            <BudgetsCard budgets={budgets} status={budgetsStatus} categories={categories} />
           </div>
 
           <RecentCard
@@ -94,7 +114,8 @@ export function DashboardPage() {
           <motion.div variants={item}>
             <TicketScannerButton />
           </motion.div>
-          <DonutCard data={donutData} />
+          <DonutCard data={donutData} overBudgetCount={overBudgetCount} />
+          <BudgetsCard budgets={budgets} status={budgetsStatus} categories={categories} />
           <AccountsSummary accounts={accounts} />
         </div>
       </div>
@@ -159,8 +180,10 @@ function MonthCards({ income, expense }: { income: number; expense: number }) {
 
 function DonutCard({
   data,
+  overBudgetCount,
 }: {
   data: { categoryId: string; total: number; category?: Category }[]
+  overBudgetCount: number
 }) {
   if (data.length === 0) return null
   return (
@@ -168,9 +191,19 @@ function DonutCard({
       variants={item}
       className="rounded-3xl bg-card p-5 shadow-sm lg:p-6"
     >
-      <h2 className="text-[17px] font-semibold tracking-tight">
-        ¿En qué se fue el dinero?
-      </h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-[17px] font-semibold tracking-tight">
+          ¿En qué se fue el dinero?
+        </h2>
+        {overBudgetCount > 0 && (
+          <span
+            className="tnum flex size-5 shrink-0 items-center justify-center rounded-full bg-expense text-[11px] font-semibold text-white"
+            title={`${overBudgetCount} categoría(s) sobre su presupuesto`}
+          >
+            {overBudgetCount}
+          </span>
+        )}
+      </div>
       <div className="mt-2 flex items-center gap-4">
         <div className="size-36 shrink-0 lg:size-40">
           <ResponsiveContainer width="100%" height="100%">
@@ -210,6 +243,123 @@ function DonutCard({
         </ul>
       </div>
     </motion.section>
+  )
+}
+
+function BudgetsCard({
+  budgets,
+  status,
+  categories,
+}: {
+  budgets: Budget[]
+  status: BudgetStatus[]
+  categories: Category[]
+}) {
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editing, setEditing] = useState<Budget | undefined>(undefined)
+
+  function openCreate() {
+    setEditing(undefined)
+    setSheetOpen(true)
+  }
+
+  function openEdit(budget: Budget) {
+    setEditing(budget)
+    setSheetOpen(true)
+  }
+
+  if (budgets.length === 0) {
+    return (
+      <>
+        <motion.section
+          variants={item}
+          className="rounded-3xl bg-card p-5 shadow-sm lg:p-6"
+        >
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-[17px] font-semibold tracking-tight">
+              Presupuestos
+            </h2>
+            <button
+              onClick={openCreate}
+              aria-label="Nuevo presupuesto"
+              className="pressable flex size-7 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+            >
+              <Plus size={16} strokeWidth={2.5} />
+            </button>
+          </div>
+          <p className="mt-2 text-[13px] text-muted-foreground">
+            Pon un límite mensual a una categoría de gasto para verla aquí.
+          </p>
+        </motion.section>
+        <BudgetFormSheet open={sheetOpen} onOpenChange={setSheetOpen} budget={editing} />
+      </>
+    )
+  }
+
+  const rows = budgets
+    .map((b) => ({
+      budget: b,
+      category: categories.find((c) => c.id === b.categoryId),
+      status: status.find((s) => s.categoryId === b.categoryId),
+    }))
+    .filter((row) => row.category)
+
+  return (
+    <>
+      <motion.section
+        variants={item}
+        className="rounded-3xl bg-card p-5 shadow-sm lg:p-6"
+      >
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-[17px] font-semibold tracking-tight">
+            Presupuestos
+          </h2>
+          <button
+            onClick={openCreate}
+            aria-label="Nuevo presupuesto"
+            className="pressable flex size-7 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+          >
+            <Plus size={16} strokeWidth={2.5} />
+          </button>
+        </div>
+        <ul className="mt-3 space-y-3">
+          {rows.map((row) => {
+            const spent = row.status?.spent ?? 0
+            const percentage = row.status?.percentage ?? 0
+            return (
+              <li
+                key={row.budget.id}
+                onClick={() => openEdit(row.budget)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    openEdit(row.budget)
+                  }
+                }}
+                className="pressable cursor-pointer"
+              >
+                <div className="mb-1 flex items-center gap-2 text-[13px]">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: row.category!.color }}
+                  />
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {row.category!.name}
+                  </span>
+                  <span className="tnum shrink-0 text-muted-foreground">
+                    {formatMoney(spent, true)} / {formatMoney(row.budget.amount, true)}
+                  </span>
+                </div>
+                <BudgetBar percentage={percentage} />
+              </li>
+            )
+          })}
+        </ul>
+      </motion.section>
+      <BudgetFormSheet open={sheetOpen} onOpenChange={setSheetOpen} budget={editing} />
+    </>
   )
 }
 

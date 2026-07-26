@@ -1,7 +1,16 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import (
+    Date,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -153,3 +162,19 @@ class RecurringRule(Base):
     anchor_day: Mapped[int | None] = mapped_column(nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(default=True)
+
+
+class Budget(Base):
+    """Límite de gasto por categoría. Global (no por mes): se define una vez
+    y el gasto de cada mes se recalcula en /budgets/status contra las
+    transacciones de ese periodo, sin recrear el presupuesto."""
+
+    __tablename__ = "budgets"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"))
+    amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("household_id", "category_id"),)

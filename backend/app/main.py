@@ -5,6 +5,7 @@ from app.api.routes import (
     accounts,
     attachments,
     auth,
+    budgets,
     categories,
     households,
     recurring,
@@ -37,6 +38,7 @@ for module in (
     recurring,
     attachments,
     summary,
+    budgets,
     tickets,
 ):
     app.include_router(module.router)

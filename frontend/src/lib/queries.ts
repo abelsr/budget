@@ -4,6 +4,8 @@ import { apiFetch } from "@/lib/api"
 import type {
   Account,
   Attachment,
+  Budget,
+  BudgetStatus,
   Category,
   Member,
   NewTransaction,
@@ -25,6 +27,8 @@ export const keys = {
   summary: ["summary", "month"] as const,
   household: ["household", "me"] as const,
   recurringRules: ["recurring-rules"] as const,
+  budgets: ["budgets"] as const,
+  budgetsStatus: ["budgets", "status"] as const,
 }
 
 export interface MonthSummary {
@@ -131,6 +135,7 @@ export function useAddTransaction() {
       queryClient.invalidateQueries({ queryKey: keys.transactions })
       queryClient.invalidateQueries({ queryKey: keys.accounts })
       queryClient.invalidateQueries({ queryKey: keys.summary })
+      queryClient.invalidateQueries({ queryKey: keys.budgetsStatus })
       // Con `repeat` el backend crea también la regla
       queryClient.invalidateQueries({ queryKey: keys.recurringRules })
     },
@@ -235,7 +240,12 @@ export function useDeleteCategory() {
 }
 
 export function useUpdateTransaction() {
-  const invalidate = useInvalidator(keys.transactions, keys.accounts, keys.summary)
+  const invalidate = useInvalidator(
+    keys.transactions,
+    keys.accounts,
+    keys.summary,
+    keys.budgetsStatus,
+  )
   return useMutation({
     mutationFn: ({ id, ...input }: Partial<NewTransaction> & { id: string }) =>
       apiFetch<Transaction>(`/transactions/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
@@ -244,7 +254,12 @@ export function useUpdateTransaction() {
 }
 
 export function useDeleteTransaction() {
-  const invalidate = useInvalidator(keys.transactions, keys.accounts, keys.summary)
+  const invalidate = useInvalidator(
+    keys.transactions,
+    keys.accounts,
+    keys.summary,
+    keys.budgetsStatus,
+  )
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/transactions/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
@@ -312,6 +327,58 @@ export function useDeleteAttachment() {
   const invalidate = useInvalidator(keys.transactions)
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/attachments/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Presupuestos
+// ---------------------------------------------------------------------------
+
+export interface BudgetInput {
+  categoryId: string
+  amount: number
+}
+
+export function useBudgets() {
+  return useQuery({
+    queryKey: keys.budgets,
+    queryFn: () => apiFetch<Budget[]>("/budgets"),
+  })
+}
+
+export function useBudgetsStatus() {
+  return useQuery({
+    queryKey: keys.budgetsStatus,
+    queryFn: () => apiFetch<BudgetStatus[]>("/budgets/status"),
+  })
+}
+
+export function useCreateBudget() {
+  const invalidate = useInvalidator(keys.budgets, keys.budgetsStatus)
+  return useMutation({
+    mutationFn: (input: BudgetInput) =>
+      apiFetch<Budget>("/budgets", { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateBudget() {
+  const invalidate = useInvalidator(keys.budgets, keys.budgetsStatus)
+  return useMutation({
+    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
+      apiFetch<Budget>(`/budgets/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ amount }),
+      }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteBudget() {
+  const invalidate = useInvalidator(keys.budgets, keys.budgetsStatus)
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/budgets/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
   })
 }

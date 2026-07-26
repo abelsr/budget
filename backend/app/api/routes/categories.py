@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Category, Transaction, User
+from app.models import Budget, Category, Transaction, User
 from app.schemas.categories import CategoryCreate, CategoryOut, CategoryUpdate
 
 router = APIRouter(prefix="/categories", tags=["categories"])
@@ -102,5 +102,8 @@ def delete_category(category_id: str, db: DbDep, user: CurrentUserDep) -> None:
     )
     if has_movements:
         raise HTTPException(status_code=409, detail="La categoría tiene movimientos")
+    # Un presupuesto no es un movimiento histórico como una transacción: no
+    # bloquea el borrado, solo se va con la categoría.
+    db.execute(delete(Budget).where(Budget.category_id == category.id))
     db.delete(category)
     db.commit()

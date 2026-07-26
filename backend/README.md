@@ -44,7 +44,7 @@ in-memory SQLite database (faster and isolated).
 ## Tests
 
 ```bash
-uv run pytest               # 65 tests, in-memory SQLite
+uv run pytest               # 78 tests, in-memory SQLite
 ```
 
 ## Docker (full stack from the repo root)
@@ -63,14 +63,14 @@ app/
 ├── database.py        # engine, session, Base
 ├── db_bootstrap.py    # migrates on startup (+ bridge for pre-Alembic databases)
 ├── models.py          # Household, User, Invitation, Account, Category,
-│                      # Transaction, Attachment, RecurringRule
+│                      # Transaction, Attachment, RecurringRule, Budget
 ├── seed.py            # default categories for each new household
 ├── core/security.py   # Argon2 + JWT
 ├── api/
 │   ├── deps.py        # get_db, get_current_user (Bearer JWT)
 │   └── routes/        # auth, households, accounts, categories,
 │                      # transactions, recurring, attachments,
-│                      # summary, tickets
+│                      # summary, budgets, tickets
 ├── services/
 │   ├── vision.py      # receipt scanner (OpenRouter via async OpenAI
 │   │                  # SDK; without OPENROUTER_API_KEY → 501)
@@ -124,5 +124,7 @@ Why this approach:
 | GET/POST/PATCH/DELETE | `/transactions` | Transaction CRUD (`?month=YYYY-MM`). `POST` accepts `repeat: weekly\|monthly` and creates the linked rule |
 | GET/POST/PATCH/DELETE | `/recurring-rules` | Recurring rule CRUD. `PATCH` only `amount`, `note`, and `active`; `DELETE` keeps the transactions already generated |
 | GET | `/summary/month` | Monthly income/expenses/donut chart |
+| GET/POST/PATCH/DELETE | `/budgets` | Budget CRUD (one per expense category, global — not per month) |
+| GET | `/budgets/status` | Spent vs. limit per category (`?month=YYYY-MM`) |
 | POST/GET/DELETE | `/transactions/{id}/attachments`, `/attachments/{id}` | Attachments (max 10MB) |
 | POST | `/tickets/scan` | AI receipt analysis (multipart) |

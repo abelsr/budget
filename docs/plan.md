@@ -35,7 +35,7 @@ Self-hosted, but with a multi-tenant schema ready to grow into a multi-family pr
 | Frontend | **React + Vite** (TypeScript), Tailwind CSS + shadcn/ui, TanStack Query, Recharts, Motion (springs) |
 | Platform | **Responsive web / PWA** (a single codebase for mobile and desktop) |
 | Deployment | **Docker Compose**: nginx (static build) + FastAPI + PostgreSQL + MinIO; HTTPS with Caddy/reverse proxy (pending) |
-| Quality | pytest for the backend (65 tests + 9 migration tests against Postgres); frontend validated with typecheck and build; CI on GitHub Actions |
+| Quality | pytest for the backend (78 tests + 9 migration tests against Postgres); frontend validated with typecheck and build; CI on GitHub Actions |
 
 ## Design language (frontend)
 
@@ -54,13 +54,14 @@ Based on the **Apple Design** skill (WWDC *Designing Fluid Interfaces* and Apple
 
 1. **MVP:** auth + households + accounts + categories + transactions + dashboard. ✅ **DONE** (+ AI scanner, attachments, dark mode)
 2. **Robustness:** migrations, invitations from the UI, onboarding, PWA, backups. 🚧 **In progress** — Alembic, invitations, and onboarding done; PWA and backups pending
-3. **Phase 2:** recurrence, CSV import, monthly budgets. 🚧 **In progress** — recurrence done; budgets, CSV, filters, and profile pending
+3. **Phase 2:** recurrence, CSV import, monthly budgets. 🚧 **In progress** — recurrence and budgets done; CSV, filters, and profile pending
 4. **Phase 3:** savings goals, personal accounts (privacy between members), offline-first with sync, multi-family opening. ⬜
 
-**Concrete next step:** monthly budgets
-([07](roadmap/07-presupuestos-mensuales.md)). HTTPS
-([15](roadmap/15-https-caddy.md)) is still blocked on installing Tailscale on the
-host (path already chosen). Details and log in [docs/roadmap/](roadmap/README.md).
+**Concrete next step:** HTTPS with Caddy
+([15](roadmap/15-https-caddy.md)), still blocked on installing Tailscale on the
+host (path already chosen) — or backups ([04](roadmap/04-backups.md)), which
+has no pending decision and is overdue given how much real household data now
+lives in Postgres. Details and log in [docs/roadmap/](roadmap/README.md).
 
 ## Repo structure
 
@@ -113,13 +114,17 @@ verified end-to-end, including access from a phone over the local IP.
   transactions. **Lazy materialization on read** (no scheduler), with an anchor day
   so a monthly rule on the 31st doesn't get stuck on 28 when passing through February, and
   `SELECT ... FOR UPDATE` to avoid duplicates from concurrent requests.
+- ✅ **Monthly budgets:** global limit per expense category (not per month),
+  traffic-light progress bars on the Dashboard (green/amber/red at 75%/100%),
+  create/edit sheet, and a count badge on the donut card when a category
+  goes over its limit.
 - ✅ **Apple Design UX:** dark mode (light/dark/system, anti-FOUC),
   translucent materials, springs, pointer-down feedback,
   `prefers-reduced-motion`, Spanish.
 
 **Infrastructure:**
 
-- ✅ Multi-tenant FastAPI backend (65 pytest tests, in-memory SQLite).
+- ✅ Multi-tenant FastAPI backend (78 pytest tests, in-memory SQLite).
 - ✅ camelCase responses end-to-end; `/api` proxy in Vite (dev) and nginx (prod).
 - ✅ Secrets in `.env` (root and backend/, ignored by git; templates in
   `.env.example` in both).
@@ -138,16 +143,15 @@ verified end-to-end, including access from a phone over the local IP.
 > Full details in **[docs/roadmap/](roadmap/README.md)** — one file per
 > pending item with why, scope, design, and acceptance criteria, plus the
 > log of what's already done. Closed: 01 (Alembic), 02 (invitations),
-> 05 (onboarding), 06 (recurring), 16 (CI).
+> 05 (onboarding), 06 (recurring), 07 (budgets), 16 (CI).
 
 **Immediate (robustness):**
 
 - ⬜ [Real PWA](roadmap/03-pwa-instalable.md): manifest + service worker (installable, offline shell).
-- ⬜ [Backups](roadmap/04-backups.md) of Postgres and MinIO.
+- ⬜ [Backups](roadmap/04-backups.md) of Postgres and MinIO. **Next.**
 
 **Phase 2 (features):**
 
-- ⬜ [Monthly budgets](roadmap/07-presupuestos-mensuales.md) per category with traffic-light bars. **Next.**
 - ⬜ [CSV import](roadmap/08-importacion-csv.md) of account statements.
 - ⬜ [Filters and search](roadmap/09-filtros-busqueda.md) in Transactions.
 - ⬜ [Profile and password change](roadmap/10-perfil-y-password.md).
