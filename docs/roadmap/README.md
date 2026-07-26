@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 6 of 17 done (01, 02, 05, 06, 07, 16) · last updated 2026-07-25
+> **Progress:** 7 of 17 done (01, 02, 04, 05, 06, 07, 16) · last updated 2026-07-26
 
 ## Immediate — robustness
 
@@ -13,7 +13,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 | 01 | [Alembic: migrations](01-alembic-migraciones.md) | ✅ 2026-07-24 | High | M |
 | 02 | [Invitations end-to-end](02-invitaciones-end-to-end.md) | ✅ 2026-07-24 | High | S |
 | 03 | [Installable PWA](03-pwa-instalable.md) | ⬜ | Medium | M |
-| 04 | [Backups](04-backups.md) | ⬜ | Medium | S |
+| 04 | [Backups](04-backups.md) | ✅ 2026-07-26 | Medium | S |
 | 05 | [Plane-style onboarding](05-onboarding.md) | ✅ 2026-07-24 | High | M |
 
 ## Phase 2 — features
@@ -45,7 +45,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 
 ## Suggested attack order
 
-`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 15 → 04`
+`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 04 ✅ → 15`
 
 Invitations and onboarding completed the family experience; Alembic and HTTPS
 harden it for production; recurring transactions and budgets are the features with the most
@@ -56,9 +56,15 @@ decision (custom domain vs. Tailscale) and CI didn't depend on anything.
 **06 and 07 were also moved ahead of 15** for the same reason: the decision is
 still pending and neither feature depended on anything.
 
-**Next: 15 — HTTPS with Caddy**, once Tailscale is installed on the host
-(see below) — or **04 — Backups**, which also has no pending decision and
-is overdue given how much real household data now lives in Postgres.
+**04 was done before 15**, for the third time for the same reason: 15 is still
+waiting on an infrastructure step and 04 had no pending decision. It was also
+overdue — 06 and 07 were both deployed after taking manual backups by hand,
+precisely because the automated one did not exist yet.
+
+**Next: 15 — HTTPS with Caddy**, once Tailscale is installed on the host (see
+below). If that step stays pending, the unblocked items are **09 — Filters and
+search** and **10 — Profile and password change** (both effort S), or
+**03 — Installable PWA**.
 
 **15 (HTTPS with Caddy) is still blocked on a decision, with the path already
 chosen: Tailscale** (`tailscale cert` over the tailnet, nothing exposed to the internet,
@@ -69,6 +75,40 @@ invitation link relies on the `document.execCommand('copy')` fallback because pl
 over IP is not a secure context (see `frontend/src/lib/clipboard.ts`).
 
 ## Log
+
+**2026-07-26 — 04 (backups) implemented, and the restore verified end to end.**
+
+- **The doc's own definition of "clean stack" was wrong**, and it mattered:
+  the backend runs Alembic on startup, so a fresh deployment already has the
+  schema at head and a plain `pg_dump` restore fails. The dump needed
+  `--clean --if-exists`. Found by actually building the clean stack first and
+  looking at it, instead of trusting the phrase.
+- **A bind mount for the MinIO tar is a docker-in-docker trap.** `-v
+  ./backups:/backup` is resolved by the host daemon, so the doc's command would
+  have written nowhere useful when run from the optional `backup` compose
+  service. Streaming `tar cz` to stdout makes one code path correct in both
+  contexts. Moral: a path handed to `docker run` and a path the script writes to
+  are not the same namespace.
+- **Postgres credentials come from the running container, not `.env`.** The doc
+  said `.env`; the compose file sets them literally and `.env` never had them.
+- Artifacts are written as `*.part` and renamed only on success, so an
+  interrupted run cannot leave a truncated file that passes for a backup.
+- **Restore verified against a throwaway compose project**
+  (`-p budget-restoretest`, its own volumes, ports 18000/18081) running beside
+  the real stack, which was never touched. After restoring: all seven table
+  counts identical, `alembic_version` at head with nothing to migrate, and both
+  MinIO volumes byte-identical file by file. Then logged into the restored app
+  in the browser at 440px — balances ($17,652.50 / $23,985.01), income/expense,
+  donut, all three transactions, and the 7.4 MB receipt opening and decoding at
+  full resolution. Only console output was a pre-existing Recharts mount
+  warning.
+- To log in, a password was reset **on the disposable copy only**; the real
+  hash was confirmed afterwards to still match the one in the pre-test dump.
+  The test project, its volumes, and its images were all removed.
+- Left alone deliberately: `.env.example` is still in Spanish (the
+  translate-to-english pass missed it) and one of the two `attachments` rows has
+  no object in MinIO — a pre-existing orphan, present identically in the real
+  volume and therefore not caused by the backup.
 
 **2026-07-25 — 07 (monthly budgets) implemented and verified against a real Postgres.**
 
