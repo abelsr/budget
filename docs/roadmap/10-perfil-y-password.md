@@ -1,46 +1,46 @@
-# 👤 Perfil y cambio de contraseña
+# 👤 Profile and password change
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Media · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
+**Status:** ⬜ Pending · **Priority:** Medium · **Effort:** S (<1 day) · **Dependencies:** None
 
-## Por qué
-Hoy el nombre del usuario y la contraseña son inmutables desde la UI. Es lo mínimo esperable de cualquier cuenta, y su ausencia obliga a tocar la DB a mano.
+## Why
+Today the user's name and password are immutable from the UI. This is the bare minimum expected of any account, and its absence forces manual DB edits.
 
-## Alcance
-**Incluye:**
-- Edición del nombre visible del usuario.
-- Cambio de contraseña con verificación de la actual.
+## Scope
+**Includes:**
+- Editing the user's display name.
+- Password change with verification of the current one.
 
-**No incluye:**
-- Cambio de email (es la identidad de login; queda fuera por ahora — documentado abajo).
-- Recuperación de contraseña olvidada (flujo de email).
-- Foto de perfil o avatar.
+**Does not include:**
+- Email change (it's the login identity; out of scope for now — documented below).
+- Forgotten password recovery (email flow).
+- Profile photo or avatar.
 
-## Diseño propuesto
+## Proposed design
 ### Backend
-- `PATCH /auth/me` con `{name}` → actualiza el nombre del usuario autenticado.
-  - **Decisión documentada: no incluir email.** El email es la identidad de login; cambiarlo implica re-verificación y casos borde (colisiones entre hogares). Fuera de alcance.
-- `POST /auth/change-password` con `{currentPassword, newPassword}`:
-  - Verifica `currentPassword`; si falla, responde `401` (o `400` con código claro) sin revelar más.
-  - Valida `newPassword` con mínimo 8 caracteres.
-  - Re-hashea con el mismo hasher actual.
-  - **Decisión recomendada: los tokens JWT existentes siguen válidos** (stateless, sin lista de revocación). Simplicidad para self-hosted familiar; invalidar requeriría store de tokens o versioning.
+- `PATCH /auth/me` with `{name}` → updates the authenticated user's name.
+  - **Documented decision: do not include email.** Email is the login identity; changing it implies re-verification and edge cases (collisions across households). Out of scope.
+- `POST /auth/change-password` with `{currentPassword, newPassword}`:
+  - Verifies `currentPassword`; if it fails, respond `401` (or `400` with a clear code) without revealing more.
+  - Validates `newPassword` with a minimum of 8 characters.
+  - Re-hashes with the same current hasher.
+  - **Recommended decision: existing JWT tokens remain valid** (stateless, no revocation list). Simplicity for a self-hosted family app; invalidating would require a token store or versioning.
 ### Frontend
-- En Ajustes > Cuenta:
-  - Editar nombre: inline o sheet simple con un campo; al guardar se refleja en sidebar/detalle.
-  - "Cambiar contraseña": sheet con 3 campos (actual, nueva, confirmar nueva); validación local de coincidencia y longitud mínima; errores del servidor mostrados en el sheet (p.ej. "La contraseña actual es incorrecta"); haptic feedback al éxito.
-- Invalidar/refetch de la query del usuario tras ambos cambios (patrón existente en `src/lib/queries.ts`).
+- In Settings > Account:
+  - Edit name: inline or simple sheet with one field; on save it's reflected in the sidebar/detail view.
+  - "Change password": sheet with 3 fields (current, new, confirm new); local validation of match and minimum length; server errors shown in the sheet (e.g. "Current password is incorrect"); haptic feedback on success.
+- Invalidate/refetch the user query after both changes (existing pattern in `src/lib/queries.ts`).
 ### Infra
-- Sin cambios.
+- No changes.
 
-## Criterios de aceptación
-- [ ] Cambiar el nombre se refleja inmediatamente en el sidebar y en el detalle de la cuenta.
-- [ ] Tras cambiar la contraseña, el login con la nueva funciona y con la vieja es rechazado.
-- [ ] Contraseña actual incorrecta devuelve error claro mostrado en el sheet.
-- [ ] Contraseña nueva de menos de 8 caracteres es rechazada con mensaje.
-- [ ] Los tokens activos siguen funcionando tras el cambio de contraseña (no se cierra la sesión).
-- [ ] Tests: PATCH nombre, cambio exitoso, contraseña actual incorrecta, validación de longitud.
+## Acceptance criteria
+- [ ] Changing the name is immediately reflected in the sidebar and account detail view.
+- [ ] After changing the password, login with the new one works and the old one is rejected.
+- [ ] Incorrect current password returns a clear error shown in the sheet.
+- [ ] A new password under 8 characters is rejected with a message.
+- [ ] Active tokens keep working after the password change (the session is not closed).
+- [ ] Tests: PATCH name, successful change, incorrect current password, length validation.
 
-## Notas
-- Riesgo: ninguno relevante; son endpoints estándar sobre auth ya existente.
-- Decisión abierta a futuro: si se agrega recuperación de contraseña, se necesita envío de email — hoy no hay infra de correo.
-- Si más adelante se quiere invalidar sesiones al cambiar la contraseña, agregar `password_version` al usuario e incluirlo en el payload del JWT.
+## Notes
+- Risk: none relevant; these are standard endpoints on top of existing auth.
+- Open future decision: if password recovery is added, email sending is needed — there is no mail infra today.
+- If sessions should be invalidated on password change in the future, add `password_version` to the user and include it in the JWT payload.

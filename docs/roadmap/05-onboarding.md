@@ -1,117 +1,117 @@
-# 🧭 Onboarding estilo Plane (wizard inicial)
+# 🧭 Plane-style onboarding (initial wizard)
 
-**Estado:** ✅ Hecho y verificado (2026-07-24) · **Prioridad:** Alta · **Esfuerzo:** M (1-3 días) · **Dependencias:** 02-invitaciones-end-to-end (reutiliza la generación de link), 01-alembic-migraciones (necesaria para agregar la columna nueva sin romper DBs existentes)
+**Status:** ✅ Done and verified (2026-07-24) · **Priority:** High · **Effort:** M (1-3 days) · **Dependencies:** 02-invitaciones-end-to-end (reuses link generation), 01-alembic-migraciones (needed to add the new column without breaking existing DBs)
 
-## Por qué
-Hoy, tras registrarse, el usuario cae directo en un dashboard vacío con solo la cuenta "Efectivo" en $0 y ninguna guía. Es la fricción clásica de adopción: no sabe qué hacer primero y abandona. Plane resuelve esto con un wizard de setup (crear workspace → invitar al equipo → tour). Copiamos ese patrón adaptado a finanzas familiares: bienvenida → cuentas iniciales → invitar familia → empezar.
+## Why
+Today, after registering, the user lands directly on an empty dashboard with only the "Cash" account at $0 and no guidance. This is the classic adoption friction: they don't know what to do first and they abandon. Plane solves this with a setup wizard (create workspace → invite the team → tour). We copy that pattern adapted to family finances: welcome → initial accounts → invite family → get started.
 
-## Alcance
-**Incluye:**
-- Flag de onboarding por usuario (persistente en backend)
-- Ruta `/onboarding` con wizard de 4 pasos, progreso visible y animaciones con springs
-- Creación de cuentas iniciales con saldo dentro del wizard
-- Generación de link de invitación dentro del wizard
-- Opción de skip en todo momento
+## Scope
+**Includes:**
+- Per-user onboarding flag (persisted on the backend)
+- `/onboarding` route with a 4-step wizard, visible progress and spring animations
+- Creating initial accounts with a balance inside the wizard
+- Generating an invitation link inside the wizard
+- Skip option available at all times
 
-**No incluye:**
-- Tour interactivo del dashboard después del wizard (fase futura)
-- Importación de movimientos históricos ni plantillas de categorías en el wizard
-- Onboarding para miembros que se unen por invitación (ellos entran directo)
+**Doesn't include:**
+- Interactive dashboard tour after the wizard (future phase)
+- Importing historical transactions or category templates in the wizard
+- Onboarding for members who join via invitation (they go straight in)
 
-## Diseño propuesto
+## Proposed design
 
 ### Backend
-- **Decisión: el flag vive en `User`, no en `Household`.** Justificación: el wizard es una experiencia del usuario que se registra creando un hogar nuevo. Si estuviera en `Household`, un segundo miembro que se une después heredaría el estado del admin (no vería nada, correcto) pero tampoco habría forma de distinguir "quién ya pasó por aquí" si en el futuro se quiere onboarding por miembro. Con el flag en `User`, se muestra el wizard **solo a quien se registra creando hogar nuevo**; quien entra con invitación se marca como completado automáticamente al registrarse.
-- Modelo `User`: agregar `onboarding_completed_at: DateTime` (nullable). `NULL` = pendiente. Requiere migración (ver dependencia con `01-alembic-migraciones.md`).
-- `GET /auth/me`: incluir el flag en la respuesta (ej. `onboarding_completed: bool` derivado de `onboarding_completed_at IS NOT NULL`).
-- `PATCH /auth/me/onboarding` con body `{ "completed": true }`: setea `onboarding_completed_at = now()`. Idempotente.
-- Al registrar con invitación (`/auth/register` con token de invitación): marcar `onboarding_completed_at` de inmediato — no necesita el wizard.
-- Tests: nuevos casos para el PATCH, el flag en `/auth/me`, y el comportamiento distinto registro normal vs. invitación.
+- **Decision: the flag lives on `User`, not on `Household`.** Rationale: the wizard is an experience for the user who registers by creating a new household. If it lived on `Household`, a second member who joins later would inherit the admin's state (they wouldn't see it, which is correct), but there would also be no way to distinguish "who has already been through here" if per-member onboarding is wanted in the future. With the flag on `User`, the wizard is shown **only to whoever registers by creating a new household**; whoever joins via invitation is marked as completed automatically upon registering.
+- `User` model: add `onboarding_completed_at: DateTime` (nullable). `NULL` = pending. Requires a migration (see dependency on `01-alembic-migraciones.md`).
+- `GET /auth/me`: include the flag in the response (e.g. `onboarding_completed: bool` derived from `onboarding_completed_at IS NOT NULL`).
+- `PATCH /auth/me/onboarding` with body `{ "completed": true }`: sets `onboarding_completed_at = now()`. Idempotent.
+- When registering with an invitation (`/auth/register` with an invitation token): mark `onboarding_completed_at` immediately — no need for the wizard.
+- Tests: new cases for the PATCH, the flag in `/auth/me`, and the different behavior between normal registration vs. invitation.
 
 ### Frontend
-- Ruta `/onboarding` protegida. En `RequireAuth` (que ya maneja `isLoading`): si el usuario autenticado tiene `onboarding_completed === false`, redirigir a `/onboarding`; al completarse, redirigir al dashboard. Evitar loop: `/onboarding` misma no redirige.
-- Wizard de 4 pasos estilo Plane, con indicador de progreso (puntos o barra) y transiciones con springs (entrar/salir por el mismo camino, estilo Apple; reusar la librería de animación ya presente en el proyecto —p. ej. framer-motion/spring— y respetar `prefers-reduced-motion`):
-  1. **Bienvenida:** "Bienvenido a Finanzas Familiares, \<nombre\>" + 3 bullets con iconos de qué puede hacer la app (registrar movimientos, escanear tickets, compartir con tu familia).
-  2. **Tus cuentas:** lista editable de cuentas iniciales con saldo. "Efectivo" ya existe → mostrarla precargada; permitir agregar Débito / Crédito / Ahorro (u otras) con nombre y saldo inicial. Usa el hook existente `useCreateAccount`.
-  3. **Invita a tu familia:** genera el link de invitación con un tap (`POST /households/me/invitations`), botones copiar/compartir (misma UI de `02-invitaciones-end-to-end.md`) y opción "Lo hago después".
-  4. **Listo:** resumen breve (cuentas creadas, invitación enviada o pendiente) + botón "Empezar" que llama `PATCH /auth/me/onboarding` y navega al dashboard.
-- Skip siempre visible: "Configurar después" → llama al mismo PATCH y navega al dashboard (el wizard no vuelve a aparecer).
-- Compatible con modo oscuro (el wizard usa los mismos tokens de tema que el resto de la app).
+- Protected `/onboarding` route. In `RequireAuth` (which already handles `isLoading`): if the authenticated user has `onboarding_completed === false`, redirect to `/onboarding`; once completed, redirect to the dashboard. Avoid a loop: `/onboarding` itself does not redirect.
+- Plane-style 4-step wizard, with a progress indicator (dots or bar) and spring transitions (enter/exit along the same path, Apple-style; reuse the animation library already present in the project — e.g. framer-motion/spring — and respect `prefers-reduced-motion`):
+  1. **Welcome:** "Welcome to Family Finances, \<name\>" + 3 bullets with icons about what the app can do (log transactions, scan receipts, share with your family).
+  2. **Your accounts:** editable list of initial accounts with a balance. "Cash" already exists → show it pre-loaded; allow adding Debit / Credit / Savings (or others) with a name and initial balance. Uses the existing `useCreateAccount` hook.
+  3. **Invite your family:** generates the invitation link with one tap (`POST /households/me/invitations`), copy/share buttons (same UI as `02-invitaciones-end-to-end.md`) and a "I'll do this later" option.
+  4. **Done:** brief summary (accounts created, invitation sent or pending) + "Get started" button that calls `PATCH /auth/me/onboarding` and navigates to the dashboard.
+- Skip always visible: "Set up later" → calls the same PATCH and navigates to the dashboard (the wizard doesn't show again).
+- Compatible with dark mode (the wizard uses the same theme tokens as the rest of the app).
 
 ### Infra
-- Sin cambios (la columna nueva llega vía migración de Alembic)
+- No changes (the new column arrives via an Alembic migration)
 
-## Criterios de aceptación
-- [x] Un usuario nuevo que crea hogar ve el wizard la primera vez; recargar la página no lo repite ni lo rompe
-- [x] En el paso 2 puede crear al menos 1 cuenta con saldo inicial y aparece luego en Cuentas
-- [x] En el paso 3 puede generar y copiar el link de invitación (mismo comportamiento que en Ajustes)
-- [x] El skip ("Configurar después") está disponible en todos los pasos y marca el flag
-- [x] Un usuario que se registra con link de invitación NO ve el wizard (entra directo al dashboard)
-- [x] El modo oscuro se respeta en los 4 pasos
-- [ ] Con `prefers-reduced-motion` activo, las transiciones se reducen/eliminan — **no probado**: sale del `MotionConfig reducedMotion="user"` que ya envuelve toda la app, pero no se pudo emular la media query desde las herramientas usadas
-- [x] Los tests nuevos del backend pasan y los 37 existentes siguen pasando (41 en total)
+## Acceptance criteria
+- [x] A new user who creates a household sees the wizard the first time; reloading the page doesn't repeat it or break it
+- [x] In step 2 they can create at least 1 account with an initial balance and it later shows up in Accounts
+- [x] In step 3 they can generate and copy the invitation link (same behavior as in Settings)
+- [x] Skip ("Set up later") is available on all steps and marks the flag
+- [x] A user who registers with an invitation link does NOT see the wizard (goes straight to the dashboard)
+- [x] Dark mode is respected across all 4 steps
+- [ ] With `prefers-reduced-motion` enabled, transitions are reduced/removed — **not tested**: it relies on the `MotionConfig reducedMotion="user"` that already wraps the whole app, but the media query could not be emulated with the tools used
+- [x] The new backend tests pass and the 37 existing ones keep passing (41 total)
 
-## Qué se implementó (2026-07-24)
+## What was implemented (2026-07-24)
 
 **Backend**
-- `User.onboarding_completed_at` (nullable; NULL = pendiente) + migración
-  `673ed5f3d911`. La migración **hace backfill**: los usuarios que ya existían
-  se marcan como completados, porque su hogar ya está configurado y no les toca
-  wizard al desplegar.
-- `GET /auth/me` devuelve `onboardingCompleted` (derivado de la fecha).
-- `PATCH /auth/me/onboarding` con `{completed}`: idempotente (repetir no mueve la
-  fecha guardada) y acepta `false` para reabrirlo.
-- `POST /auth/join` marca el flag al crear al miembro: quien llega por
-  invitación entra directo al dashboard.
-- 4 tests nuevos (41 en total): registro deja pendiente, PATCH idempotente,
-  reabrir, y 401 sin token. `test_join_flow` cubre el caso de la invitación.
+- `User.onboarding_completed_at` (nullable; NULL = pending) + migration
+  `673ed5f3d911`. The migration **backfills**: users who already existed
+  are marked as completed, because their household is already set up and they
+  don't need the wizard on deploy.
+- `GET /auth/me` returns `onboardingCompleted` (derived from the date).
+- `PATCH /auth/me/onboarding` with `{completed}`: idempotent (repeating it doesn't
+  move the stored date) and accepts `false` to reopen it.
+- `POST /auth/join` sets the flag when creating the member: whoever arrives via
+  invitation goes straight to the dashboard.
+- 4 new tests (41 total): registration leaves it pending, PATCH idempotent,
+  reopening, and 401 without a token. `test_join_flow` covers the invitation case.
 
 **Frontend**
-- `pages/OnboardingPage.tsx`: wizard de 4 pasos (bienvenida → cuentas → familia
-  → listo), barra de progreso de 4 segmentos, transición horizontal
-  direccional (entra y sale por el mismo camino) con `AnimatePresence` y
-  springs, "Configurar después" siempre visible en el header.
-  - Paso 2 lee las cuentas del backend (`useAccounts`), así que "Efectivo" ya
-    aparece y recargar a mitad del wizard no duplica nada; el formulario inline
-    crea con `useCreateAccount`.
-  - Paso 4 resume cuentas creadas e invitación generada o pendiente.
-- `components/InviteLink.tsx`: se extrajo el contenido del `InviteSheet` de la
-  tarea 02 para reusarlo. `autoGenerate` distingue los dos usos: en el sheet
-  abrir ya es el gesto, en el wizard hay botón explícito para no dejar
-  invitaciones sueltas al pasar por el paso.
-- `lib/auth.tsx`: `Session.onboardingCompleted` + `completeOnboarding()`.
-- `App.tsx`: ruta `/onboarding` fuera del `AppShell` (pantalla completa) y
-  guard en `RequireAuth` en ambos sentidos — sin flag completado todo redirige
-  al wizard, con el flag completado `/onboarding` redirige al dashboard. Nada
-  se decide antes de que `/auth/me` resuelva, así que no hay loop ni parpadeo.
-- Modo oscuro y `prefers-reduced-motion` salen gratis: solo tokens de tema y el
-  `MotionConfig reducedMotion="user"` que ya envuelve la app.
+- `frontend/src/pages/OnboardingPage.tsx`: 4-step wizard (welcome → accounts → family
+  → done), 4-segment progress bar, directional horizontal transition
+  (enters and exits along the same path) with `AnimatePresence` and
+  springs, "Set up later" always visible in the header.
+  - Step 2 reads accounts from the backend (`useAccounts`), so "Cash" already
+    shows up and reloading mid-wizard doesn't duplicate anything; the inline form
+    creates via `useCreateAccount`.
+  - Step 4 summarizes accounts created and invitation generated or pending.
+- `frontend/src/components/InviteLink.tsx`: the content of task 02's `InviteSheet` was
+  extracted to reuse it. `autoGenerate` distinguishes the two uses: in the sheet,
+  opening it is already the gesture, in the wizard there's an explicit button so
+  as not to leave stray invitations when passing through the step.
+- `frontend/src/lib/auth.tsx`: `Session.onboardingCompleted` + `completeOnboarding()`.
+- `App.tsx`: `/onboarding` route outside the `AppShell` (full screen) and
+  a guard in `RequireAuth` in both directions — without the flag completed everything
+  redirects to the wizard, with the flag completed `/onboarding` redirects to the dashboard. Nothing
+  is decided before `/auth/me` resolves, so there's no loop or flicker.
+- Dark mode and `prefers-reduced-motion` come for free: just theme tokens and the
+  `MotionConfig reducedMotion="user"` that already wraps the app.
 
-**Verificado:** 41 tests pasan, `tsc -b && vite build` limpio, `oxlint` sin
-warnings nuevos, migración con `upgrade`/`downgrade`/`check` en SQLite y Postgres.
+**Verified:** 41 tests pass, `tsc -b && vite build` clean, `oxlint` with no
+new warnings, migration with `upgrade`/`downgrade`/`check` on SQLite and Postgres.
 
-**Recorrido en navegador (2026-07-24, stack en Docker, viewport 430×900):**
-- Registro nuevo → redirige a `/onboarding` con "Bienvenido, Sofía".
-- Paso 2: "Efectivo" precargada; se creó "Nómina BBVA" con $15,750.50.
-- Recarga a mitad del wizard: sigue en el wizard, reinicia en el paso 1 y las
-  cuentas siguen siendo 2 (sin duplicados).
-- Paso 3: link generado con URL absoluta y expiración correcta ("31 de julio");
-  "Copiar link" → botón muestra "Copiado" y `navigator.clipboard.readText()`
-  devolvió el link exacto. "Compartir" no se renderiza en escritorio (sin
-  `navigator.share`), como se diseñó.
-- Paso 4: "2 cuentas listas" / "Invitación lista para compartir" → "Empezar" →
-  dashboard con balance $15,750.50 (la cuenta del wizard persistió).
-- `/onboarding` a mano tras completarlo → redirige al dashboard. Con onboarding
-  pendiente, entrar a `/cuentas` redirige al wizard. Sin loops ni parpadeos.
-- "Configurar después" en el paso 1 → dashboard, y `/onboarding` deja de abrir.
-- Invitación end-to-end en contexto aislado: segundo usuario se registró con el
-  link y entró **directo al dashboard, sin wizard**; Ajustes > Hogar muestra los
-  2 miembros. Reusar el link consumido → "Invitación inválida o expirada".
-- Temas: pasos 1 y 4 en oscuro, 2 y 3 en claro; el sheet de Ajustes en claro con
-  su material translúcido. Sin errores ni warnings en consola.
+**Browser walkthrough (2026-07-24, stack in Docker, 430×900 viewport):**
+- New registration → redirects to `/onboarding` with "Welcome, Sofía".
+- Step 2: "Cash" pre-loaded; "Nómina BBVA" was created with $15,750.50.
+- Reload mid-wizard: stays in the wizard, restarts at step 1 and the
+  accounts remain at 2 (no duplicates).
+- Step 3: link generated with an absolute URL and the correct expiration ("July 31");
+  "Copy link" → button shows "Copied" and `navigator.clipboard.readText()`
+  returned the exact link. "Share" doesn't render on desktop (no
+  `navigator.share`), as designed.
+- Step 4: "2 accounts ready" / "Invitation ready to share" → "Get started" →
+  dashboard with a $15,750.50 balance (the wizard's account persisted).
+- `/onboarding` visited manually after completing it → redirects to the dashboard. With onboarding
+  pending, going to `/accounts` redirects to the wizard. No loops or flicker.
+- "Set up later" on step 1 → dashboard, and `/onboarding` no longer opens.
+- Invitation end-to-end in an isolated context: a second user registered with the
+  link and went **straight to the dashboard, no wizard**; Settings > Household shows the
+  2 members. Reusing the consumed link → "Invalid or expired invitation".
+- Themes: steps 1 and 4 in dark mode, 2 and 3 in light mode; the Settings sheet in light mode with
+  its translucent material. No errors or warnings in the console.
 
-## Notas
-- Inspiración de UX: wizard de setup de Plane (https://plane.so) — progreso lineal, un paso a la vez, skip siempre disponible.
-- Riesgo: redirección en `RequireAuth` mal hecha puede crear loops o parpadeos; apoyarse en el `isLoading` existente y no decidir la ruta hasta tener `/auth/me` resuelto.
-- Decisión abierta: ¿permitir re-abrir el wizard desde Ajustes ("Repetir configuración inicial")? No incluido en el alcance; si surge, es un botón que resetea el flag.
-- Si el paso 2 crea cuentas y el usuario recarga a mitad del wizard, las cuentas ya creadas no deben duplicarse al volver (cargar las cuentas existentes al entrar al paso 2 en lugar de asumir estado vacío).
+## Notes
+- UX inspiration: Plane's setup wizard (https://plane.so) — linear progress, one step at a time, skip always available.
+- Risk: a poorly implemented redirect in `RequireAuth` can create loops or flicker; rely on the existing `isLoading` and don't decide the route until `/auth/me` has resolved.
+- Open decision: allow re-opening the wizard from Settings ("Repeat initial setup")? Not included in scope; if it comes up, it's a button that resets the flag.
+- If step 2 creates accounts and the user reloads mid-wizard, the already-created accounts must not get duplicated on return (load existing accounts when entering step 2 instead of assuming empty state).

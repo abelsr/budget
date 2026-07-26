@@ -1,44 +1,44 @@
-# 🎯 Presupuestos mensuales
+# 🎯 Monthly budgets
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Alta · **Esfuerzo:** M (1-3 días) · **Dependencias:** Ninguna
+**Status:** ⬜ Pending · **Priority:** High · **Effort:** M (1-3 days) · **Dependencies:** None
 
-## Por qué
-Después del registro de gastos, la feature más pedida: límites por categoría con alertas visuales. Es lo que convierte la app de "historial" en "herramienta de control".
+## Why
+After expense tracking, this is the most requested feature: per-category limits with visual alerts. It's what turns the app from a "history" into a "control tool."
 
-## Alcance
-**Incluye:**
-- Modelo y CRUD de presupuestos por categoría.
-- Endpoint de estado (gastado vs límite) cruzado con el summary del mes.
-- Barras de progreso con semáforo en el dashboard.
+## Scope
+**Includes:**
+- Model and CRUD for budgets per category.
+- Status endpoint (spent vs limit) cross-referenced with the month's summary.
+- Progress bars with traffic-light colors on the dashboard.
 
-**No incluye:**
-- Presupuestos por cuenta, miembro o período arbitrario.
-- Alertas push/notificaciones al exceder.
-- Presupuestos de ingresos.
+**Does not include:**
+- Budgets per account, member, or arbitrary period.
+- Push alerts/notifications when exceeding the limit.
+- Income budgets.
 
-## Diseño propuesto
+## Proposed design
 ### Backend
-- Modelo `budgets`: `{id, household_id, category_id, amount NUMERIC}`, con `UNIQUE(household_id, category_id)`.
-- **Decisión recomendada: presupuesto global por categoría** (un límite vigente siempre, aplicado cada mes) en lugar de un registro por mes (`YYYY-MM`). Más simple: se define una vez y se reutiliza; el conteo mensual se calcula con las transacciones del mes. No hay que recrear presupuestos cada mes.
-- CRUD `/budgets`: `GET` (lista del hogar), `POST`/`PATCH` (upsert por `category_id`), `DELETE /{id}`. Scoping por `household_id`.
-- Endpoint `GET /budgets/status?month=YYYY-MM` → por categoría con presupuesto: `{categoryId, budget, spent, percentage}`, cruzando con la misma lógica de `/summary/month` (solo gastos).
+- `budgets` model: `{id, household_id, category_id, amount NUMERIC}`, with `UNIQUE(household_id, category_id)`.
+- **Recommended decision: a global budget per category** (a limit that's always active, applied every month) instead of a record per month (`YYYY-MM`). Simpler: it's defined once and reused; the monthly count is calculated from that month's transactions. No need to recreate budgets every month.
+- CRUD `/budgets`: `GET` (household list), `POST`/`PATCH` (upsert by `category_id`), `DELETE /{id}`. Scoped by `household_id`.
+- Endpoint `GET /budgets/status?month=YYYY-MM` → per category with a budget: `{categoryId, budget, spent, percentage}`, cross-referenced with the same logic as `/summary/month` (expenses only).
 ### Frontend
-- Sección "Presupuestos" en el dashboard (debajo de la dona): barras de progreso por categoría con color semáforo — verde `<75%`, ámbar `<100%`, rojo `≥100%`. Si crece mucho, evaluar página propia `/presupuestos`.
-- Crear/editar límite desde la misma vista: sheet simple con categoría (select) + monto. Editar = mismo sheet precargado.
-- Badge en la dona del dashboard si alguna categoría supera su límite (punto rojo o contador).
-- Hook nuevo en `src/lib/queries.ts` siguiendo el patrón de mutaciones existente.
+- "Budgets" section on the dashboard (below the donut chart): progress bars per category with traffic-light colors — green `<75%`, amber `<100%`, red `≥100%`. If it grows too much, consider a dedicated `/budgets` page.
+- Create/edit limit from the same view: simple sheet with category (select) + amount. Edit = same sheet pre-loaded.
+- Badge on the dashboard donut if any category exceeds its limit (red dot or counter).
+- New hook in `src/lib/queries.ts` following the existing mutation pattern.
 ### Infra
-- Migración Alembic para la tabla `budgets`.
+- Alembic migration for the `budgets` table.
 
-## Criterios de aceptación
-- [ ] Definir límite a "Supermercado", registrar gastos → la barra avanza y cambia de color al cruzar 75% y 100%.
-- [ ] Al empezar un mes nuevo, el conteo se reinicia sin recrear el presupuesto.
-- [ ] No se puede crear un segundo presupuesto para la misma categoría (upsert o error claro).
-- [ ] Eliminar una categoría con presupuesto no rompe `/budgets/status` (cascade o validación).
-- [ ] `/budgets/status` solo incluye gastos (`type=expense`), no ingresos.
-- [ ] Tests: CRUD, cálculo de `spent`/`percentage`, unicidad por hogar+categoría.
+## Acceptance criteria
+- [ ] Set a limit for "Groceries", log expenses → the bar advances and changes color when crossing 75% and 100%.
+- [ ] When a new month starts, the count resets without recreating the budget.
+- [ ] A second budget cannot be created for the same category (upsert or clear error).
+- [ ] Deleting a category with a budget does not break `/budgets/status` (cascade or validation).
+- [ ] `/budgets/status` only includes expenses (`type=expense`), not income.
+- [ ] Tests: CRUD, `spent`/`percentage` calculation, uniqueness per household+category.
 
-## Notas
-- Riesgo: duplicar la lógica de agregación de `/summary/month`; reutilizar la misma query base.
-- Decisión abierta: si en el futuro se quieren límites distintos por mes, el modelo global migra a `month` nullable sin romper lo existente.
-- UX: mostrar también el monto restante ("te quedan $1,200") junto al porcentaje.
+## Notes
+- Risk: duplicating the aggregation logic from `/summary/month`; reuse the same base query.
+- Open decision: if different limits per month are wanted in the future, the global model can migrate to a nullable `month` without breaking existing behavior.
+- UX: also show the remaining amount ("you have $1,200 left") alongside the percentage.

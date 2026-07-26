@@ -1,51 +1,51 @@
-# 📴 Modo offline con cola de sincronización
+# 📴 Offline mode with sync queue
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Baja · **Esfuerzo:** L (3+ días) · **Dependencias:** 03-pwa (service worker ya instalado)
+**Status:** ⬜ Pending · **Priority:** Low · **Effort:** L (3+ days) · **Dependencies:** 03-pwa (service worker already installed)
 
-## Por qué
-El caso de uso principal es registrar un gasto en el momento: en el súper, en la calle, con datos móviles malos. Hoy, sin conexión, la app simplemente falla y el gasto se olvida. Una cola offline convierte la captura en confiable aunque la red no lo sea; es el siguiente paso natural después de tener la PWA instalable.
+## Why
+The main use case is logging an expense on the spot: at the supermarket, on the street, with bad mobile data. Today, without a connection, the app simply fails and the expense gets forgotten. An offline queue makes capture reliable even when the network isn't; it's the natural next step after having an installable PWA.
 
-## Alcance
-**Incluye:**
-- Outbox en IndexedDB: movimientos creados sin conexión se guardan localmente con estado "pendiente"
-- Sincronización automática al volver online (listener `online` + reintento; Background Sync API donde esté disponible)
-- Banner persistente "Sin conexión — N movimientos pendientes" con estado de la cola
-- Lectura offline del último snapshot de datos (persistir el cache de TanStack Query en localStorage)
-- Resolución de conflictos simple: server-wins (los movimientos son append-only, colisiones raras)
+## Scope
+**Includes:**
+- Outbox in IndexedDB: transactions created offline are saved locally with a "pending" status
+- Automatic sync when back online (`online` listener + retry; Background Sync API where available)
+- Persistent banner "Offline — N pending transactions" showing queue status
+- Offline reading of the last data snapshot (persist the TanStack Query cache in localStorage)
+- Simple conflict resolution: server-wins (transactions are append-only, collisions are rare)
 
-**No incluye:**
-- Edición offline de movimientos existentes (solo creación)
-- Sincronización de cuentas/categorías/metas (se asumen estables; si faltan, la subida falla y reintenta)
-- Conflict resolution UI (no aplica con append-only + server-wins)
-- Attachments offline (el escáner y los adjuntos requieren red; se encolan solo los datos del movimiento)
+**Excludes:**
+- Offline editing of existing transactions (creation only)
+- Syncing accounts/categories/goals (assumed stable; if missing, the upload fails and retries)
+- Conflict resolution UI (not applicable with append-only + server-wins)
+- Offline attachments (the scanner and attachments require network; only transaction data is queued)
 
-## Diseño propuesto
+## Proposed design
 
 ### Backend
-- Endpoint de sync idempotente: el cliente envía `client_id` (UUID generado en el dispositivo) en cada movimiento; el servidor lo guarda y rechaza duplicados (constraint único por household) para tolerar reintentos
-- Sin cambios en modelos de negocio más allá del `client_id` nullable en `transactions`
-- Respuesta de error clara si el movimiento referencia una cuenta/categoría inexistente (el cliente lo marca como fallido y lo reporta)
+- Idempotent sync endpoint: the client sends `client_id` (UUID generated on the device) with each transaction; the server stores it and rejects duplicates (unique constraint per household) to tolerate retries
+- No business model changes beyond the nullable `client_id` on `transactions`
+- Clear error response if the transaction references a nonexistent account/category (the client marks it as failed and reports it)
 
 ### Frontend
-- Outbox en IndexedDB (`idb` o Dexie): tabla `pending_mutations` con `{ client_id, payload, created_at, attempts, last_error }`
-- Interceptor en el layer de mutaciones: si `navigator.onLine === false` o el POST falla por red (no por 4xx), guardar en outbox y devolver éxito optimista
-- Flush: al evento `online`, al recuperar foco, y con `setInterval` de respaldo; cada item se sube en orden y se borra al confirmar 2xx
-- Banner global: lee el estado de la red y el conteo del outbox ("Sin conexión — 3 movimientos pendientes"); desaparece al vaciarse
-- `persistQueryClient` (plugin oficial de TanStack Query) con persister de localStorage: al abrir sin red, se muestran los datos del último snapshot con indicador de "datos de hace X"
-- Los movimientos pendientes se muestran en el feed con badge "Pendiente de subir" (optimistic UI desde el outbox, no del cache de queries)
+- Outbox in IndexedDB (`idb` or Dexie): `pending_mutations` table with `{ client_id, payload, created_at, attempts, last_error }`
+- Interceptor in the mutations layer: if `navigator.onLine === false` or the POST fails due to a network error (not a 4xx), save it to the outbox and return an optimistic success
+- Flush: on the `online` event, on regaining focus, and with a backup `setInterval`; each item is uploaded in order and deleted once confirmed with a 2xx
+- Global banner: reads network status and the outbox count ("Offline — 3 pending transactions"); disappears once empty
+- `persistQueryClient` (official TanStack Query plugin) with a localStorage persister: when opened offline, the last snapshot's data is shown with a "data from X ago" indicator
+- Pending transactions appear in the feed with a "Pending upload" badge (optimistic UI from the outbox, not from the query cache)
 
 ### Infra
-- Sin cambios
+- No changes
 
-## Criterios de aceptación
-- [ ] Modo avión → registrar un gasto → aparece en el feed con badge "Pendiente" y el banner cuenta 1
-- [ ] Al volver la conexión, el gasto se sube solo, el badge desaparece y el banner se vacía sin intervención del usuario
-- [ ] Un reintento (doble flush, recarga a mitad de sync) no duplica movimientos en el servidor
-- [ ] Sin conexión, al abrir la app se ven los datos del último snapshot con indicador de antigüedad
-- [ ] Un movimiento que falla con 4xx se marca como error y no bloquea el resto de la cola
+## Acceptance criteria
+- [ ] Airplane mode → log an expense → it appears in the feed with a "Pending" badge and the banner counts 1
+- [ ] When the connection returns, the expense uploads on its own, the badge disappears, and the banner clears without user intervention
+- [ ] A retry (double flush, reload mid-sync) does not duplicate transactions on the server
+- [ ] Offline, opening the app shows the last snapshot's data with an age indicator
+- [ ] A transaction that fails with a 4xx is marked as an error and does not block the rest of the queue
 
-## Notas
-- Riesgo: estados raros del service worker combinados con el outbox (p. ej. SW sirviendo shell viejo con lógica de sync distinta). Probar el flujo de actualización de la PWA junto con la cola.
-- `client_id` debe generarse una vez por movimiento y sobrevivir recargas del navegador (vive en IndexedDB, no en memoria).
-- Decisión abierta: Background Sync API no existe en Safari iOS; el fallback de listener `online` + foco es suficiente para el uso real, documentarlo.
-- No intentar sincronizar attachments offline: el flujo del escáner ya es inherentemente online (llamada a OpenRouter).
+## Notes
+- Risk: rare service worker states combined with the outbox (e.g. SW serving an old shell with different sync logic). Test the PWA update flow together with the queue.
+- `client_id` must be generated once per transaction and survive browser reloads (it lives in IndexedDB, not in memory).
+- Open decision: the Background Sync API doesn't exist on Safari iOS; the `online` listener + focus fallback is sufficient for real-world use — document this.
+- Don't attempt to sync attachments offline: the scanner flow is already inherently online (call to OpenRouter).

@@ -1,49 +1,49 @@
-# 💾 Backups de Postgres y MinIO
+# 💾 Postgres and MinIO backups
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Media · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
+**Status:** ⬜ Pending · **Priority:** Medium · **Effort:** S (<1 day) · **Dependencies:** None
 
-## Por qué
-Son finanzas familiares self-hosted: los datos viven en dos volúmenes Docker (`pgdata` y `minio_data`). Perder esos volúmenes —disco roto, `docker compose down -v` accidental, migración de servidor mal hecha— es perder **todo**, sin recursos a terceros. Un backup automático y un restore documentado son la red de seguridad mínima.
+## Why
+This is self-hosted family finance software: the data lives in two Docker volumes (`pgdata` and `minio_data`). Losing those volumes — a broken disk, an accidental `docker compose down -v`, a botched server migration — means losing **everything**, with no third-party recourse. An automatic backup and a documented restore procedure are the minimum safety net.
 
-## Alcance
-**Incluye:**
-- Script `scripts/backup.sh` que genera dump de Postgres + copia de los archivos de MinIO con timestamp en `./backups/`
-- Retención simple (borrar backups con más de 30 días)
-- Opción de automatización: servicio con cron en compose o documentación para cron del host
-- Procedimiento de restore documentado en el README
+## Scope
+**Includes:**
+- `scripts/backup.sh` script that generates a Postgres dump + a copy of the MinIO files with a timestamp in `./backups/`
+- Simple retention (delete backups older than 30 days)
+- Automation option: a cron service in compose or documentation for host cron
+- Restore procedure documented in the README
 
-**No incluye:**
-- Backups cifrados ni subida a destinos remotos (S3, B2, etc.) — el usuario puede rsync/sync la carpeta `./backups/` por su cuenta
+**Doesn't include:**
+- Encrypted backups or upload to remote destinations (S3, B2, etc.) — the user can rsync/sync the `./backups/` folder on their own
 - Point-in-time recovery (WAL archiving)
-- Backup de la configuración (`.env`, compose) — aunque se menciona como recomendación
+- Backup of the configuration (`.env`, compose) — although it's mentioned as a recommendation
 
-## Diseño propuesto
+## Proposed design
 
 ### Backend
-- Sin cambios
+- No changes
 
 ### Frontend
-- Sin cambios
+- No changes
 
 ### Infra
 - `scripts/backup.sh`:
-  - Dump de Postgres: `docker compose exec -T db pg_dump -U <user> <db> | gzip > ./backups/pg-<timestamp>.sql.gz`
-  - Attachments: `tar` del volumen `minio_data` (`docker run --rm -v ..._minio_data:/data -v ./backups:/backup alpine tar czf /backup/minio-<timestamp>.tar.gz -C /data .`) o `mc mirror` a una carpeta local — elegir uno y documentarlo (preferir `tar` del volumen: cero dependencias nuevas)
-  - Retención: `find ./backups -name '*.gz' -mtime +30 -delete`
-  - Variables leídas del `.env` existente (credenciales de Postgres); fail-fast con `set -euo pipefail`
-- Automatización (una de las dos, documentar ambas):
-  - Cron del host: línea de ejemplo `0 3 * * * /ruta/al/proyecto/scripts/backup.sh`
-  - Servicio opcional en compose con una imagen de cron que ejecute el script (perfil `backup` para no arrancarlo por defecto)
-- README: sección "Restaurar un backup" — levantar stack limpio, `gunzip < dump | docker compose exec -T db psql ...`, restaurar el tar en el volumen de MinIO, arrancar
+  - Postgres dump: `docker compose exec -T db pg_dump -U <user> <db> | gzip > ./backups/pg-<timestamp>.sql.gz`
+  - Attachments: `tar` of the `minio_data` volume (`docker run --rm -v ..._minio_data:/data -v ./backups:/backup alpine tar czf /backup/minio-<timestamp>.tar.gz -C /data .`) or `mc mirror` to a local folder — pick one and document it (prefer `tar` of the volume: zero new dependencies)
+  - Retention: `find ./backups -name '*.gz' -mtime +30 -delete`
+  - Variables read from the existing `.env` (Postgres credentials); fail-fast with `set -euo pipefail`
+- Automation (one of the two, document both):
+  - Host cron: example line `0 3 * * * /path/to/project/scripts/backup.sh`
+  - Optional compose service with a cron image that runs the script (`backup` profile so it doesn't start by default)
+- README: "Restoring a backup" section — bring up a clean stack, `gunzip < dump | docker compose exec -T db psql ...`, restore the tar into the MinIO volume, start it up
 
-## Criterios de aceptación
-- [ ] Correr `scripts/backup.sh` genera el dump comprimido de Postgres y el archivo de MinIO en `./backups/` con timestamp
-- [ ] Los backups con más de 30 días se eliminan automáticamente al correr el script
-- [ ] Restore probado: en un stack limpio (volúmenes nuevos), restaurar ambos artefactos levanta la app con los datos anteriores (usuarios, cuentas, transacciones y attachments visibles)
-- [ ] El README documenta backup y restore paso a paso
+## Acceptance criteria
+- [ ] Running `scripts/backup.sh` generates the compressed Postgres dump and the MinIO archive in `./backups/` with a timestamp
+- [ ] Backups older than 30 days are automatically deleted when running the script
+- [ ] Restore tested: on a clean stack (new volumes), restoring both artifacts brings up the app with the previous data (users, accounts, transactions and attachments visible)
+- [ ] The README documents backup and restore step by step
 
-## Notas
-- Probar el restore **antes** de necesitarlo: un backup no verificado no es un backup.
-- `pg_dump` en caliente es consistente para este caso de uso (app familiar, baja concurrencia); no hace falta detener el backend.
-- `./backups/` debe estar en `.gitignore`.
-- Decisión abierta: si más adelante se agrega destino remoto, `restic` o `rclone` son buenas opciones sin cambiar la estructura del script.
+## Notes
+- Test the restore **before** you need it: an unverified backup is not a backup.
+- A hot `pg_dump` is consistent enough for this use case (family app, low concurrency); there's no need to stop the backend.
+- `./backups/` must be in `.gitignore`.
+- Open decision: if a remote destination is added later, `restic` or `rclone` are good options without changing the script's structure.

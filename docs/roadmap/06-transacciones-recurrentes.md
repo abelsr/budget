@@ -1,95 +1,95 @@
-# 🔁 Transacciones recurrentes
+# 🔁 Recurring transactions
 
-**Estado:** ✅ Hecho 2026-07-25 · **Prioridad:** Alta · **Esfuerzo:** M (1-3 días) · **Dependencias:** Ninguna
+**Status:** ✅ Done 2026-07-25 · **Priority:** High · **Effort:** M (1-3 days) · **Dependencies:** None
 
-## Por qué
-Renta, sueldo y suscripciones son la columna vertebral de las finanzas familiares, y capturarlos a mano cada mes es la fricción #1 del día a día. La tabla `recurring_rules` ya existe en el esquema — falta exponerla y materializarla.
+## Why
+Rent, salary and subscriptions are the backbone of family finances, and capturing them by hand every month is the #1 day-to-day friction. The `recurring_rules` table already exists in the schema — it's just missing being exposed and materialized.
 
-## Alcance
-**Incluye:**
-- CRUD de reglas recurrentes con scoping por hogar.
-- Materialización de transacciones pendientes (lazy, al leer).
-- Opción "Repetir" en el sheet de registro.
-- Sección para listar/pausar/eliminar reglas.
+## Scope
+**Includes:**
+- CRUD for recurring rules scoped by household.
+- Materialization of pending transactions (lazy, on read).
+- "Repeat" option in the entry sheet.
+- Section to list/pause/delete rules.
 
-**No incluye:**
-- Frecuencias adicionales (quincenal, anual, personalizada).
-- Edición retroactiva de transacciones ya generadas.
-- Notificaciones de "se generó una transacción".
+**Doesn't include:**
+- Additional frequencies (biweekly, yearly, custom).
+- Retroactive editing of already-generated transactions.
+- "A transaction was generated" notifications.
 
-## Diseño propuesto
+## Proposed design
 ### Backend
-- Endpoints `/recurring-rules`: `GET` (lista del hogar), `POST` (crear), `PATCH /{id}` (pausar/editar `amount`, `note`, `active`), `DELETE /{id}`. Todos filtrados por `household_id`.
-- Materialización **lazy** (decisión recomendada para MVP self-hosted, sin scheduler): al llamar `GET /transactions`, antes de responder, generar las transacciones pendientes de reglas `active` con `next_run_date <= hoy` y avanzar `next_run_date`.
-  - `weekly`: `+7 días`.
-  - `monthly`: mismo día del mes siguiente, cuidando meses cortos (p.ej. 31 de enero → 28/29 de febrero, usando el último día del mes si el día no existe).
-  - Una regla puede materializar varias ocurrencias atrasadas en un solo paso (loop hasta `next_run_date > hoy`).
-- **Evitar duplicados**: el avance de `next_run_date` y la inserción ocurren en la misma transacción de DB; al ser lazy e idempotente por fecha, releer no duplica.
-- **Decisión propuesta**: agregar `recurring_rule_id` nullable a `transactions` para soportar el badge en frontend y futura trazabilidad. Las transacciones manuales quedan en `NULL`.
-- Documentar en el endpoint por qué lazy y no job: en self-hosted no hay scheduler garantizado; lazy garantiza consistencia sin infra extra.
+- `/recurring-rules` endpoints: `GET` (household list), `POST` (create), `PATCH /{id}` (pause/edit `amount`, `note`, `active`), `DELETE /{id}`. All filtered by `household_id`.
+- **Lazy** materialization (recommended decision for a self-hosted MVP, no scheduler): when `GET /transactions` is called, before responding, generate the pending transactions for `active` rules with `next_run_date <= today` and advance `next_run_date`.
+  - `weekly`: `+7 days`.
+  - `monthly`: same day of the following month, being careful with short months (e.g. January 31 → February 28/29, using the last day of the month if the day doesn't exist).
+  - A single rule can materialize several overdue occurrences in one pass (loop until `next_run_date > today`).
+- **Avoiding duplicates**: advancing `next_run_date` and the insert happen in the same DB transaction; being lazy and idempotent by date, re-reading doesn't duplicate.
+- **Proposed decision**: add a nullable `recurring_rule_id` to `transactions` to support the frontend badge and future traceability. Manual transactions stay `NULL`.
+- Document in the endpoint why lazy and not a job: in self-hosted there's no guaranteed scheduler; lazy guarantees consistency without extra infra.
 ### Frontend
-- En el sheet de registro rápido: selector "Repetir" con opciones **No repetir / Semanal / Mensual**. Si se elige una frecuencia, se crea la regla (con `next_run_date` = fecha de la transacción + frecuencia) y la transacción actual queda como la primera ocurrencia.
-- Sección "Recurrentes" en Ajustes (o en Movimientos): lista de reglas con monto, categoría, frecuencia y próxima fecha; acciones pausar/reanudar y eliminar.
-- Badge sutil ("Recurrente") en transacciones generadas, visible en la lista y en el sheet de detalle, usando `recurring_rule_id`.
+- In the quick entry sheet: a "Repeat" selector with **No repeat / Weekly / Monthly** options. If a frequency is chosen, the rule is created (with `next_run_date` = transaction date + frequency) and the current transaction becomes the first occurrence.
+- "Recurring" section in Settings (or in Transactions): list of rules with amount, category, frequency and next date; pause/resume and delete actions.
+- Subtle badge ("Recurring") on generated transactions, visible in the list and in the detail sheet, using `recurring_rule_id`.
 ### Infra
-- Sin cambios (la tabla ya existe; solo migración menor si se agrega `recurring_rule_id` a `transactions`).
+- No changes (the table already exists; only a minor migration if `recurring_rule_id` is added to `transactions`).
 
-## Criterios de aceptación
-- [x] Crear una regla mensual con `next_run_date` en el pasado → al cargar Movimientos aparece la transacción materializada.
-- [x] Recargar o volver a llamar `GET /transactions` no duplica las transacciones generadas.
-- [x] Pausar una regla (`active=false`) detiene futuras materializaciones; reactivarla las reanuda desde la fecha correcta.
-- [x] Eliminar una regla no borra las transacciones ya generadas.
-- [x] Regla mensual del día 31 materializa correctamente en febrero (último día del mes).
-- [x] Tests: materialización, no-duplicación, meses cortos, pausa. (65 tests pasan + 9 de migraciones.)
+## Acceptance criteria
+- [x] Creating a monthly rule with `next_run_date` in the past → the materialized transaction appears when loading Transactions.
+- [x] Reloading or calling `GET /transactions` again doesn't duplicate the generated transactions.
+- [x] Pausing a rule (`active=false`) stops future materializations; reactivating it resumes them from the correct date.
+- [x] Deleting a rule doesn't delete the already-generated transactions.
+- [x] A monthly rule on the 31st materializes correctly in February (last day of the month).
+- [x] Tests: materialization, non-duplication, short months, pausing. (65 tests pass + 9 migration tests.)
 
-## Notas
-- Riesgo: la materialización lazy en `GET /transactions` añade trabajo a un endpoint caliente; si crece, mover a un endpoint dedicado `POST /recurring-rules/materialize` llamado al abrir la app.
-- Decisión abierta: si el usuario edita una regla (p.ej. cambia el monto), ¿afecta solo futuras ocurrencias? Propuesta: sí, nunca retroactivo.
+## Notes
+- Risk: lazy materialization in `GET /transactions` adds work to a hot endpoint; if it grows, move it to a dedicated `POST /recurring-rules/materialize` endpoint called when the app opens.
+- Open decision: if the user edits a rule (e.g. changes the amount), does it affect only future occurrences? Proposal: yes, never retroactive.
 
-## Cómo quedó (2026-07-25)
+## How it turned out (2026-07-25)
 
-Implementado con cuatro desvíos del diseño de arriba, todos por problemas que
-aparecieron al escribirlo:
+Implemented with four deviations from the design above, all due to problems that
+came up while writing it.
 
-1. **Materializa en tres endpoints, no en uno.** El Dashboard es la pantalla de
-   entrada y dispara `/accounts`, `/transactions` y `/summary/month` **en
-   paralelo**: enganchar solo el de movimientos dejaba el saldo y el resumen
-   desfasados en la primera carga tras vencer una regla. El servicio es
-   idempotente, así que llamarlo desde los tres es seguro; `GET
-   /recurring-rules` también lo llama, o la pantalla mostraría una "próxima
-   fecha" ya pasada.
-2. **Día ancla guardado en la regla** (`anchor_day`). El diseño decía "31 de
-   enero → 28 de febrero", pero guardando el 28 en `next_run_date` marzo partía
-   de ahí y la renta se movía al 28 **para siempre**. Con el ancla la secuencia
-   real es 31 ene → 28 feb → 31 mar → 30 abr → 31 may → 30 jun.
-3. **`repeat` en `POST /transactions`** en vez de dos llamadas desde el
-   frontend. Crea transacción y regla ligadas en una sola operación atómica; en
-   dos pasos, si la segunda falla queda una transacción huérfana o una regla sin
-   primera ocurrencia.
-4. **`created_by_id` en la regla.** `transactions.member_id` es NOT NULL y
-   atribuir lo generado a quien casualmente abrió la app haría que el mismo
-   gasto cambiara de miembro según quién entrara primero.
+1. **Materializes in three endpoints, not one.** The Dashboard is the entry
+   screen and it fires `/accounts`, `/transactions` and `/summary/month` **in
+   parallel**: hooking only the transactions one left the balance and the summary
+   out of sync on the first load after a rule came due. The service is
+   idempotent, so calling it from all three is safe; `GET
+   /recurring-rules` also calls it, otherwise the screen would show a "next
+   date" already in the past.
+2. **Anchor day stored on the rule** (`anchor_day`). The design said "January 31
+   → February 28", but storing the 28 in `next_run_date` meant March started
+   from there and rent moved to the 28th **forever**. With the anchor, the
+   real sequence is Jan 31 → Feb 28 → Mar 31 → Apr 30 → May 31 → Jun 30.
+3. **`repeat` in `POST /transactions`** instead of two calls from the
+   frontend. It creates the transaction and the linked rule in a single atomic
+   operation; in two steps, if the second one fails you end up with an orphaned
+   transaction or a rule without a first occurrence.
+4. **`created_by_id` on the rule.** `transactions.member_id` is NOT NULL, and
+   attributing what was generated to whoever happened to open the app would make
+   the same expense change member depending on who logged in first.
 
-**Cómo se garantiza la no-duplicación.** La lectura de reglas vencidas toma
-`SELECT ... FOR UPDATE`, y la inserción y el avance de `next_run_date` van en la
-misma transacción de DB. Si dos peticiones llegan juntas, la segunda se bloquea;
-al liberarse, Postgres re-evalúa el `WHERE` contra la fila ya actualizada, la
-regla no califica y se va sin generar nada. Verificado con 8 peticiones
-concurrentes contra Postgres 17 real: 4 ocurrencias, cero duplicados. En SQLite
-—los tests— el `FOR UPDATE` no se renderiza, pero ahí no hay concurrencia.
+**How non-duplication is guaranteed.** Reading overdue rules uses
+`SELECT ... FOR UPDATE`, and the insert and the advance of `next_run_date` are in
+the same DB transaction. If two requests arrive together, the second one blocks;
+once released, Postgres re-evaluates the `WHERE` against the already-updated row,
+the rule no longer qualifies and it exits without generating anything. Verified with 8
+concurrent requests against real Postgres 17: 4 occurrences, zero duplicates. In SQLite
+— the tests — `FOR UPDATE` isn't rendered, but there's no concurrency there.
 
-**Semántica de pausar/reanudar.** El criterio decía "reanudarla las reanuda
-desde la fecha correcta" sin definir cuál. Se eligió **saltar hacia adelante**:
-quien apagó la regla en marzo no quiere que al prenderla en julio le caigan
-cuatro meses de renta. Reanudar una regla que no venció no mueve su fecha.
+**Pause/resume semantics.** The criteria said "resuming it resumes them from the
+correct date" without defining which one. **Jumping forward** was chosen:
+whoever turned off the rule in March doesn't want four months of rent to hit
+when they turn it on in July. Resuming a rule that hasn't come due doesn't move its date.
 
-**Tope de atraso.** `next_run_date` no puede estar a más de un año en el pasado
-(422). Sin tope, una fecha de hace años materializaría cientos de transacciones
-en la primera lectura.
+**Backlog cap.** `next_run_date` can't be more than a year in the past (422).
+Without a cap, a date from years ago would materialize hundreds of transactions
+on the first read.
 
-**PATCH solo toca `amount`, `note` y `active`.** Cambiar categoría, cuenta o
-frecuencia es otra regla: mejor borrar y crear que reescribir la historia.
+**PATCH only touches `amount`, `note` and `active`.** Changing category, account or
+frequency is a different rule: better to delete and create than to rewrite history.
 
-Borrar una regla suelta el enlace de sus transacciones (`recurring_rule_id` a
-NULL) en vez de borrarlas: son dinero que se movió. Pierden el badge, que es la
-única información que se va.
+Deleting a rule unlinks its transactions (`recurring_rule_id` set to
+NULL) instead of deleting them: that's money that moved. They lose the badge, which is the
+only information that goes away.

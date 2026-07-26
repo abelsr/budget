@@ -1,55 +1,55 @@
-# 🌐 Apertura multi-familia
+# 🌐 Opening up to multiple families
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Baja · **Esfuerzo:** L (3+ días) · **Dependencias:** 01-alembic ✅ (hecho), 15-https-caddy (HTTPS obligatorio para exponer auth a internet)
+**Status:** ⬜ Pending · **Priority:** Low · **Effort:** L (3+ days) · **Dependencies:** 01-alembic ✅ (done), 15-https-caddy (HTTPS mandatory before exposing auth to the internet)
 
-## Por qué
-Hoy la app sirve a una sola familia por despliegue, con acceso por IP local. Abrir el registro público convierte el proyecto en un producto que cualquier familia puede usar sin que el dev intervenga. Implica endurecer la superficie expuesta a internet: rate limiting, anti-abuso, mínimos legales. Es un cambio de postura de seguridad, no solo un endpoint nuevo.
+## Why
+Today the app serves a single family per deployment, accessed via local IP. Opening up public signup turns the project into a product that any family can use without the dev's involvement. This means hardening the surface exposed to the internet: rate limiting, anti-abuse measures, legal minimums. It's a security posture change, not just a new endpoint.
 
-## Alcance
-**Incluye:**
-- Signup público: cualquier persona crea su cuenta y su hogar en un solo flujo (el register actual ya crea hogar propio; exponerlo sin restricción)
-- Rate limiting básico en endpoints de auth (register, login, join)
-- Verificación de email: decisión documentada abajo (recomendado: con servicio externo o diferirla)
-- Límites anti-abuso: máximo de invitaciones activas por hogar, máximo de miembros por hogar
-- Página de privacidad mínima (qué datos se guardan, dónde, quién los ve)
-- Telemetría: ninguna, u opt-in explícito (recomendado: ninguna al inicio)
+## Scope
+**Includes:**
+- Public signup: anyone can create their account and household in a single flow (the current register endpoint already creates its own household; exposing it without restriction)
+- Basic rate limiting on auth endpoints (register, login, join)
+- Email verification: decision documented below (recommended: use an external service or defer it)
+- Anti-abuse limits: maximum active invitations per household, maximum members per household
+- Minimal privacy page (what data is stored, where, who sees it)
+- Telemetry: none, or explicit opt-in (recommended: none at first)
 
-**No incluye:**
-- Recuperación de contraseña por email (depende de la verificación; puede ser fase posterior)
-- Login social (Google/Apple)
-- Planes de pago, billing o límites comerciales
-- Panel de administración de la instancia (ban de usuarios, métricas)
+**Excludes:**
+- Password recovery via email (depends on verification; can be a later phase)
+- Social login (Google/Apple)
+- Paid plans, billing, or commercial limits
+- Instance admin panel (banning users, metrics)
 
-## Diseño propuesto
+## Proposed design
 
 ### Backend
-- `slowapi` (o middleware propio) para rate limiting: p. ej. 5 registros/hora/IP, 10 logins/min/IP, límites en `/invitations`
-- Límites de negocio en configuración: `MAX_MEMBERS_PER_HOUSEHOLD`, `MAX_ACTIVE_INVITATIONS_PER_HOUSEHOLD` (valores razonables, p. ej. 10 y 5)
-- Verificación de email — **decisión:** iniciar SIN verificación obligatoria pero con el campo `email_verified` en el modelo desde ya; cuando se active, integrar Resend (o SES) con un endpoint `POST /auth/verify` y bloqueo suave (recordatorio, no impedimento) al inicio. Justificación: añadir email transaccional es otra dependencia de infra y otro secreto; el valor anti-abuso real al inicio lo da el rate limiting
-- Endpoint `GET /legal/privacy` servido como contenido estático o página del frontend
-- Tests: rate limit devuelve 429, límites de invitaciones se respetan, dos hogares registrados por el flujo público quedan aislados
+- `slowapi` (or custom middleware) for rate limiting: e.g. 5 registrations/hour/IP, 10 logins/min/IP, limits on `/invitations`
+- Business limits in configuration: `MAX_MEMBERS_PER_HOUSEHOLD`, `MAX_ACTIVE_INVITATIONS_PER_HOUSEHOLD` (reasonable values, e.g. 10 and 5)
+- Email verification — **decision:** start WITHOUT mandatory verification but with the `email_verified` field in the model from the start; once activated, integrate Resend (or SES) with a `POST /auth/verify` endpoint and a soft block (reminder, not a hard blocker) initially. Rationale: adding transactional email is another infra dependency and another secret; the real anti-abuse value at the start comes from rate limiting
+- `GET /legal/privacy` endpoint served as static content or a frontend page
+- Tests: rate limit returns 429, invitation limits are respected, two households registered through the public flow remain isolated from each other
 
 ### Frontend
-- Página pública de signup (hoy el registro puede estar escondido): copy claro de "crea el hogar de tu familia"
-- Pantallas de estado para verificación de email (cuando se active)
-- Página `/privacidad` accesible desde el footer y desde el signup
-- Mensajes de error legibles para 429 ("demasiados intentos, espera unos minutos")
+- Public signup page (today the register page may be hidden): clear copy like "create your family's household"
+- Status screens for email verification (once activated)
+- `/privacy` page accessible from the footer and from signup
+- Readable error messages for 429 ("too many attempts, wait a few minutes")
 
 ### Infra
-- HTTPS activo (15) antes de abrir el registro: auth sin TLS en internet es inaceptable
-- Variables nuevas en `.env` del backend: límites, y credenciales del proveedor de email si se activa verificación
-- Backups del volumen `pgdata` pasan a ser críticos (ya no son solo datos propios): documentar al menos un `pg_dump` programado
-- Decisión de hosting: la instancia pública puede vivir en el mismo host o en un VPS barato; documentar requisitos mínimos
+- HTTPS active (15) before opening up registration: auth without TLS on the internet is unacceptable
+- New variables in the backend `.env`: limits, and email provider credentials if verification is activated
+- Backups of the `pgdata` volume become critical (no longer just your own data): document at least one scheduled `pg_dump`
+- Hosting decision: the public instance can live on the same host or on a cheap VPS; document minimum requirements
 
-## Criterios de aceptación
-- [ ] Una instancia pública desplegada permite que dos familias reales se registren y usen la app sin ver datos de la otra
-- [ ] El rate limiting bloquea un script de registros masivos (429 tras el límite)
-- [ ] Los límites de miembros e invitaciones por hogar se aplican y devuelven error claro
-- [ ] Existe página de privacidad accesible sin login
-- [ ] Todo el flujo corre sobre HTTPS con CORS restringido al dominio público
+## Acceptance criteria
+- [ ] A deployed public instance lets two real families register and use the app without seeing each other's data
+- [ ] Rate limiting blocks a mass-registration script (429 after the limit)
+- [ ] Member and invitation limits per household are enforced and return a clear error
+- [ ] A privacy page exists and is accessible without login
+- [ ] The whole flow runs over HTTPS with CORS restricted to the public domain
 
-## Notas
-- Riesgo mayor: abrir auth a internet multiplica la superficie de ataque. Antes de este archivo, revisar: fuerza del `JWT_SECRET`, expiración de tokens, que no haya endpoints sin auth por descuido, y que el escáner IA no se pueda abusar como proxy de OpenRouter (rate limit también ahí).
-- Los costos de OpenRouter pasan a ser por uso de terceros: considerar límite de escaneos por hogar/día o dejar el escáner como feature opt-in con API key propia del usuario.
-- Decisión abierta: ¿una instancia pública gestionada por el dev, o solo "self-hosteable por otros"? El alcance asume instancia pública gestionada; si fuera solo self-host, la mayoría de este archivo se reduce a documentación.
-- Sin telemetría no hay forma de detectar abuso pasivo: mínimo logs (17-monitoreo) activos en la instancia pública.
+## Notes
+- Bigger risk: opening auth to the internet multiplies the attack surface. Before this file, review: strength of `JWT_SECRET`, token expiration, that there are no accidentally unauthenticated endpoints, and that the AI scanner can't be abused as an OpenRouter proxy (rate limit there too).
+- OpenRouter costs become third-party usage costs: consider a limit on scans per household/day, or leave the scanner as an opt-in feature with the user's own API key.
+- Open decision: a public instance managed by the dev, or just "self-hostable by others"? The scope assumes a dev-managed public instance; if it were self-host only, most of this file reduces to documentation.
+- Without telemetry there's no way to detect passive abuse: at minimum, logs (17-monitoreo) should be active on the public instance.

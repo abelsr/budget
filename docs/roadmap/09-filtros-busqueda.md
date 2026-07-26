@@ -1,46 +1,46 @@
-# 🔍 Filtros y búsqueda en Movimientos
+# 🔍 Filters and search in Transactions
 
-**Estado:** ⬜ Pendiente · **Prioridad:** Media · **Esfuerzo:** S (<1 día) · **Dependencias:** Ninguna
+**Status:** ⬜ Pending · **Priority:** Medium · **Effort:** S (<1 day) · **Dependencies:** None
 
-## Por qué
-La lista de Movimientos crece cada día y hoy no hay forma de encontrar nada: ni buscar por nota, ni filtrar por categoría o cuenta. Es la carencia más visible de la página.
+## Why
+The Transactions list grows every day and today there's no way to find anything: no searching by note, no filtering by category or account. It's the most visible gap on the page.
 
-## Alcance
-**Incluye:**
-- Parámetros de filtro/búsqueda en `GET /transactions`.
-- Barra de búsqueda con debounce y chips de filtro en Movimientos.
-- Filtros reflejados en la URL (compartibles).
+## Scope
+**Includes:**
+- Filter/search parameters on `GET /transactions`.
+- Search bar with debounce and filter chips in Transactions.
+- Filters reflected in the URL (shareable).
 
-**No incluye:**
-- Búsqueda full-text avanzada (ranking, fuzzy).
-- Filtros guardados o vistas personalizadas.
-- Filtrado en el dashboard.
+**Does not include:**
+- Advanced full-text search (ranking, fuzzy matching).
+- Saved filters or custom views.
+- Filtering on the dashboard.
 
-## Diseño propuesto
+## Proposed design
 ### Backend
-- Extender `GET /transactions` con query params:
-  - `q`: busca en `note` con `ILIKE '%q%'`.
+- Extend `GET /transactions` with query params:
+  - `q`: searches `note` with `ILIKE '%q%'`.
   - `categoryId`, `accountId`, `memberId`, `type` (`expense|income`).
-  - `from`, `to`: rango de fechas (ISO).
-- Mantener compatibilidad total con los params actuales (`month`, `limit`, `offset`); si vienen `from`/`to` junto con `month`, `month` tiene precedencia o se documenta la combinación (decidir y documentar).
-- Índice en `transactions(household_id, date)` si no existe ya, para sostener los filtros con paginación.
+  - `from`, `to`: date range (ISO).
+- Maintain full compatibility with the current params (`month`, `limit`, `offset`); if `from`/`to` are provided along with `month`, `month` takes precedence, or the combination is documented (decide and document).
+- Index on `transactions(household_id, date)` if it doesn't already exist, to support filters with pagination.
 ### Frontend
-- Barra de búsqueda en Movimientos: input con icono `Search`, debounce de 300ms, ligada al param `q`.
-- Fila de chips de filtro debajo: categoría, cuenta, tipo (gasto/ingreso). Si crecen, mover a un sheet de filtros.
-- Estado vacío amable: "Sin resultados para estos filtros" con botón para limpiar.
-- Filtros sincronizados con query params de la URL (`?q=sams&categoryId=…`) usando el router, para URLs compartibles.
-- Actualizar el hook de `src/lib/queries.ts` para pasar los params a TanStack Query (query key incluye los filtros).
+- Search bar in Transactions: input with `Search` icon, 300ms debounce, bound to the `q` param.
+- Filter chip row below: category, account, type (expense/income). If they grow, move to a filter sheet.
+- Friendly empty state: "No results for these filters" with a clear button.
+- Filters synced with URL query params (`?q=sams&categoryId=…`) using the router, for shareable URLs.
+- Update the hook in `src/lib/queries.ts` to pass the params to TanStack Query (query key includes the filters).
 ### Infra
-- Sin cambios (índice vía migración si aplica).
+- No changes (index via migration if applicable).
 
-## Criterios de aceptación
-- [ ] Escribir "sams" filtra la lista a transacciones cuya nota contiene "sams" (case-insensitive).
-- [ ] Combinar categoría + cuenta funciona (intersección).
-- [ ] Limpiar filtros restaura la lista completa.
-- [ ] Copiar la URL con filtros y abrirla en otra pestaña conserva los filtros aplicados.
-- [ ] Los params existentes (`month`, `limit`, `offset`) siguen funcionando igual.
-- [ ] Tests: cada param individual, combinaciones, búsqueda `ILIKE` case-insensitive.
+## Acceptance criteria
+- [ ] Typing "sams" filters the list to transactions whose note contains "sams" (case-insensitive).
+- [ ] Combining category + account works (intersection).
+- [ ] Clearing filters restores the full list.
+- [ ] Copying the URL with filters and opening it in another tab preserves the applied filters.
+- [ ] The existing params (`month`, `limit`, `offset`) keep working the same way.
+- [ ] Tests: each individual param, combinations, case-insensitive `ILIKE` search.
 
-## Notas
-- Riesgo bajo; el principal es la interacción `month` vs `from`/`to` — resolverlo con una regla explícita documentada.
-- El debounce y la query key correcta evitan refetches innecesarios al teclear.
+## Notes
+- Low risk; the main one is the `month` vs `from`/`to` interaction — resolve it with an explicit, documented rule.
+- Debounce and the correct query key prevent unnecessary refetches while typing.
