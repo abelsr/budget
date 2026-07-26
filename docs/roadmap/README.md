@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 5 of 17 done (01, 02, 05, 06, 16) · last updated 2026-07-25
+> **Progress:** 6 of 17 done (01, 02, 05, 06, 07, 16) · last updated 2026-07-25
 
 ## Immediate — robustness
 
@@ -21,7 +21,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 | # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
 | 06 | [Recurring transactions](06-transacciones-recurrentes.md) | ✅ 2026-07-25 | High | M |
-| 07 | [Monthly budgets](07-presupuestos-mensuales.md) | ⬜ | High | M |
+| 07 | [Monthly budgets](07-presupuestos-mensuales.md) | ✅ 2026-07-25 | High | M |
 | 08 | [CSV import](08-importacion-csv.md) | ⬜ | Medium | L |
 | 09 | [Filters and search](09-filtros-busqueda.md) | ⬜ | Medium | S |
 | 10 | [Profile and password change](10-perfil-y-password.md) | ⬜ | Medium | S |
@@ -45,7 +45,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 
 ## Suggested attack order
 
-`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 → 15 → 04`
+`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 15 → 04`
 
 Invitations and onboarding completed the family experience; Alembic and HTTPS
 harden it for production; recurring transactions and budgets are the features with the most
@@ -53,11 +53,12 @@ daily impact.
 
 **16 (CI) was done before 15** because HTTPS is waiting on an infrastructure
 decision (custom domain vs. Tailscale) and CI didn't depend on anything.
-**06 was also moved ahead of 15** for the same reason: the decision is still
-pending and recurring transactions didn't depend on anything.
+**06 and 07 were also moved ahead of 15** for the same reason: the decision is
+still pending and neither feature depended on anything.
 
-**Next: 07 — Monthly budgets.** It's the other feature with daily impact
-and it builds on categories and transactions, already closed.
+**Next: 15 — HTTPS with Caddy**, once Tailscale is installed on the host
+(see below) — or **04 — Backups**, which also has no pending decision and
+is overdue given how much real household data now lives in Postgres.
 
 **15 (HTTPS with Caddy) is still blocked on a decision, with the path already
 chosen: Tailscale** (`tailscale cert` over the tailnet, nothing exposed to the internet,
@@ -68,6 +69,40 @@ invitation link relies on the `document.execCommand('copy')` fallback because pl
 over IP is not a secure context (see `frontend/src/lib/clipboard.ts`).
 
 ## Log
+
+**2026-07-25 — 07 (monthly budgets) implemented and verified against a real Postgres.**
+
+- **Plain CRUD instead of a literal upsert endpoint.** The doc suggested
+  `POST`/`PATCH` "upsert by category_id", but every other router in this app
+  (`categories`, `accounts`, `recurring-rules`) does plain
+  `POST`/`PATCH`/`DELETE` and relies on a DB unique constraint + a 409 for
+  duplicates. Kept that convention instead of inventing a new pattern.
+- **Category picker is a pill selector, not a literal `<select>`.** Nothing
+  in the app uses the raw `ui/select.tsx` for choosing a category — pills
+  (accounts) and icon grids (categories) are the established idiom.
+- **Deleting a category with a budget now cascades the budget row**, instead
+  of blocking the delete the way it blocks deletion when transactions exist.
+  A budget isn't a historical movement; there's nothing to preserve.
+- **The empty state needed a "+" affordance.** A bare `null` return (like
+  `DonutCard` when there's no data) would have left no way to ever create the
+  first budget, since this feature has no dedicated management page.
+- Added a `--warning` (iOS system orange) token to `index.css`, matching the
+  existing `--income`/`--expense` first-class-token pattern, for the
+  75–100% amber band — and a small red count badge on the donut card's
+  heading when any category goes over 100%, which was in the original scope
+  but easy to miss since it's not part of the new `BudgetsCard` itself.
+- **Local SQLite `dev.db` can't replay the existing `8c41b0e7d2a9` migration**
+  (raw `ALTER COLUMN`, not batch-wrapped) — a pre-existing limitation, not
+  something this item introduced. Generated and verified the new migration
+  against a throwaway Postgres 17 container instead: upgrade, downgrade,
+  upgrade again, plus all 9 `test_migrations.py` cases.
+- **Verified in the browser against the real database**, using two
+  disposable test households (deleted afterward via a transactional
+  `DELETE` that left household/user/category/transaction counts identical to
+  before). Confirmed bar colors at 73%/80%/110%, the duplicate-category
+  guard in the create picker, editing an existing budget, deleting a
+  budgeted-but-transaction-free category, the donut badge, and both mobile
+  (390px) and desktop (1280px) layouts.
 
 **2026-07-25 — 06 (recurring) implemented and verified against a real Postgres.**
 

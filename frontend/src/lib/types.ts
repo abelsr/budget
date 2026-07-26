@@ -98,3 +98,19 @@ export interface RecurringRule {
   note: string | null
   active: boolean
 }
+
+/** Límite de gasto por categoría. Global (no por mes): ver `budgets/status`. */
+export interface Budget {
+  id: string
+  householdId: string
+  categoryId: string
+  amount: number
+}
+
+/** Gasto del mes vs. límite para una categoría con presupuesto. */
+export interface BudgetStatus {
+  categoryId: string
+  budget: number
+  spent: number
+  percentage: number
+}
