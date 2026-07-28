@@ -14,6 +14,8 @@ const STORAGE_KEY = "ff-theme"
 const ThemeContext = createContext<{
   theme: Theme
   setTheme: (t: Theme) => void
+  /** Tema efectivo: resuelve "system" contra el SO. Lo usan las gráficas. */
+  isDark: boolean
 } | null>(null)
 
 function resolveDark(theme: Theme): boolean {
@@ -22,13 +24,14 @@ function resolveDark(theme: Theme): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches
 }
 
-function applyTheme(theme: Theme) {
+function applyTheme(theme: Theme): boolean {
   const dark = resolveDark(theme)
   document.documentElement.classList.toggle("dark", dark)
-  // theme-color: pinta la barra del sistema en la PWA
+  // theme-color: pinta la barra del sistema en la PWA (--background de cada modo)
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", dark ? "#000000" : "#f2f2f7")
+    ?.setAttribute("content", dark ? "#070c16" : "#eff6ff")
+  return dark
 }
 
 /**
@@ -44,11 +47,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       : "system"
   })
 
+  const [isDark, setIsDark] = useState(() => resolveDark(theme))
+
   useEffect(() => {
-    applyTheme(theme)
+    setIsDark(applyTheme(theme))
     if (theme !== "system") return
     const mq = window.matchMedia("(prefers-color-scheme: dark)")
-    const onChange = () => applyTheme("system")
+    const onChange = () => setIsDark(applyTheme("system"))
     mq.addEventListener("change", onChange)
     return () => mq.removeEventListener("change", onChange)
   }, [theme])
@@ -59,7 +64,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, isDark }}>
       {children}
     </ThemeContext.Provider>
   )

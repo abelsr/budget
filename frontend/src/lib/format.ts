@@ -20,6 +20,16 @@ export function formatMoney(amount: number, compact = false): string {
   return MXN.format(amount)
 }
 
+/** Monto corto para ejes y etiquetas de gráfica: `$1.2k`, `$850`. */
+export function formatMoneyCompact(amount: number): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    notation: "compact",
+    maximumFractionDigits: Math.abs(amount) >= 10_000 ? 0 : 1,
+  }).format(amount)
+}
+
 const dayFmt = new Intl.DateTimeFormat("es-MX", {
   weekday: "long",
   day: "numeric",

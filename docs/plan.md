@@ -39,7 +39,13 @@ Self-hosted, but with a multi-tenant schema ready to grow into a multi-family pr
 
 ## Design language (frontend)
 
-Based on the **Apple Design** skill (WWDC *Designing Fluid Interfaces* and Apple's design principles):
+> **Full spec: [docs/design-guidelines.md](design-guidelines.md)** — tokens,
+> validated chart palette, component rules and the dashboard layout. It is the
+> document of record; the summary below is the interaction half of it.
+
+Colour follows the **brand system** (`#2563EB` blue, one hero surface per
+screen, semantic green/red reserved for money flow). Interaction follows the
+**Apple Design** skill (WWDC *Designing Fluid Interfaces* and Apple's design principles):
 
 - **Immediate response:** feedback on pointer-down, never wait for click.
 - **Springs, not durations:** animations with `motion`, critically-damped by default (`bounce: 0`, ~0.4s); bounce only when the gesture carries momentum.
