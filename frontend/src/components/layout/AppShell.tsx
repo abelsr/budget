@@ -5,6 +5,7 @@ import { motion } from "motion/react"
 import { springIndicator } from "@/lib/springs"
 import { useHousehold, useMembers } from "@/lib/queries"
 import { AddTransactionButton } from "@/components/AddTransactionSheet"
+import { BrandMark } from "@/components/BrandMark"
 import { TicketScannerButton } from "@/components/TicketScanner"
 
 const tabs = [
@@ -32,22 +33,12 @@ export function AppShell() {
     <div className="min-h-dvh">
       {/* Sidebar (desktop) */}
       <aside className="material-bar fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r md:flex">
-        {/* Isólogo de marca: isotipo + wordmark, y debajo el hogar activo */}
-        <div className="flex items-center gap-2.5 px-6 pt-8 pb-6">
-          <img
-            src="/budget/isotipo.svg"
-            alt=""
-            aria-hidden="true"
-            className="size-8 shrink-0 object-contain"
-          />
-          <div className="min-w-0">
-            <h1 className="text-xl leading-none font-bold tracking-[-0.02em]">
-              budget
-            </h1>
-            <p className="mt-1 truncate text-[13px] font-medium text-muted-foreground">
-              {householdName}
-            </p>
-          </div>
+        {/* Isólogo de marca y, debajo, el hogar activo */}
+        <div className="px-6 pt-8 pb-6">
+          <BrandMark size={30} />
+          <p className="mt-1.5 truncate text-[13px] font-medium text-muted-foreground">
+            {householdName}
+          </p>
         </div>
         <nav className="flex flex-col gap-1 px-3">
           {tabs.map(({ to, label, icon: Icon }) => (

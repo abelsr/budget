@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ChevronLeft, Repeat, Trash2 } from "lucide-react"
+import { Repeat, Trash2 } from "lucide-react"
 import { motion } from "motion/react"
 
 import { CategoryIcon } from "@/components/CategoryIcon"
@@ -14,6 +14,7 @@ import {
   useUpdateRecurringRule,
 } from "@/lib/queries"
 import { springAppear } from "@/lib/springs"
+import { EmptyState as Empty, PageHeader, Toggle } from "@/components/ui/surface"
 import type { Account, Category, RecurringRule } from "@/lib/types"
 
 const frequencyLabel: Record<RecurringRule["frequency"], string> = {
@@ -40,20 +41,9 @@ export function RecurringPage() {
       transition={springAppear}
       className="flex max-w-2xl flex-col gap-5"
     >
-      <header className="flex items-center gap-2 px-1">
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Volver"
-          className="pressable flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <h1 className="flex-1 text-[34px] leading-tight font-bold tracking-tight">
-          Recurrentes
-        </h1>
-      </header>
+      <PageHeader title="Recurrentes" back={() => navigate(-1)} />
 
-      <div className="overflow-hidden rounded-3xl bg-card shadow-sm">
+      <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         {isLoading ? (
           <p className="px-4 py-3.5 text-[13px] text-muted-foreground">
             Cargando…
@@ -90,16 +80,11 @@ export function RecurringPage() {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
-      <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-        <Repeat size={22} />
-      </span>
-      <p className="text-[15px] font-medium">Sin movimientos recurrentes</p>
-      <p className="text-[13px] text-muted-foreground">
-        Al registrar un movimiento, elige "Repetir" para que la renta, el sueldo
-        o una suscripción se generen solos.
-      </p>
-    </div>
+    <Empty
+      icon={<Repeat size={24} />}
+      title="Sin movimientos recurrentes"
+      hint={'Al registrar un movimiento, elige "Repetir" para que la renta, el sueldo o una suscripción se generen solos.'}
+    />
   )
 }
 
@@ -122,7 +107,7 @@ function RuleRow({
 
   return (
     <div
-      className={`px-4 py-3 ${first ? "" : "border-t border-border/60"} ${
+      className={`px-4 py-3 ${first ? "" : "border-t border-border"} ${
         rule.active ? "" : "opacity-50"
       }`}
     >
@@ -160,23 +145,13 @@ function RuleRow({
       </div>
 
       <div className="mt-2 flex items-center gap-2 pl-13">
-        <button
-          role="switch"
-          aria-checked={rule.active}
-          aria-label={`${rule.active ? "Pausar" : "Reanudar"} ${
+        <Toggle
+          checked={rule.active}
+          onChange={onToggle}
+          label={`${rule.active ? "Pausar" : "Reanudar"} ${
             rule.note || category?.name || "movimiento"
           }`}
-          onClick={onToggle}
-          className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-            rule.active ? "bg-primary" : "bg-muted"
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform ${
-              rule.active ? "translate-x-5" : "translate-x-0"
-            }`}
-          />
-        </button>
+        />
         <span className="flex-1 text-[12px] text-muted-foreground">
           {rule.active ? "Activa" : "Pausada"}
         </span>

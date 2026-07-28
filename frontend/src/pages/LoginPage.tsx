@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Wallet } from "lucide-react"
 import { motion } from "motion/react"
 
+import { BrandMark } from "@/components/BrandMark"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -78,15 +78,13 @@ export function LoginPage() {
         className="w-full max-w-sm"
       >
         {/* Marca */}
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <span className="flex size-16 items-center justify-center rounded-[22px] bg-primary text-primary-foreground shadow-lg shadow-primary/30">
-            <Wallet size={30} strokeWidth={2.2} />
-          </span>
+        <div className="mb-8 flex flex-col items-center gap-4">
+          <BrandMark size={56} showWordmark={false} />
           <div className="text-center">
-            <h1 className="text-[28px] font-bold tracking-tight">
-              Finanzas Familiares
+            <h1 className="text-[30px] leading-none font-bold tracking-[-0.03em]">
+              budget
             </h1>
-            <p className="mt-1 text-[15px] text-muted-foreground">
+            <p className="mt-2 text-[15px] text-muted-foreground">
               El dinero de tu hogar, en un solo lugar
             </p>
           </div>
@@ -95,7 +93,7 @@ export function LoginPage() {
         {/* Formulario */}
         <form
           onSubmit={onSubmit}
-          className="flex flex-col gap-4 rounded-3xl bg-card p-6 shadow-sm"
+          className="flex flex-col gap-4 rounded-3xl border border-border bg-card p-6 shadow-sm"
         >
           {/* Segmented control estilo iOS (oculto en modo invitación) */}
           {!isJoin ? (

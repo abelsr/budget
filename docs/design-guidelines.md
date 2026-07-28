@@ -247,6 +247,11 @@ Unchanged from the Apple Design language, restated for completeness:
 
 ## 7. Component rules
 
+The system lives in code as `components/ui/surface.tsx` — `CARD`, `Card`,
+`PageHeader`, `IconButton`, `SectionTitle`, `EmptyState`, `Toggle`, `TAP_TARGET`
+— plus `components/BrandMark.tsx`. A screen that hand-rolls one of these is
+drifting; import it instead.
+
 **Card.** `rounded-3xl bg-card shadow-sm` + hairline. Title 17/600 on the left,
 one optional text action on the right (`--primary`, 13/500). Never two actions
 in a card header — the second one belongs in the row or in a sheet.
@@ -267,6 +272,16 @@ ink, never a border swap.
 **Budget bar.** 8px track (`--secondary`), rounded-full, fill green → amber at
 75% → red at 100%, with the percentage stated in text next to it. The colour is
 redundant with the number, deliberately.
+
+**Sheet.** Bottom drawer, `rounded-t-3xl` (same radius as a card — a sheet is
+not a smaller surface than the cards behind it), translucent scrim, swipe
+handle. **The primary action is pinned**: it sits in a sticky footer with a
+hairline above it, and the form scrolls underneath. A "Guardar" that requires
+scrolling to find is a bug, not a layout.
+
+**Screen header.** `PageHeader`: optional eyebrow (13/500 muted), 34px title,
+at most one action on the right, and a back button on second-level screens.
+Never two titles on one screen.
 
 **Empty state.** One sentence in `--muted-foreground` plus the action that
 resolves it. No illustrations, no "no data" chrome.
@@ -338,7 +353,32 @@ every account, and repeating them costs a screenful.
 
 ---
 
-## 9. Accessibility checklist
+## 9. The other screens
+
+Every screen answers one question and states it in the header. Width is part of
+the answer: a list of rows never spans 1280px just because the viewport does.
+
+| Screen | Question | Shape | Max width |
+|---|---|---|---|
+| Resumen | how are we doing? | bento, §8 | full (6xl) |
+| Movimientos | what happened? | **one ledger** grouped by day, sticky day headers with the day's net | 3xl |
+| Cuentas | where is the money? | one list card, total in the eyebrow | 3xl |
+| Ajustes | how do I change things? | grouped list cards, iOS-style | 2xl |
+| Categorías | what buckets exist? | list per type, colour medallion + toggle | 2xl |
+| Recurrentes | what repeats? | list with state and two-step delete | 2xl |
+| Acceso / Onboarding | who are you? | centred card on the page plane, brand mark on top | sm / md |
+
+Two decisions worth keeping:
+
+- **Movimientos is a ledger, not a grid.** It used to be a masonry of
+  one-card-per-day, which with one movement a day read as confetti and made
+  amounts impossible to compare. A single column with sticky day headers lets
+  the eye run down the amounts, which is the whole point of the screen.
+- **Redundant metadata is removed, not styled.** An account named "Efectivo"
+  does not need the subtitle "Efectivo"; a disabled row does not get a chevron
+  that leads nowhere.
+
+## 10. Accessibility checklist
 
 Ship-blocking. Check every screen against this list:
 
@@ -355,7 +395,7 @@ Ship-blocking. Check every screen against this list:
 
 ---
 
-## 10. Changing the system
+## 11. Changing the system
 
 1. **Adding a colour is the last resort.** First check whether an existing
    semantic token means what you mean.

@@ -15,9 +15,17 @@ import { motion } from "motion/react"
 
 import { InviteSheet } from "@/components/InviteSheet"
 import { useAuth } from "@/lib/auth"
-import { useMembers } from "@/lib/queries"
+import { useHousehold, useMembers } from "@/lib/queries"
 import { useTheme, type Theme } from "@/lib/theme"
 import { springAppear, springIndicator } from "@/lib/springs"
+import { PageHeader, SectionTitle } from "@/components/ui/surface"
+
+/** Nombre largo de las monedas que ya soporta el hogar; si no, se usa el código. */
+const currencyNames: Record<string, string> = {
+  MXN: "Peso mexicano",
+  USD: "Dólar estadounidense",
+  EUR: "Euro",
+}
 
 const themeOptions: { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Claro", icon: Sun },
@@ -30,6 +38,7 @@ export function SettingsPage() {
   const { session, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const { data: members = [] } = useMembers()
+  const { data: household } = useHousehold()
   const navigate = useNavigate()
   const [inviteOpen, setInviteOpen] = useState(false)
 
@@ -45,11 +54,7 @@ export function SettingsPage() {
       transition={springAppear}
       className="flex max-w-2xl flex-col gap-5"
     >
-      <header className="px-1">
-        <h1 className="text-[34px] leading-tight font-bold tracking-tight">
-          Ajustes
-        </h1>
-      </header>
+      <PageHeader title="Ajustes" />
 
       {/* Cuenta */}
       <Section>
@@ -107,7 +112,7 @@ export function SettingsPage() {
           <div
             key={m.id}
             className={`flex items-center gap-3 px-4 py-3 ${
-              i > 0 ? "border-t border-border/60" : ""
+              i > 0 ? "border-t border-border" : ""
             }`}
           >
             <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-[12px] font-semibold text-primary">
@@ -121,7 +126,7 @@ export function SettingsPage() {
         ))}
         <button
           onClick={() => setInviteOpen(true)}
-          className="pressable flex w-full items-center gap-3 border-t border-border/60 px-4 py-3 text-left"
+          className="pressable flex w-full items-center gap-3 border-t border-border px-4 py-3 text-left"
         >
           <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
             <UserPlus size={16} />
@@ -146,7 +151,7 @@ export function SettingsPage() {
         <Row
           icon={<ScanLine size={16} />}
           label="Escáner con IA"
-          value="Modelo por definir"
+          value="Activo"
           disabled
           last
         />
@@ -155,8 +160,14 @@ export function SettingsPage() {
       {/* Moneda */}
       <Section title="Moneda del hogar">
         <div className="flex items-center px-4 py-3.5">
-          <p className="flex-1 text-[15px] font-medium">Peso mexicano</p>
-          <span className="tnum text-[14px] text-muted-foreground">MXN · $</span>
+          <p className="flex-1 text-[15px] font-medium">
+            {currencyNames[household?.currencyCode ?? ""] ??
+              household?.currencyCode ??
+              "—"}
+          </p>
+          <span className="tnum text-[14px] text-muted-foreground">
+            {household?.currencyCode ?? ""}
+          </span>
         </div>
       </Section>
 
@@ -172,7 +183,7 @@ export function SettingsPage() {
       </Section>
 
       <p className="text-center text-[12px] text-muted-foreground">
-        Finanzas Familiares · v0.1.0 · datos de demostración
+        budget · v0.1.0 · autohospedado
       </p>
 
       <InviteSheet open={inviteOpen} onOpenChange={setInviteOpen} />
@@ -189,12 +200,8 @@ function Section({
 }) {
   return (
     <section>
-      {title && (
-        <h2 className="mb-1.5 px-4 text-[13px] font-medium text-muted-foreground">
-          {title}
-        </h2>
-      )}
-      <div className="overflow-hidden rounded-3xl bg-card shadow-sm">
+      {title && <SectionTitle>{title}</SectionTitle>}
+      <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         {children}
       </div>
     </section>
@@ -217,7 +224,7 @@ function Row({
   to?: string
 }) {
   const className = `flex w-full items-center gap-3 px-4 py-3 text-left ${
-    !last ? "border-b border-border/60" : ""
+    !last ? "border-b border-border" : ""
   } ${disabled ? "opacity-50" : "pressable"}`
   const content = (
     <>
@@ -226,7 +233,7 @@ function Row({
       </span>
       <p className="flex-1 text-[15px] font-medium">{label}</p>
       {value && <span className="text-[13px] text-muted-foreground">{value}</span>}
-      <ChevronRight size={16} className="text-muted-foreground/50" />
+      {to && <ChevronRight size={16} className="text-muted-foreground/50" />}
     </>
   )
   if (to) {
