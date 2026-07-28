@@ -53,23 +53,26 @@ Based on the **Apple Design** skill (WWDC *Designing Fluid Interfaces* and Apple
 ## Roadmap
 
 1. **MVP:** auth + households + accounts + categories + transactions + dashboard. ✅ **DONE** (+ AI scanner, attachments, dark mode)
-2. **Robustness:** migrations, invitations from the UI, onboarding, PWA, backups. 🚧 **In progress** — Alembic, invitations, and onboarding done; PWA and backups pending
+2. **Robustness:** migrations, invitations from the UI, onboarding, PWA, backups. 🚧 **In progress** — Alembic, invitations, onboarding, and backups done; PWA pending
 3. **Phase 2:** recurrence, CSV import, monthly budgets. 🚧 **In progress** — recurrence and budgets done; CSV, filters, and profile pending
 4. **Phase 3:** savings goals, personal accounts (privacy between members), offline-first with sync, multi-family opening. ⬜
 
 **Concrete next step:** HTTPS with Caddy
 ([15](roadmap/15-https-caddy.md)), still blocked on installing Tailscale on the
-host (path already chosen) — or backups ([04](roadmap/04-backups.md)), which
-has no pending decision and is overdue given how much real household data now
-lives in Postgres. Details and log in [docs/roadmap/](roadmap/README.md).
+host (path already chosen). While that stays pending, the unblocked short items
+are filters and search ([09](roadmap/09-filtros-busqueda.md)) and profile and
+password change ([10](roadmap/10-perfil-y-password.md)). Details and log in
+[docs/roadmap/](roadmap/README.md).
 
 ## Repo structure
 
 ```
 budget/
 ├── docs/plan.md        ← this document
-├── docker-compose.yml  ← db + backend + frontend + minio
+├── docker-compose.yml  ← db + backend + frontend + minio (+ optional `backup` profile)
 ├── .env                ← compose secrets (ignored by git)
+├── scripts/backup.sh   ← Postgres dump + MinIO archive into backups/
+├── backups/            ← backup artifacts (ignored by git, not off-site)
 ├── backend/            ← FastAPI + PostgreSQL + MinIO (Python 3.14, uv)
 └── frontend/           ← React + Vite PWA (nginx in prod)
 ```
@@ -143,12 +146,11 @@ verified end-to-end, including access from a phone over the local IP.
 > Full details in **[docs/roadmap/](roadmap/README.md)** — one file per
 > pending item with why, scope, design, and acceptance criteria, plus the
 > log of what's already done. Closed: 01 (Alembic), 02 (invitations),
-> 05 (onboarding), 06 (recurring), 07 (budgets), 16 (CI).
+> 04 (backups), 05 (onboarding), 06 (recurring), 07 (budgets), 16 (CI).
 
 **Immediate (robustness):**
 
 - ⬜ [Real PWA](roadmap/03-pwa-instalable.md): manifest + service worker (installable, offline shell).
-- ⬜ [Backups](roadmap/04-backups.md) of Postgres and MinIO. **Next.**
 
 **Phase 2 (features):**
 

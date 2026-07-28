@@ -74,6 +74,90 @@ build`, and migrations against real Postgres (schema == models, reversibility,
 and that data survives the upgrade). See
 [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
+## Backups
+
+All household data lives in two Docker volumes. Losing them means losing
+everything, with no third-party recourse:
+
+| Volume | Contents | Backup artifact |
+|---|---|---|
+| `pgdata` | users, households, accounts, transactions, budgets | `backups/pg-<timestamp>.sql.gz` |
+| `minio_data` | attachment files (receipt photos) | `backups/minio-<timestamp>.tar.gz` |
+
+```bash
+./scripts/backup.sh          # requires the `db` service to be running
+```
+
+The script dumps Postgres with `pg_dump --clean --if-exists`, archives the
+MinIO volume with `tar`, and then deletes `*.gz` files older than 30 days.
+Artifacts are written as `*.part` and renamed only on success, so an
+interrupted run never leaves a truncated file that looks usable. Override
+`BACKUP_DIR`, `RETENTION_DAYS`, or `MINIO_VOLUME` via the environment.
+
+`backups/` is in `.gitignore`. It is **not** off-site: copy or `rsync` it to
+another machine, and keep a copy of `.env` somewhere safe too (it holds
+`JWT_SECRET` and the MinIO credentials, and neither is in any backup artifact).
+
+### Automating it
+
+**Host cron (recommended).** Nothing new to install, backups are owned by your
+user, and you get a real wall-clock schedule:
+
+```bash
+crontab -e
+# every day at 03:00
+0 3 * * * /path/to/budget/scripts/backup.sh >> /path/to/budget/backups/backup.log 2>&1
+```
+
+**Compose service (alternative).** A `backup` profile service that never
+starts by default:
+
+```bash
+docker compose --profile backup up -d backup
+docker compose logs -f backup
+```
+
+It runs one backup on startup and then every `BACKUP_INTERVAL_SECONDS`
+(default 86400), so it cannot target a wall-clock hour the way cron does. It
+also mounts the host Docker socket — any process in that container can control
+Docker on the host — and its artifacts are owned by `root`. Prefer host cron
+unless you specifically want the backup to travel with the compose stack.
+
+### Restoring a backup
+
+Verified end to end on 2026-07-26 against a throwaway stack with empty volumes.
+Steps 1–2 assume you are starting from a fresh deployment; skip them to restore
+over an existing one.
+
+```bash
+# 1. Bring up the stack. The backend applies Alembic migrations on startup, so
+#    a "clean" stack already has the schema — this is why the dump is taken
+#    with --clean --if-exists.
+docker compose up -d --build
+
+# 2. Pick the pair of artifacts to restore (both must share a timestamp).
+TS=20260726-161247
+
+# 3. Stop the services holding the data open.
+docker compose stop backend minio
+
+# 4. Restore Postgres.
+gunzip -c "backups/pg-$TS.sql.gz" \
+  | docker compose exec -T db psql -U budget -d budget -v ON_ERROR_STOP=1
+
+# 5. Replace the MinIO volume contents. `budget_` is the compose project name;
+#    it defaults to the directory name.
+docker run --rm -i -v budget_minio_data:/data alpine \
+  sh -c 'find /data -mindepth 1 -delete && tar xz -C /data' \
+  < "backups/minio-$TS.tar.gz"
+
+# 6. Start everything back up.
+docker compose start minio backend
+```
+
+Then log in and confirm the dashboard shows the expected balances, the
+transaction list is populated, and a receipt attachment opens.
+
 ## Documentation
 
 - **[docs/plan.md](docs/plan.md)** — product and architecture decisions, current status.
