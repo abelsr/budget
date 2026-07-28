@@ -11,6 +11,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import { CategoryIcon } from "@/components/CategoryIcon"
+import { CHART_OTHER } from "@/lib/chart-colors"
 import { apiFetchBlob, ApiError } from "@/lib/api"
 import { formatMoney, toISODate } from "@/lib/format"
 import {
@@ -162,7 +163,7 @@ function ViewMode({
       <div className="flex flex-col items-center gap-2">
         <CategoryIcon
           icon={category?.icon ?? "wallet"}
-          color={category?.color ?? "#8e8e93"}
+          color={category?.color ?? CHART_OTHER.light}
           size={26}
           className="size-12"
         />

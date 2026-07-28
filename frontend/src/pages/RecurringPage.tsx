@@ -4,6 +4,7 @@ import { ChevronLeft, Repeat, Trash2 } from "lucide-react"
 import { motion } from "motion/react"
 
 import { CategoryIcon } from "@/components/CategoryIcon"
+import { CHART_OTHER } from "@/lib/chart-colors"
 import { formatMoney, formatShortDate } from "@/lib/format"
 import {
   useAccounts,
@@ -128,7 +129,7 @@ function RuleRow({
       <div className="flex items-center gap-3">
         <CategoryIcon
           icon={category?.icon ?? "wallet"}
-          color={category?.color ?? "#8e8e93"}
+          color={category?.color ?? CHART_OTHER.light}
           size={20}
           className="size-10 shrink-0"
         />

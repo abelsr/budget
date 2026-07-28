@@ -33,7 +33,13 @@ import {
   useMonthSummary,
   useTransactions,
 } from "@/lib/queries"
-import { CHART_OTHER, cssVar, seriesColor } from "@/lib/chart-colors"
+import {
+  CHART_OTHER,
+  CHART_PALETTE_DARK,
+  CHART_PALETTE_LIGHT,
+  cssVar,
+  seriesColor,
+} from "@/lib/chart-colors"
 import { springAppear } from "@/lib/springs"
 import { useTheme } from "@/lib/theme"
 import type { Account, Budget, BudgetStatus, Category, Member, Transaction } from "@/lib/types"
@@ -325,7 +331,8 @@ function PaceCard({
 
   const spent = data[data.length - 1].total
   const overBudget = budgetTotal > 0 && spent > budgetTotal
-  const stroke = isDark ? "#5b8def" : "#2563eb"
+  // Serie única: slot 1 de la paleta categórica (el azul de marca)
+  const stroke = isDark ? CHART_PALETTE_DARK[0] : CHART_PALETTE_LIGHT[0]
 
   return (
     <motion.section variants={item} className={`${CARD} p-5 lg:p-6`}>

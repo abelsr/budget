@@ -4,6 +4,7 @@ import { Paperclip, Repeat } from "lucide-react"
 import { formatMoney, formatShortDate } from "@/lib/format"
 import type { Account, Category, Member, Transaction } from "@/lib/types"
 import { CategoryIcon } from "@/components/CategoryIcon"
+import { CHART_OTHER } from "@/lib/chart-colors"
 import { TransactionDetailSheet } from "@/components/TransactionDetailSheet"
 
 /**
@@ -41,7 +42,7 @@ export function TransactionItem({
       >
         <CategoryIcon
           icon={category?.icon ?? "wallet"}
-          color={category?.color ?? "#8e8e93"}
+          color={category?.color ?? CHART_OTHER.light}
           className="size-10 shrink-0"
         />
         <div className="min-w-0 flex-1">
