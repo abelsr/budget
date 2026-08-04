@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
@@ -63,6 +63,13 @@ def list_transactions(
     limit: Annotated[int, Query(le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
     month: Annotated[str | None, Query(pattern=_MONTH_PATTERN)] = None,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    category_id: Annotated[str | None, Query(alias="categoryId")] = None,
+    account_id: Annotated[str | None, Query(alias="accountId")] = None,
+    member_id: Annotated[str | None, Query(alias="memberId")] = None,
+    transaction_type: Annotated[Literal["expense", "income"] | None, Query(alias="type")] = None,
+    from_date: Annotated[date | None, Query(alias="from")] = None,
+    to_date: Annotated[date | None, Query(alias="to")] = None,
 ) -> list[TransactionOut]:
     household_id = _household_id(user)
     materialize_due(db, household_id)
@@ -74,6 +81,23 @@ def list_transactions(
         start = date(year, mon, 1)
         end = date(year + 1, 1, 1) if mon == 12 else date(year, mon + 1, 1)
         stmt = stmt.where(Transaction.date >= start, Transaction.date < end)
+    else:
+        if from_date is not None and to_date is not None and from_date > to_date:
+            raise HTTPException(status_code=422, detail="La fecha inicial debe ser anterior a la final")
+        if from_date is not None:
+            stmt = stmt.where(Transaction.date >= from_date)
+        if to_date is not None:
+            stmt = stmt.where(Transaction.date <= to_date)
+    if q:
+        stmt = stmt.where(Transaction.note.ilike(f"%{q}%"))
+    if category_id is not None:
+        stmt = stmt.where(Transaction.category_id == category_id)
+    if account_id is not None:
+        stmt = stmt.where(Transaction.account_id == account_id)
+    if member_id is not None:
+        stmt = stmt.where(Transaction.member_id == member_id)
+    if transaction_type is not None:
+        stmt = stmt.where(Transaction.type == transaction_type)
     stmt = stmt.order_by(Transaction.date.desc(), Transaction.created_at.desc())
     stmt = stmt.limit(limit).offset(offset)
     transactions = db.scalars(stmt).all()

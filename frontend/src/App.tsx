@@ -13,6 +13,7 @@ import { RecurringPage } from "@/pages/RecurringPage"
 import { LoginPage } from "@/pages/LoginPage"
 import { OnboardingPage } from "@/pages/OnboardingPage"
 import { LandingPage } from "@/pages/LandingPage"
+import { ReportsPage } from "@/pages/ReportsPage"
 
 const ONBOARDING_PATH = "/onboarding"
 /** La app vive bajo /app; / es la landing pública. */
@@ -85,6 +86,7 @@ function App() {
               <Route index element={<DashboardPage />} />
               <Route path="transacciones" element={<TransactionsPage />} />
               <Route path="cuentas" element={<AccountsPage />} />
+              <Route path="reportes" element={<ReportsPage />} />
               <Route path="ajustes" element={<SettingsPage />} />
               <Route path="ajustes/categorias" element={<CategoriesPage />} />
               <Route path="ajustes/recurrentes" element={<RecurringPage />} />

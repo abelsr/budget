@@ -36,7 +36,7 @@ const mobileTabs: Array<NavigationItem & { to: string }> = [
 const desktopTabs: NavigationItem[] = [
   ...mobileTabs.slice(0, 3),
   { to: "/app/ajustes/categorias", label: "Categorías", icon: Tags },
-  { label: "Reportes", icon: FolderCog, disabled: true },
+  { to: "/app/reportes", label: "Reportes", icon: FolderCog },
   mobileTabs[3]!,
 ]
 
