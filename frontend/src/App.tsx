@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "rea
 import { MotionConfig } from "motion/react"
 
 import { useAuth } from "@/lib/auth"
+import { LandingI18nProvider } from "@/lib/landing-i18n"
 import { AppShell } from "@/components/layout/AppShell"
 import { DashboardPage } from "@/pages/DashboardPage"
 import { TransactionsPage } from "@/pages/TransactionsPage"
@@ -11,8 +12,11 @@ import { CategoriesPage } from "@/pages/CategoriesPage"
 import { RecurringPage } from "@/pages/RecurringPage"
 import { LoginPage } from "@/pages/LoginPage"
 import { OnboardingPage } from "@/pages/OnboardingPage"
+import { LandingPage } from "@/pages/LandingPage"
 
 const ONBOARDING_PATH = "/onboarding"
+/** La app vive bajo /app; / es la landing pública. */
+const APP_ROOT = "/app"
 
 /**
  * Rutas que requieren sesión; redirige a /login recordando el destino.
@@ -35,7 +39,7 @@ function RequireAuth() {
     return <Navigate to={ONBOARDING_PATH} replace />
   }
   if (session.onboardingCompleted && onOnboarding) {
-    return <Navigate to="/" replace />
+    return <Navigate to={APP_ROOT} replace />
   }
   return <Outlet />
 }
@@ -46,7 +50,7 @@ function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
   if (isLoading) {
     return <div className="min-h-dvh" aria-label="Cargando" />
   }
-  if (session) return <Navigate to="/" replace />
+  if (session) return <Navigate to={APP_ROOT} replace />
   return children
 }
 
@@ -65,10 +69,19 @@ function App() {
               </RedirectIfAuthed>
             }
           />
+          {/* La landing siempre es la página de entrada, con su i18n ES/EN. */}
+          <Route
+            path="/"
+            element={
+              <LandingI18nProvider>
+                <LandingPage />
+              </LandingI18nProvider>
+            }
+          />
           <Route element={<RequireAuth />}>
             {/* Fuera del AppShell: el wizard ocupa la pantalla completa */}
             <Route path="onboarding" element={<OnboardingPage />} />
-            <Route element={<AppShell />}>
+            <Route path={APP_ROOT} element={<AppShell />}>
               <Route index element={<DashboardPage />} />
               <Route path="transacciones" element={<TransactionsPage />} />
               <Route path="cuentas" element={<AccountsPage />} />

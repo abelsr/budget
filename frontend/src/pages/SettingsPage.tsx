@@ -149,12 +149,12 @@ export function SettingsPage() {
             <Row
               icon={<Tags size={16} />}
               label="Categorías"
-              to="/ajustes/categorias"
+              to="/app/ajustes/categorias"
             />
             <Row
               icon={<Repeat size={16} />}
               label="Recurrentes"
-              to="/ajustes/recurrentes"
+              to="/app/ajustes/recurrentes"
             />
             <Row
               icon={<ScanLine size={16} />}

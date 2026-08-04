@@ -732,7 +732,7 @@ function AccountsSummary({ accounts }: { accounts: Account[] }) {
     <motion.section variants={item} className={`${CARD} p-5 lg:p-6`}>
       <div className="flex items-baseline justify-between">
         <h2 className="text-[17px] font-semibold tracking-tight">Cuentas</h2>
-        <Link to="/cuentas" className="text-[13px] font-medium text-primary">
+        <Link to="/app/cuentas" className="text-[13px] font-medium text-primary">
           Ver todas
         </Link>
       </div>
@@ -782,7 +782,7 @@ function RecentCard({
         <h2 className="text-[17px] font-semibold tracking-tight">
           Movimientos recientes
         </h2>
-        <Link to="/transacciones" className="text-[13px] font-medium text-primary">
+        <Link to="/app/transacciones" className="text-[13px] font-medium text-primary">
           Ver todos
         </Link>
       </div>

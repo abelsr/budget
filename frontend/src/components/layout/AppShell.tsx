@@ -9,10 +9,10 @@ import { BrandMark } from "@/components/BrandMark"
 import { TicketScannerButton } from "@/components/TicketScanner"
 
 const tabs = [
-  { to: "/", label: "Resumen", icon: LayoutDashboard },
-  { to: "/transacciones", label: "Movimientos", icon: ArrowLeftRight },
-  { to: "/cuentas", label: "Cuentas", icon: Wallet },
-  { to: "/ajustes", label: "Ajustes", icon: Settings },
+  { to: "/app", label: "Resumen", icon: LayoutDashboard },
+  { to: "/app/transacciones", label: "Movimientos", icon: ArrowLeftRight },
+  { to: "/app/cuentas", label: "Cuentas", icon: Wallet },
+  { to: "/app/ajustes", label: "Ajustes", icon: Settings },
 ]
 
 /**
@@ -45,7 +45,7 @@ export function AppShell() {
             <NavLink
               key={to}
               to={to}
-              end={to === "/"}
+              end={to === "/app"}
               className={({ isActive }) =>
                 `pressable relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors ${
                   isActive
@@ -112,7 +112,7 @@ export function AppShell() {
             <NavLink
               key={to}
               to={to}
-              end={to === "/"}
+              end={to === "/app"}
               className={({ isActive }) =>
                 `relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
                   isActive ? "text-primary" : "text-muted-foreground"

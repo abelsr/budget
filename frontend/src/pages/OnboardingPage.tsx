@@ -51,7 +51,7 @@ export function OnboardingPage() {
     setFinishing(true)
     try {
       await completeOnboarding()
-      navigate("/", { replace: true })
+      navigate("/app", { replace: true })
     } catch {
       // Si falla el PATCH, dejamos al usuario reintentar en vez de encerrarlo
       setFinishing(false)
