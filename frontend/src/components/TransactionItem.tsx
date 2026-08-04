@@ -4,6 +4,8 @@ import { Paperclip, Repeat } from "lucide-react"
 import { formatMoney, formatShortDate } from "@/lib/format"
 import type { Account, Category, Member, Transaction } from "@/lib/types"
 import { CategoryIcon } from "@/components/CategoryIcon"
+import { BrandMedallion } from "@/components/BrandMedallion"
+import { matchBrand } from "@/lib/brands"
 import { CHART_OTHER } from "@/lib/chart-colors"
 import { TransactionDetailSheet } from "@/components/TransactionDetailSheet"
 
@@ -35,6 +37,9 @@ export function TransactionItem({
   const hasAttachments = transaction.attachments.length > 0
   const isRecurring = Boolean(transaction.recurringRuleId)
 
+  // Comercio reconocido por la nota → medallón de marca (fallback: categoría).
+  const brand = matchBrand(transaction.note)
+
   // La cuenta es una columna propia en el ledger de escritorio; fuera de él va
   // en la línea de metadatos. En móvil (donde la columna está oculta) vuelve a
   // los metadatos. Nunca en ambas, §9.
@@ -56,11 +61,15 @@ export function TransactionItem({
         role="button"
         onClick={() => setOpen(true)}
       >
-        <CategoryIcon
-          icon={category?.icon ?? "wallet"}
-          color={category?.color ?? CHART_OTHER.light}
-          className="size-10 shrink-0"
-        />
+        {brand ? (
+          <BrandMedallion brand={brand} className="size-10 shrink-0" />
+        ) : (
+          <CategoryIcon
+            icon={category?.icon ?? "wallet"}
+            color={category?.color ?? CHART_OTHER.light}
+            className="size-10 shrink-0"
+          />
+        )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-medium">
             {transaction.note || category?.name || "Movimiento"}
