@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { motion } from "motion/react"
 import {
@@ -47,6 +47,7 @@ import { BudgetBar } from "@/components/BudgetBar"
 import { BudgetFormSheet } from "@/components/BudgetFormSheet"
 import { TransactionItem } from "@/components/TransactionItem"
 import { TicketScannerButton } from "@/components/TicketScanner"
+import { CARD } from "@/components/ui/surface"
 
 const container = {
   hidden: {},
@@ -57,11 +58,22 @@ const item = {
   show: { opacity: 1, y: 0, transition: springAppear },
 }
 
-/** Tarjeta base: superficie, radio y elevación únicos del sistema. */
-const CARD = "rounded-3xl border border-border bg-card shadow-sm"
-
 /** Máximo de segmentos en la dona; el resto se pliega en "Otros". */
 const MAX_SLICES = 6
+
+/**
+ * Animación de gráficas "solo al primer montaje" (§6). Recharts re-anima cada
+ * vez que cambian los datos; aquí el flag se activa únicamente cuando los datos
+ * llegan por primera vez y luego queda apagado, para que una actualización en
+ * caliente se refleje en su sitio sin leerse como "pasó algo nuevo".
+ */
+function useFirstDataAnim(hasData: boolean) {
+  const [animated, setAnimated] = useState(false)
+  useEffect(() => {
+    if (hasData) setAnimated(true)
+  }, [hasData])
+  return hasData && !animated
+}
 
 /**
  * Dashboard.
@@ -326,6 +338,7 @@ function PaceCard({
 }) {
   const { isDark } = useTheme()
   const data = useMemo(() => cumulativeExpense(transactions), [transactions])
+  const animate = useFirstDataAnim(data.length >= 2)
 
   if (data.length < 2) return null
 
@@ -391,7 +404,7 @@ function PaceCard({
               strokeWidth={2}
               fill="url(#pace-fill)"
               activeDot={{ r: 4, strokeWidth: 2, stroke: cssVar("--card") }}
-              isAnimationActive={false}
+              isAnimationActive={animate}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -499,6 +512,8 @@ function DonutCard({
   total: number
   overBudgetCount: number
 }) {
+  const animate = useFirstDataAnim(slices.length > 0)
+
   if (slices.length === 0) {
     return (
       <motion.section variants={item} className={`${CARD} p-5 lg:p-6`}>
@@ -541,7 +556,7 @@ function DonutCard({
                 paddingAngle={2}
                 cornerRadius={5}
                 strokeWidth={0}
-                isAnimationActive={false}
+                isAnimationActive={animate}
               >
                 {slices.map((s) => (
                   <Cell key={s.id} fill={s.color} />
