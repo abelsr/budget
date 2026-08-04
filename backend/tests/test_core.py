@@ -303,6 +303,36 @@ def test_transaction_validation(client, world):
     assert resp.status_code == 404
 
 
+def test_transaction_filters_and_month_precedence(client, world):
+    headers = world["headers1"]
+    account = create_account(client, headers, name="Efectivo")
+    other_account = create_account(client, headers, name="Débito")
+    category = create_category(client, headers, name="Comida")
+    income_category = create_category(client, headers, name="Nómina", type="income")
+    grocery = create_transaction(client, headers, category["id"], account["id"], amount=30,
+                                 date="2026-07-10", note="Súper mercado")
+    create_transaction(client, headers, category["id"], other_account["id"], amount=15,
+                       date="2026-06-10", note="Café")
+    salary = create_transaction(client, headers, income_category["id"], account["id"], amount=100,
+                                type="income", date="2026-07-20", note="Nómina")
+
+    response = client.get(
+        "/transactions",
+        params={"q": "MERCADO", "categoryId": category["id"], "accountId": account["id"],
+                "type": "expense", "from": "2026-07-01", "to": "2026-07-31"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert [tx["id"] for tx in response.json()] == [grocery["id"]]
+
+    response = client.get(
+        "/transactions",
+        params={"month": "2026-07", "from": "2026-01-01", "to": "2026-01-02"},
+        headers=headers,
+    )
+    assert {tx["id"] for tx in response.json()} == {grocery["id"], salary["id"]}
+
+
 # ---------- Aislamiento entre hogares ----------
 
 

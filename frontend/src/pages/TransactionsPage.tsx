@@ -1,5 +1,7 @@
 import { motion } from "motion/react"
-import { Receipt } from "lucide-react"
+import { Receipt, Search, X } from "lucide-react"
+import { useSearchParams } from "react-router-dom"
+import { useEffect, useState } from "react"
 
 import { formatDayHeader, formatMoney } from "@/lib/format"
 import {
@@ -8,6 +10,7 @@ import {
   useMembers,
   useTransactions,
 } from "@/lib/queries"
+import type { TransactionFilters } from "@/lib/queries"
 import { springAppear } from "@/lib/springs"
 import { TransactionItem } from "@/components/TransactionItem"
 import { Card, EmptyState, PageHeader } from "@/components/ui/surface"
@@ -20,10 +23,50 @@ import { Card, EmptyState, PageHeader } from "@/components/ui/surface"
  * verticalmente, que es para lo que sirve la pantalla.
  */
 export function TransactionsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "")
   const { data: accounts = [] } = useAccounts()
   const { data: categories = [] } = useCategories()
   const { data: members = [] } = useMembers()
-  const { data: transactions = [] } = useTransactions()
+  const filters: TransactionFilters = {
+    q: searchParams.get("q") ?? undefined,
+    categoryId: searchParams.get("categoryId") ?? undefined,
+    accountId: searchParams.get("accountId") ?? undefined,
+    memberId: searchParams.get("memberId") ?? undefined,
+    type: (searchParams.get("type") as TransactionFilters["type"]) ?? undefined,
+    from: searchParams.get("from") ?? undefined,
+    to: searchParams.get("to") ?? undefined,
+  }
+  const { data: transactions = [] } = useTransactions(filters)
+  const hasFilters = Object.values(filters).some(Boolean)
+  useEffect(() => {
+    if (searchQuery === (filters.q ?? "")) return
+    const timeout = window.setTimeout(() => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current)
+        if (searchQuery) next.set("q", searchQuery)
+        else next.delete("q")
+        return next
+      })
+    }, 300)
+    return () => window.clearTimeout(timeout)
+  }, [filters.q, searchQuery, setSearchParams])
+  const setFilter = (name: keyof TransactionFilters, value: string) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (value) next.set(name, value)
+      else next.delete(name)
+      return next
+    })
+  }
+  const clearFilters = () => {
+    setSearchQuery("")
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      for (const name of ["q", "categoryId", "accountId", "memberId", "type", "from", "to"]) next.delete(name)
+      return next
+    })
+  }
 
   const byDay = new Map<string, typeof transactions>()
   for (const t of transactions) {
@@ -40,20 +83,53 @@ export function TransactionsPage() {
       transition={springAppear}
       className="flex max-w-3xl flex-col gap-4 lg:max-w-5xl"
     >
-      <PageHeader
-        title="Movimientos"
-        eyebrow={
-          transactions.length > 0 &&
-          `${transactions.length} ${transactions.length === 1 ? "registro" : "registros"}`
-        }
-      />
+      <div className="hidden md:block">
+        <PageHeader
+          title="Movimientos"
+          eyebrow={
+            transactions.length > 0 &&
+            `${transactions.length} ${transactions.length === 1 ? "registro" : "registros"}`
+          }
+        />
+      </div>
+
+      <header className="space-y-2 px-1 md:hidden">
+        <h1 className="text-[18px] leading-tight font-bold tracking-[-0.02em]">
+          Movimientos
+        </h1>
+      </header>
+
+      <section aria-label="Buscar y filtrar movimientos" className="rounded-2xl border border-border bg-card p-2.5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-secondary px-2.5 text-muted-foreground">
+            <Search size={14} aria-hidden="true" />
+            <span className="sr-only">Buscar en notas</span>
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Buscar en notas"
+              className="h-8 min-w-0 flex-1 bg-transparent text-[12px] text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </label>
+          {hasFilters && <button onClick={clearFilters} className="pressable flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-primary hover:bg-primary-soft"><X size={14} />Limpiar</button>}
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
+          <FilterSelect label="Tipo" value={filters.type ?? ""} onChange={(value) => setFilter("type", value)} options={[["expense", "Gastos"], ["income", "Ingresos"]]} />
+          <FilterSelect label="Categoría" value={filters.categoryId ?? ""} onChange={(value) => setFilter("categoryId", value)} options={categories.map((category) => [category.id, category.name])} />
+          <FilterSelect label="Cuenta" value={filters.accountId ?? ""} onChange={(value) => setFilter("accountId", value)} options={accounts.map((account) => [account.id, account.name])} />
+          <FilterSelect label="Miembro" value={filters.memberId ?? ""} onChange={(value) => setFilter("memberId", value)} options={members.map((member) => [member.id, member.name])} />
+          <label className="relative"><span className="sr-only">Desde</span><input type="date" value={filters.from ?? ""} onChange={(event) => setFilter("from", event.target.value)} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus:ring-2 focus:ring-ring/30" /></label>
+          <label className="relative"><span className="sr-only">Hasta</span><input type="date" value={filters.to ?? ""} onChange={(event) => setFilter("to", event.target.value)} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus:ring-2 focus:ring-ring/30" /></label>
+        </div>
+      </section>
 
       {days.length === 0 ? (
         <Card>
           <EmptyState
             icon={<Receipt size={26} />}
-            title="Todavía no hay movimientos"
-            hint="Registra tu último gasto con el botón + y aparecerá aquí, agrupado por día."
+            title={hasFilters ? "No encontramos movimientos" : "Todavía no hay movimientos"}
+            hint={hasFilters ? "Prueba con otros filtros o vuelve a ver todos tus movimientos." : "Registra tu último gasto con el botón + y aparecerá aquí, agrupado por día."}
+            action={hasFilters ? <button onClick={clearFilters} className="pressable rounded-lg bg-primary px-3 py-2 text-[12px] font-medium text-primary-foreground">Limpiar filtros</button> : undefined}
           />
         </Card>
       ) : (
@@ -113,4 +189,8 @@ export function TransactionsPage() {
       )}
     </motion.div>
   )
+}
+
+function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[][] }) {
+  return <label><span className="sr-only">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-[11px] text-foreground outline-none focus:ring-2 focus:ring-ring/30"><option value="">{label}</option>{options.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
 }

@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react"
-import { FileText, Paperclip, Plus, Repeat, X } from "lucide-react"
+import { CalendarDays, ChevronDown, FileText, Paperclip, Plus, Repeat, X } from "lucide-react"
 import { motion } from "motion/react"
 
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
@@ -41,13 +42,24 @@ export function AddTransactionButton() {
         render={
           <button
             aria-label="Registrar movimiento"
-            className="pressable fixed right-5 bottom-24 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 md:right-8 md:bottom-8"
+            className="pressable fixed right-5 bottom-24 z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 md:hidden"
           >
             <Plus size={28} strokeWidth={2.5} />
           </button>
         }
       />
-      <DrawerContent className="mx-auto max-w-lg">
+      <DrawerTrigger
+        render={
+          <button
+            aria-label="Registrar movimiento"
+            className="pressable fixed top-3 right-8 z-50 hidden items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-sm shadow-primary/25 hover:bg-primary-strong md:flex"
+          >
+            <Plus size={15} strokeWidth={2.5} />
+            + Registrar
+          </button>
+        }
+      />
+      <DrawerContent className="mx-auto h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] max-w-lg md:h-auto md:max-h-[calc(100dvh-6rem)]">
         {open && <AddTransactionForm onDone={() => setOpen(false)} />}
       </DrawerContent>
     </Drawer>
@@ -76,6 +88,8 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
     [categories, type],
   )
   const effectiveAccountId = accountId ?? accounts.find((a) => a.kind === "debit")?.id ?? accounts[0]?.id
+  const selectedCategory = visibleCategories.find((c) => c.id === categoryId)
+  const selectedAccount = accounts.find((a) => a.id === effectiveAccountId)
   const canSave = amount > 0 && categoryId !== null && effectiveAccountId && date
   const isSaving = addTransaction.isPending || uploadAttachment.isPending
 
@@ -117,19 +131,41 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className="flex flex-col gap-5 px-5 pb-8">
-      <DrawerHeader className="p-0 pt-2">
-        <DrawerTitle className="sr-only">Registrar movimiento</DrawerTitle>
-        {/* Segmented control estilo iOS */}
-        <div className="mx-auto flex rounded-xl bg-secondary p-1">
+    <div className="flex h-full min-h-0 flex-col md:h-auto">
+      <DrawerHeader className="flex-row items-center justify-between border-b border-border px-5 pt-2 pb-3 text-left">
+        <DrawerTitle className="text-[16px] font-semibold">Registrar</DrawerTitle>
+        <DrawerClose
+          render={
+            <button
+              type="button"
+              aria-label="Cerrar registro de movimiento"
+              className="pressable flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+            >
+              <X size={18} />
+            </button>
+          }
+        />
+      </DrawerHeader>
+
+      <form
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"
+        onSubmit={(event) => {
+          event.preventDefault()
+          save()
+        }}
+      >
+        <div className="flex flex-col gap-5 px-5 pt-4 pb-5">
+          <div className="grid grid-cols-2 rounded-lg border border-border bg-secondary p-0.5" role="group" aria-label="Tipo de movimiento">
           {(["expense", "income"] as const).map((t) => (
             <button
+              type="button"
               key={t}
               onClick={() => {
                 setType(t)
                 setCategoryId(null)
               }}
-              className="relative rounded-lg px-6 py-1.5 text-[14px] font-medium"
+              aria-pressed={type === t}
+              className="relative rounded-md py-2 text-[13px] font-medium"
             >
               {type === t && (
                 <motion.span
@@ -147,100 +183,120 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
               </span>
             </button>
           ))}
-        </div>
-      </DrawerHeader>
+          </div>
 
-      {/* Monto: protagonista, tracking cerrado, cifras tabulares */}
-      <div className="flex items-baseline justify-center gap-1">
-        <span className="text-2xl font-semibold text-muted-foreground">$</span>
-        <input
-          autoFocus
-          inputMode="decimal"
-          placeholder="0"
-          value={amountText}
-          onChange={(e) => setAmountText(e.target.value.replace(/[^0-9.,]/g, ""))}
-          className="tnum w-48 bg-transparent text-center text-5xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40"
-          aria-label="Monto"
-        />
-      </div>
+          <div className="flex items-baseline justify-center gap-1 py-2">
+            <span className="text-2xl font-semibold text-muted-foreground">$</span>
+            <input
+              autoFocus
+              inputMode="decimal"
+              placeholder="0.00"
+              value={amountText}
+              onChange={(e) => setAmountText(e.target.value.replace(/[^0-9.,]/g, ""))}
+              className="tnum w-56 bg-transparent text-center text-5xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40"
+              aria-label="Monto"
+            />
+          </div>
 
-      {/* Categorías */}
-      <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
-          Categoría
-        </p>
-        <div className="grid grid-cols-4 gap-2">
-          {visibleCategories.map((c) => {
-            const selected = categoryId === c.id
-            return (
-              <button
-                key={c.id}
-                onClick={() => setCategoryId(c.id)}
-                className="pressable flex flex-col items-center gap-1.5 rounded-2xl py-2"
-              >
+          <div className="space-y-2">
+            <label htmlFor="transaction-category" className="block text-[12px] font-semibold text-muted-foreground">
+              Categoría
+            </label>
+            <div className="relative flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3">
+              {selectedCategory ? (
                 <CategoryIcon
-                  icon={c.icon}
-                  color={c.color}
-                  size={22}
-                  className={`size-12 transition-shadow ${
-                    selected ? "ring-2 ring-offset-2 ring-offset-background" : ""
-                  }`}
-                  style={{ ["--tw-ring-color" as string]: c.color }}
+                  icon={selectedCategory.icon}
+                  color={selectedCategory.color}
+                  size={18}
+                  className="size-7 shrink-0"
                 />
-                <span className="max-w-full truncate text-[11px] font-medium">
-                  {c.name}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
+              ) : (
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">?</span>
+              )}
+              <select
+                id="transaction-category"
+                value={categoryId ?? ""}
+                onChange={(e) => setCategoryId(e.target.value || null)}
+                className="min-w-0 flex-1 appearance-none rounded-sm bg-transparent pr-7 text-[14px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+              >
+                <option value="">Selecciona una categoría</option>
+                {visibleCategories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3 text-muted-foreground"
+              />
+            </div>
+          </div>
 
-      {/* Cuenta */}
-      <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
-          Cuenta
-        </p>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {accounts.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => setAccountId(a.id)}
-              className={`pressable shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${
-                effectiveAccountId === a.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground"
-              }`}
-            >
-              {a.name}
-            </button>
-          ))}
-        </div>
-      </div>
+          <div className="space-y-2">
+            <label htmlFor="transaction-account" className="block text-[12px] font-semibold text-muted-foreground">
+              Cuenta
+            </label>
+            <div className="relative flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[12px] font-semibold text-primary">
+                {selectedAccount?.name.slice(0, 1).toUpperCase() ?? "?"}
+              </span>
+              <select
+                id="transaction-account"
+                value={effectiveAccountId ?? ""}
+                onChange={(e) => setAccountId(e.target.value || null)}
+                className="min-w-0 flex-1 appearance-none rounded-sm bg-transparent pr-7 text-[14px] font-medium outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+              >
+                {accounts.length === 0 && <option value="">No hay cuentas disponibles</option>}
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>{account.name}</option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3 text-muted-foreground"
+              />
+            </div>
+          </div>
 
-      {/* Fecha: hoy por defecto, editable para gastos de días anteriores */}
-      <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
-          Fecha
-        </p>
-        <input
-          type="date"
-          value={date}
-          max={toISODate(new Date())}
-          onChange={(e) => e.target.value && setDate(e.target.value)}
-          className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none [color-scheme:light] dark:[color-scheme:dark]"
-          aria-label="Fecha del movimiento"
-        />
-      </div>
+          <div className="space-y-2">
+            <label htmlFor="transaction-date" className="block text-[12px] font-semibold text-muted-foreground">Fecha</label>
+            <div className="flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3">
+              <CalendarDays size={18} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+              <input
+                id="transaction-date"
+                type="date"
+                value={date}
+                max={toISODate(new Date())}
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                className="tnum min-w-0 flex-1 bg-transparent text-[14px] font-medium outline-none [color-scheme:light] dark:[color-scheme:dark]"
+              />
+            </div>
+          </div>
 
-      {/* Repetir: renta, sueldo y suscripciones se capturan una vez */}
-      <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
-          Repetir
-        </p>
-        <div className="flex gap-2">
+          <div className="space-y-2">
+            <label htmlFor="transaction-note" className="block text-[12px] font-semibold text-muted-foreground">Nota <span className="font-normal">(opcional)</span></label>
+            <input
+              id="transaction-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ej. Despensa de la semana"
+              className="h-12 w-full rounded-xl border border-border bg-card px-3 text-[14px] outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+
+          <details className="rounded-xl border border-border bg-secondary/40 px-3">
+            <summary className="flex h-11 cursor-pointer list-none items-center gap-2 text-[13px] font-medium text-muted-foreground">
+              <Repeat size={15} aria-hidden="true" />
+              Opciones adicionales
+            </summary>
+            <div className="space-y-4 border-t border-border py-4">
+              <div>
+                <p className="mb-2 text-[12px] font-semibold text-muted-foreground">Repetir</p>
+                <div className="flex gap-2">
           {repeatOptions.map((option) => (
             <button
+              type="button"
               key={option.label}
               onClick={() => setRepeat(option.value)}
               aria-pressed={repeat === option.value}
@@ -260,13 +316,10 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
             Este movimiento es el primero; el siguiente se generará solo.
           </p>
         )}
-      </div>
+              </div>
 
-      {/* Comprobante opcional */}
-      <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
-          Comprobante (opcional)
-        </p>
+              <div>
+                <p className="mb-2 text-[12px] font-semibold text-muted-foreground">Comprobante <span className="font-normal">(opcional)</span></p>
         <input
           ref={fileInputRef}
           type="file"
@@ -274,7 +327,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
           className="hidden"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
-        {file ? (
+                {file ? (
           <div className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2">
             <FileText size={16} className="shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
@@ -295,7 +348,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
               <X size={12} />
             </button>
           </div>
-        ) : (
+                ) : (
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -304,29 +357,24 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
             <Paperclip size={14} />
             Adjuntar foto, PDF o doc
           </button>
-        )}
-      </div>
+                )}
+              </div>
+            </div>
+          </details>
+        </div>
 
-      {/* Nota opcional */}
-      <input
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="Nota (opcional)"
-        className="rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
-      />
-
-      {/* Acción principal siempre visible: el sheet scrollea debajo de ella */}
-      <div className="sticky bottom-0 -mx-5 -mb-8 border-t border-border bg-card px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="sticky bottom-0 mt-auto border-t border-border bg-popover px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <Button
           size="lg"
+          type="submit"
           disabled={!canSave || isSaving}
-          onClick={save}
           className="pressable h-12 w-full rounded-2xl text-[16px] font-semibold"
         >
-          Guardar
+          {isSaving ? "Guardando..." : "Guardar"}
         </Button>
+        </div>
+      </form>
       </div>
-    </div>
   )
 }
 

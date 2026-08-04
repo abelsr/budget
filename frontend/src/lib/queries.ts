@@ -25,6 +25,7 @@ export const keys = {
   members: ["members"] as const,
   transactions: ["transactions"] as const,
   summary: ["summary", "month"] as const,
+  rangeSummary: ["summary", "range"] as const,
   household: ["household", "me"] as const,
   recurringRules: ["recurring-rules"] as const,
   budgets: ["budgets"] as const,
@@ -35,6 +36,21 @@ export interface MonthSummary {
   income: number
   expense: number
   byCategory: { categoryId: string; total: number }[]
+}
+
+export interface RangeSummary {
+  monthly: { month: string; income: number; expense: number; net: number }[]
+  byCategory: { categoryId: string; total: number }[]
+}
+
+export interface TransactionFilters {
+  q?: string
+  categoryId?: string
+  accountId?: string
+  memberId?: string
+  type?: Transaction["type"]
+  from?: string
+  to?: string
 }
 
 export interface Household {
@@ -94,10 +110,14 @@ export function useMembers() {
   })
 }
 
-export function useTransactions() {
+export function useTransactions(filters: TransactionFilters = {}) {
+  const search = new URLSearchParams({ limit: "200" })
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) search.set(key, value)
+  }
   return useQuery({
-    queryKey: keys.transactions,
-    queryFn: () => apiFetch<Transaction[]>("/transactions?limit=200"),
+    queryKey: [...keys.transactions, filters],
+    queryFn: () => apiFetch<Transaction[]>(`/transactions?${search}`),
   })
 }
 
@@ -105,6 +125,14 @@ export function useMonthSummary() {
   return useQuery({
     queryKey: keys.summary,
     queryFn: () => apiFetch<MonthSummary>("/summary/month"),
+  })
+}
+
+export function useRangeSummary(from: string, to: string) {
+  return useQuery({
+    queryKey: [...keys.rangeSummary, from, to],
+    queryFn: () => apiFetch<RangeSummary>(`/summary/range?from=${from}&to=${to}`),
+    enabled: Boolean(from && to),
   })
 }
 

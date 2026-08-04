@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
@@ -6,8 +6,13 @@ from sqlalchemy import extract, func, select
 
 from app.api.deps import CurrentUserDep, DbDep
 from app.models import Transaction
-from app.schemas.summary import CategoryTotal, MonthSummaryResponse
+from app.schemas.summary import (
+    CategoryTotal,
+    MonthSummaryResponse,
+    RangeSummaryResponse,
+)
 from app.services.recurring import materialize_due
+from app.services.range_summary import build_range_report
 
 router = APIRouter(prefix="/summary", tags=["summary"])
 
@@ -64,3 +69,20 @@ def get_month_summary(
     ]
 
     return MonthSummaryResponse(income=income, expense=expense, by_category=by_category)
+
+
+@router.get("/range", response_model=RangeSummaryResponse)
+def get_range_summary(
+    db: DbDep,
+    user: CurrentUserDep,
+    from_date: Annotated[date, Query(alias="from")],
+    to_date: Annotated[date, Query(alias="to")],
+) -> RangeSummaryResponse:
+    if user.household_id is None:
+        raise HTTPException(status_code=400, detail="El usuario no pertenece a un hogar")
+    if from_date > to_date:
+        raise HTTPException(status_code=422, detail="La fecha inicial debe ser anterior a la final")
+
+    materialize_due(db, user.household_id)
+    report = build_range_report(db, user.household_id, from_date, to_date)
+    return RangeSummaryResponse(monthly=report.monthly, by_category=report.by_category)

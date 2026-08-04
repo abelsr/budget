@@ -1,4 +1,4 @@
-# 🗺️ Roadmap — Family Finances
+# 🗺️ Roadmap — budget
 
 One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to

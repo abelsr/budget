@@ -24,6 +24,7 @@ export function TransactionItem({
   member,
   showDate = false,
   ledger = false,
+  hideAmount = false,
 }: {
   transaction: Transaction
   category?: Category
@@ -31,6 +32,8 @@ export function TransactionItem({
   member?: Member
   showDate?: boolean
   ledger?: boolean
+  /** Dashboard privacy control; the transaction remains actionable. */
+  hideAmount?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const isIncome = transaction.type === "income"
@@ -104,8 +107,7 @@ export function TransactionItem({
             isIncome ? "text-income" : ""
           }`}
         >
-          {isIncome ? "+" : "−"}
-          {formatMoney(transaction.amount)}
+          {hideAmount ? "••••••" : <>{isIncome ? "+" : "−"}{formatMoney(transaction.amount)}</>}
         </span>
       </li>
       <TransactionDetailSheet

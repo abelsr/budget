@@ -26,7 +26,7 @@ export function BrandMark({
         width={size}
         height={size}
         style={{ width: size, height: size }}
-        className={`shrink-0 object-contain ${
+        className={`shrink-0 scale-[1.22] object-contain ${
           onBrand ? "rounded-[28%] bg-white p-1 shadow-sm" : ""
         }`}
       />

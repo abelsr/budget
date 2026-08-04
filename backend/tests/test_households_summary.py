@@ -202,3 +202,114 @@ def test_month_summary_isolation_between_households(client, session, setup_data)
     assert len(body["byCategory"]) == 1
     assert body["byCategory"][0]["categoryId"] == data["cat_food"].id
     assert body["byCategory"][0]["total"] == 100.0
+
+
+def test_range_summary_groups_months_categories_and_isolates_households(client, session, setup_data):
+    data = setup_data
+    _add_transaction(session, household=data["household"], account=data["account"],
+                     category=data["cat_salary"], member=data["user"],
+                     tx_type="income", amount=1200.0, tx_date=date(2026, 1, 31))
+    _add_transaction(session, household=data["household"], account=data["account"],
+                     category=data["cat_food"], member=data["member2"],
+                     tx_type="expense", amount=200.0, tx_date=date(2026, 2, 1))
+    _add_transaction(session, household=data["household"], account=data["account"],
+                     category=data["cat_transport"], member=data["user"],
+                     tx_type="expense", amount=50.0, tx_date=date(2026, 2, 28))
+    _add_transaction(session, household=data["other_household"], account=data["other_account"],
+                     category=data["other_cat"], member=data["other_user"],
+                     tx_type="expense", amount=9999.0, tx_date=date(2026, 2, 1))
+    session.commit()
+
+    response = client.get(
+        "/summary/range",
+        params={"from": "2026-01-31", "to": "2026-02-28"},
+        headers=_auth_headers(data["user"]),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "monthly": [
+            {"month": "2026-01", "income": 1200.0, "expense": 0.0, "net": 1200.0},
+            {"month": "2026-02", "income": 0.0, "expense": 250.0, "net": -250.0},
+        ],
+        "byCategory": [
+            {"categoryId": data["cat_food"].id, "total": 200.0},
+            {"categoryId": data["cat_transport"].id, "total": 50.0},
+        ],
+    }
+
+
+def test_range_summary_validates_date_order(client, setup_data):
+    response = client.get(
+        "/summary/range",
+        params={"from": "2026-02-01", "to": "2026-01-31"},
+        headers=_auth_headers(setup_data["user"]),
+    )
+    assert response.status_code == 422
+
+
+def test_report_exports_are_authenticated_and_isolated(client, session, setup_data):
+    data = setup_data
+    _add_transaction(session, household=data["household"], account=data["account"],
+                     category=data["cat_salary"], member=data["user"],
+                     tx_type="income", amount=1200.0, tx_date=date(2026, 2, 1))
+    _add_transaction(session, household=data["household"], account=data["account"],
+                     category=data["cat_food"], member=data["member2"],
+                     tx_type="expense", amount=200.0, tx_date=date(2026, 2, 2))
+    _add_transaction(session, household=data["other_household"], account=data["other_account"],
+                     category=data["other_cat"], member=data["other_user"],
+                     tx_type="expense", amount=9999.0, tx_date=date(2026, 2, 2))
+    session.commit()
+
+    params = {"format": "csv", "from": "2026-02-01", "to": "2026-02-28"}
+    assert client.get("/reports/export", params=params).status_code == 401
+
+    response = client.get("/reports/export", params=params, headers=_auth_headers(data["user"]))
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert 'attachment; filename="reporte-2026-02-01-a-2026-02-28.csv"' == response.headers["content-disposition"]
+    content = response.content.decode("utf-8-sig")
+    assert "1200.0" in content
+    assert "200.0" in content
+    assert "9999.0" not in content
+    assert "Comida" in content
+
+
+@pytest.mark.parametrize(
+    ("format", "content_type", "signature"),
+    [
+        ("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b"PK\x03\x04"),
+        ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b"PK\x03\x04"),
+        ("pdf", "application/pdf", b"%PDF"),
+    ],
+)
+def test_report_export_file_formats(client, session, setup_data, format, content_type, signature):
+    data = setup_data
+    _add_transaction(session, household=data["household"], account=data["account"],
+                     category=data["cat_food"], member=data["user"],
+                     tx_type="expense", amount=25.0, tx_date=date(2026, 2, 2))
+    session.commit()
+
+    response = client.get(
+        "/reports/export",
+        params={"format": format, "from": "2026-02-01", "to": "2026-02-28"},
+        headers=_auth_headers(data["user"]),
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(content_type)
+    assert response.headers["content-disposition"].endswith(f".{format}\"")
+    assert response.content.startswith(signature)
+
+
+def test_report_export_validates_range_and_format(client, setup_data):
+    headers = _auth_headers(setup_data["user"])
+    assert client.get(
+        "/reports/export",
+        params={"format": "csv", "from": "2026-02-02", "to": "2026-02-01"},
+        headers=headers,
+    ).status_code == 422
+    assert client.get(
+        "/reports/export",
+        params={"format": "zip", "from": "2026-02-01", "to": "2026-02-02"},
+        headers=headers,
+    ).status_code == 422

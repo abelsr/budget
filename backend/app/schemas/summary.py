@@ -15,3 +15,15 @@ class MonthSummaryResponse(_CamelModel):
     income: float
     expense: float
     by_category: list[CategoryTotal]
+
+
+class RangeMonthTotal(_CamelModel):
+    month: str
+    income: float
+    expense: float
+    net: float
+
+
+class RangeSummaryResponse(_CamelModel):
+    monthly: list[RangeMonthTotal]
+    by_category: list[CategoryTotal]

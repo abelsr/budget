@@ -50,7 +50,7 @@ export function LoginPage() {
       } else {
         await register(email, password, name, householdName)
       }
-      navigate("/", { replace: true })
+      navigate("/app", { replace: true })
     } catch (err) {
       setError(
         err instanceof ApiError
