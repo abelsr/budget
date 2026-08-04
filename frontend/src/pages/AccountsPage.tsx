@@ -6,7 +6,6 @@ import { Card, EmptyState, IconButton, PageHeader } from "@/components/ui/surfac
 import { formatMoney } from "@/lib/format"
 import { useAccounts } from "@/lib/queries"
 import type { Account, AccountKind } from "@/lib/types"
-
 const kindMeta: Record<AccountKind, { label: string; icon: typeof Wallet }> = {
   cash: { label: "Efectivo", icon: Wallet },
   debit: { label: "Débito", icon: Landmark },
@@ -33,7 +32,7 @@ export function AccountsPage() {
   }
 
   return (
-    <div className="flex max-w-3xl flex-col gap-4">
+    <div className="flex max-w-3xl flex-col gap-4 lg:max-w-4xl">
       <PageHeader
         title="Cuentas"
         eyebrow={<>Total · <span className="tnum">{formatMoney(total)}</span></>}
@@ -45,7 +44,7 @@ export function AccountsPage() {
       />
 
       {accounts.length === 0 ? (
-        <Card>
+        <Card className="flex min-h-[calc(100dvh-12rem)] flex-col items-center justify-center md:min-h-[calc(100dvh-14rem)]">
           <EmptyState
             icon={<Wallet size={26} />}
             title="Sin cuentas"
@@ -61,17 +60,17 @@ export function AccountsPage() {
           />
         </Card>
       ) : (
-        <Card>
-          <ul className="divide-y divide-border py-2">
-            {accounts.map((a) => {
-              const meta = kindMeta[a.kind]
-              const Icon = meta.icon
-              return (
-                <li
-                  key={a.id}
-                  onClick={() => openEdit(a)}
-                  className="pressable flex cursor-pointer items-center gap-3 px-4 py-3"
-                >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {accounts.map((a) => {
+            const meta = kindMeta[a.kind]
+            const Icon = meta.icon
+            return (
+              <button
+                key={a.id}
+                onClick={() => openEdit(a)}
+                className="pressable flex flex-col gap-5 rounded-3xl border border-border bg-card p-5 text-left shadow-sm"
+              >
+                <div className="flex items-start gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
                     <Icon size={20} />
                   </span>
@@ -84,18 +83,18 @@ export function AccountsPage() {
                       </p>
                     )}
                   </div>
-                  <span
-                    className={`tnum shrink-0 text-[15px] font-semibold ${
-                      a.balance < 0 ? "text-expense" : ""
-                    }`}
-                  >
-                    {formatMoney(a.balance)}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        </Card>
+                </div>
+                <span
+                  className={`tnum text-[20px] leading-none font-bold tracking-tight ${
+                    a.balance < 0 ? "text-expense" : ""
+                  }`}
+                >
+                  {formatMoney(a.balance)}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       )}
 
       <AccountFormSheet

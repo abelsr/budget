@@ -52,126 +52,136 @@ export function SettingsPage() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={springAppear}
-      className="flex max-w-2xl flex-col gap-5"
+      className="flex max-w-2xl flex-col gap-5 lg:max-w-5xl"
     >
       <PageHeader title="Ajustes" />
 
-      {/* Cuenta */}
-      <Section>
-        <div className="flex items-center gap-3 px-4 py-3.5">
-          <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-[15px] font-semibold text-primary">
-            {session?.name.charAt(0).toUpperCase() ?? "?"}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[16px] font-semibold">{session?.name}</p>
-            <p className="truncate text-[13px] text-muted-foreground">
-              {session?.email}
-            </p>
-          </div>
+      {/* En escritorio, dos columnas para usar el ancho: izquierda personal,
+          derecha hogar + preferencias. En móvil todo apilado (lista iOS). */}
+      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:gap-6">
+        {/* Columna izquierda: cuenta y apariencia */}
+        <div className="flex flex-col gap-5 lg:gap-6">
+          {/* Cuenta */}
+          <Section>
+            <div className="flex items-center gap-3 px-4 py-3.5">
+              <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-[15px] font-semibold text-primary">
+                {session?.name.charAt(0).toUpperCase() ?? "?"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[16px] font-semibold">{session?.name}</p>
+                <p className="truncate text-[13px] text-muted-foreground">
+                  {session?.email}
+                </p>
+              </div>
+            </div>
+          </Section>
+
+          {/* Apariencia */}
+          <Section title="Apariencia">
+            <div className="px-4 py-3.5">
+              <div className="flex rounded-xl bg-secondary p-1">
+                {themeOptions.map(({ value, label, icon: Icon }) => {
+                  const active = theme === value
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => setTheme(value)}
+                      className="relative flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[13px] font-medium"
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="theme-segment"
+                          transition={springIndicator}
+                          className="absolute inset-0 rounded-lg bg-card shadow-sm"
+                        />
+                      )}
+                      <Icon
+                        size={15}
+                        className={`relative ${active ? "text-foreground" : "text-muted-foreground"}`}
+                      />
+                      <span
+                        className={`relative ${active ? "text-foreground" : "text-muted-foreground"}`}
+                      >
+                        {label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </Section>
         </div>
-      </Section>
 
-      {/* Apariencia */}
-      <Section title="Apariencia">
-        <div className="px-4 py-3.5">
-          <div className="flex rounded-xl bg-secondary p-1">
-            {themeOptions.map(({ value, label, icon: Icon }) => {
-              const active = theme === value
-              return (
-                <button
-                  key={value}
-                  onClick={() => setTheme(value)}
-                  className="relative flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[13px] font-medium"
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="theme-segment"
-                      transition={springIndicator}
-                      className="absolute inset-0 rounded-lg bg-card shadow-sm"
-                    />
-                  )}
-                  <Icon
-                    size={15}
-                    className={`relative ${active ? "text-foreground" : "text-muted-foreground"}`}
-                  />
-                  <span
-                    className={`relative ${active ? "text-foreground" : "text-muted-foreground"}`}
-                  >
-                    {label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+        {/* Columna derecha: hogar, preferencias y moneda */}
+        <div className="flex flex-col gap-5 lg:gap-6">
+          {/* Hogar */}
+          <Section title="Hogar">
+            {members.map((m, i) => (
+              <div
+                key={m.id}
+                className={`flex items-center gap-3 px-4 py-3 ${
+                  i > 0 ? "border-t border-border" : ""
+                }`}
+              >
+                <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-[12px] font-semibold text-primary">
+                  {m.initials}
+                </span>
+                <p className="flex-1 text-[15px] font-medium">{m.name}</p>
+                <span className="text-[12px] text-muted-foreground">
+                  {i === 0 ? "Administrador" : "Miembro"}
+                </span>
+              </div>
+            ))}
+            <button
+              onClick={() => setInviteOpen(true)}
+              className="pressable flex w-full items-center gap-3 border-t border-border px-4 py-3 text-left"
+            >
+              <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <UserPlus size={16} />
+              </span>
+              <p className="flex-1 text-[15px] font-medium">Invitar miembro</p>
+              <ChevronRight size={16} className="text-muted-foreground/50" />
+            </button>
+          </Section>
+
+          {/* Preferencias */}
+          <Section title="Preferencias">
+            <Row
+              icon={<Tags size={16} />}
+              label="Categorías"
+              to="/ajustes/categorias"
+            />
+            <Row
+              icon={<Repeat size={16} />}
+              label="Recurrentes"
+              to="/ajustes/recurrentes"
+            />
+            <Row
+              icon={<ScanLine size={16} />}
+              label="Escáner con IA"
+              value="Activo"
+              disabled
+              last
+            />
+          </Section>
+
+          {/* Moneda */}
+          <Section title="Moneda del hogar">
+            <div className="flex items-center px-4 py-3.5">
+              <p className="flex-1 text-[15px] font-medium">
+                {currencyNames[household?.currencyCode ?? ""] ??
+                  household?.currencyCode ??
+                  "—"}
+              </p>
+              <span className="tnum text-[14px] text-muted-foreground">
+                {household?.currencyCode ?? ""}
+              </span>
+            </div>
+          </Section>
         </div>
-      </Section>
+      </div>
 
-      {/* Hogar */}
-      <Section title="Hogar">
-        {members.map((m, i) => (
-          <div
-            key={m.id}
-            className={`flex items-center gap-3 px-4 py-3 ${
-              i > 0 ? "border-t border-border" : ""
-            }`}
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-[12px] font-semibold text-primary">
-              {m.initials}
-            </span>
-            <p className="flex-1 text-[15px] font-medium">{m.name}</p>
-            <span className="text-[12px] text-muted-foreground">
-              {i === 0 ? "Administrador" : "Miembro"}
-            </span>
-          </div>
-        ))}
-        <button
-          onClick={() => setInviteOpen(true)}
-          className="pressable flex w-full items-center gap-3 border-t border-border px-4 py-3 text-left"
-        >
-          <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <UserPlus size={16} />
-          </span>
-          <p className="flex-1 text-[15px] font-medium">Invitar miembro</p>
-          <ChevronRight size={16} className="text-muted-foreground/50" />
-        </button>
-      </Section>
-
-      {/* Preferencias */}
-      <Section title="Preferencias">
-        <Row
-          icon={<Tags size={16} />}
-          label="Categorías"
-          to="/ajustes/categorias"
-        />
-        <Row
-          icon={<Repeat size={16} />}
-          label="Recurrentes"
-          to="/ajustes/recurrentes"
-        />
-        <Row
-          icon={<ScanLine size={16} />}
-          label="Escáner con IA"
-          value="Activo"
-          disabled
-          last
-        />
-      </Section>
-
-      {/* Moneda */}
-      <Section title="Moneda del hogar">
-        <div className="flex items-center px-4 py-3.5">
-          <p className="flex-1 text-[15px] font-medium">
-            {currencyNames[household?.currencyCode ?? ""] ??
-              household?.currencyCode ??
-              "—"}
-          </p>
-          <span className="tnum text-[14px] text-muted-foreground">
-            {household?.currencyCode ?? ""}
-          </span>
-        </div>
-      </Section>
-
-      {/* Cerrar sesión */}
+      {/* Cerrar sesión: ancho completo, fuera de las columnas */}
       <Section>
         <button
           onClick={onLogout}

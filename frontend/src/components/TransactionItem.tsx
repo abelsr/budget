@@ -21,22 +21,38 @@ export function TransactionItem({
   account,
   member,
   showDate = false,
+  ledger = false,
 }: {
   transaction: Transaction
   category?: Category
   account?: Account
   member?: Member
   showDate?: boolean
+  ledger?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const isIncome = transaction.type === "income"
   const hasAttachments = transaction.attachments.length > 0
   const isRecurring = Boolean(transaction.recurringRuleId)
 
+  // La cuenta es una columna propia en el ledger de escritorio; fuera de él va
+  // en la línea de metadatos. En móvil (donde la columna está oculta) vuelve a
+  // los metadatos. Nunca en ambas, §9.
+  const meta = [
+    transaction.note ? category?.name : undefined,
+    ledger ? undefined : account?.name,
+    member?.name,
+    showDate ? formatShortDate(transaction.date) : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+
   return (
     <>
       <li
-        className="pressable flex cursor-pointer items-center gap-3 px-4 py-3"
+        className={`pressable flex cursor-pointer items-center gap-3 px-4 py-3 ${
+          ledger ? "md:grid md:grid-cols-[minmax(0,1fr)_10rem_auto] md:gap-4" : ""
+        }`}
         role="button"
         onClick={() => setOpen(true)}
       >
@@ -51,14 +67,13 @@ export function TransactionItem({
           </p>
           <p className="flex items-center gap-1 truncate text-[13px] text-muted-foreground">
             <span className="truncate">
-              {[
-                transaction.note ? category?.name : undefined,
-                account?.name,
-                member?.name,
-                showDate ? formatShortDate(transaction.date) : undefined,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+              {meta}
+              {ledger && (
+                <>
+                  {meta && <span aria-hidden="true"> · </span>}
+                  <span className="md:hidden">{account?.name ?? "—"}</span>
+                </>
+              )}
             </span>
             {isRecurring && (
               <Repeat
@@ -70,6 +85,11 @@ export function TransactionItem({
             {hasAttachments && <Paperclip size={13} className="shrink-0" />}
           </p>
         </div>
+        {ledger && (
+          <span className="hidden min-w-0 truncate text-right text-[13px] text-muted-foreground md:block">
+            {account?.name ?? "—"}
+          </span>
+        )}
         <span
           className={`tnum shrink-0 text-[15px] font-semibold ${
             isIncome ? "text-income" : ""

@@ -38,7 +38,7 @@ export function TransactionsPage() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={springAppear}
-      className="flex max-w-3xl flex-col gap-4"
+      className="flex max-w-3xl flex-col gap-4 lg:max-w-5xl"
     >
       <PageHeader
         title="Movimientos"
@@ -58,6 +58,12 @@ export function TransactionsPage() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
+          {/* Cabecera de columnas, solo escritorio */}
+          <div className="hidden items-center gap-4 border-b border-border px-4 py-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase md:grid md:grid-cols-[minmax(0,1fr)_10rem_auto]">
+            <span>Movimiento</span>
+            <span className="text-right">Cuenta</span>
+            <span className="text-right">Importe</span>
+          </div>
           {days.map(([date, txs]) => {
             const dayTotal = txs.reduce(
               (sum, t) => sum + (t.type === "income" ? t.amount : -t.amount),
@@ -87,6 +93,7 @@ export function TransactionsPage() {
                       category={categories.find((c) => c.id === t.categoryId)}
                       account={accounts.find((a) => a.id === t.accountId)}
                       member={members.find((m) => m.id === t.memberId)}
+                      ledger
                     />
                   ))}
                 </ul>
