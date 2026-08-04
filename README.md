@@ -1,6 +1,12 @@
-# 💸 Family Finances
+# budget
+
+<p>
+  <img src="docs/brand/isotipo.png" alt="budget isotipo" width="48" height="40">
+</p>
 
 [![CI](https://github.com/abelsr/budget/actions/workflows/ci.yml/badge.svg)](https://github.com/abelsr/budget/actions/workflows/ci.yml)
+
+> **El dinero de tu hogar, en un solo lugar.**
 
 Self-hosted web app (PWA) for a family to track and understand their expenses
 and income. Individual accounts per person that join a **household** via an
@@ -17,6 +23,18 @@ transactions.
 - **Dashboard:** balance per account, monthly income vs. expenses, category
   donut chart.
 - **Guided onboarding** when creating the household, plus light/dark mode.
+
+## Brand
+
+| Asset | File |
+|---|---|
+| Isotipo (mark) | [`docs/brand/isotipo.png`](docs/brand/isotipo.png) |
+| Isólogo (mark + wordmark) | [`docs/brand/isologo.png`](docs/brand/isologo.png) |
+| Brand sheet | [`docs/brand/imagen-de-marca.png`](docs/brand/imagen-de-marca.png) |
+| Reference screens | [`docs/brand/pantallas-referencia.png`](docs/brand/pantallas-referencia.png) |
+
+Design tokens and usage rules live in
+[`docs/design-guidelines.md`](docs/design-guidelines.md).
 
 ## Stack
 
