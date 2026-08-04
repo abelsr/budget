@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { springAppear, springIndicator } from "@/lib/springs"
+import { CARD } from "@/components/ui/surface"
 
 type Mode = "login" | "register"
 
@@ -93,7 +94,7 @@ export function LoginPage() {
         {/* Formulario */}
         <form
           onSubmit={onSubmit}
-          className="flex flex-col gap-4 rounded-3xl border border-border bg-card p-6 shadow-sm"
+          className={`${CARD} flex flex-col gap-4 p-6`}
         >
           {/* Segmented control estilo iOS (oculto en modo invitación) */}
           {!isJoin ? (
