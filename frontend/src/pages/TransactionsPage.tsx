@@ -57,22 +57,31 @@ export function TransactionsPage() {
           />
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          {/* Cabecera de columnas, solo escritorio */}
-          <div className="hidden items-center gap-4 border-b border-border px-4 py-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase md:grid md:grid-cols-[minmax(0,1fr)_10rem_auto]">
+        <Card>
+          {/* Cabecera de columnas, solo escritorio.
+              `rounded-t-3xl` empareja con la esquina del Card; sin esto y sin
+              `overflow-hidden`, el fondo se sale por arriba. */}
+          <div className="hidden items-center gap-4 rounded-t-3xl border-b border-border px-4 py-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase md:grid md:grid-cols-[minmax(0,1fr)_10rem_auto]">
             <span>Movimiento</span>
             <span className="text-right">Cuenta</span>
             <span className="text-right">Importe</span>
           </div>
-          {days.map(([date, txs]) => {
+          {days.map(([date, txs], dayIdx) => {
             const dayTotal = txs.reduce(
               (sum, t) => sum + (t.type === "income" ? t.amount : -t.amount),
               0,
             )
             return (
               <section key={date}>
-                {/* Cabecera de día: se queda pegada mientras se recorre el día */}
-                <div className="sticky top-0 z-10 flex items-baseline justify-between border-y border-border bg-secondary/60 px-4 py-1.5 backdrop-blur-sm">
+                {/* Cabecera de día: se queda pegada mientras se recorre el día.
+                    En móvil el primer día es el primer hijo visible del Card,
+                    así que necesita `rounded-t-3xl` para no salirse por arriba
+                    (no usamos `overflow-hidden` porque rompería `position: sticky`). */}
+                <div
+                  className={`sticky top-0 z-10 flex items-baseline justify-between border-y border-border bg-secondary/60 px-4 py-1.5 backdrop-blur-sm ${
+                    dayIdx === 0 ? "rounded-t-3xl md:rounded-t-none" : ""
+                  }`}
+                >
                   <h2 className="text-[12px] font-semibold tracking-wide text-muted-foreground">
                     {formatDayHeader(date)}
                   </h2>

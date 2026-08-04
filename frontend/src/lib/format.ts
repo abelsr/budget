@@ -21,13 +21,23 @@ export function formatMoney(amount: number, compact = false): string {
 }
 
 /** Monto corto para ejes y etiquetas de gráfica: `$1.2k`, `$850`. */
+// `Intl.NumberFormat` es caro de construir y Recharts invoca esto muchas veces
+// por render; cacheamos los dos casos (≥10k y <10k) a nivel de módulo.
+const compactFmtHigh = new Intl.NumberFormat("es-MX", {
+  style: "currency",
+  currency: "MXN",
+  notation: "compact",
+  maximumFractionDigits: 0,
+})
+const compactFmtLow = new Intl.NumberFormat("es-MX", {
+  style: "currency",
+  currency: "MXN",
+  notation: "compact",
+  maximumFractionDigits: 1,
+})
+
 export function formatMoneyCompact(amount: number): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    notation: "compact",
-    maximumFractionDigits: Math.abs(amount) >= 10_000 ? 0 : 1,
-  }).format(amount)
+  return (Math.abs(amount) >= 10_000 ? compactFmtHigh : compactFmtLow).format(amount)
 }
 
 const dayFmt = new Intl.DateTimeFormat("es-MX", {
