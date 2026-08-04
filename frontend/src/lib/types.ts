@@ -7,6 +7,9 @@ export type TransactionType = "expense" | "income"
 
 export type AccountKind = "cash" | "debit" | "credit" | "savings"
 
+/** Emisor de la tarjeta (widget tipo wallet). */
+export type CardBrand = "visa" | "mastercard" | "amex" | "other"
+
 /** Cada cuánto se repite una regla recurrente. */
 export type Frequency = "weekly" | "monthly"
 
@@ -23,6 +26,13 @@ export interface Account {
   kind: AccountKind
   openingBalance: number
   balance: number
+  /** Banco (texto libre, ej. "BBVA"). Si se define con `lastFour`, la cuenta
+   *  se dibuja como tarjeta tipo wallet. */
+  bank?: string | null
+  /** Emisor de la tarjeta, cuando aplica. */
+  cardBrand?: CardBrand | null
+  /** Últimos 4 dígitos del número de tarjeta (nunca el número completo). */
+  lastFour?: string | null
 }
 
 export interface Category {

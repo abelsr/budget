@@ -78,6 +78,14 @@ class Account(Base):
     # cash | debit | credit | savings
     kind: Mapped[str] = mapped_column(String(20))
     opening_balance: Mapped[float] = mapped_column(Numeric(19, 4), default=0)
+    # Datos de tarjeta opcionales (banco + últimos 4 dígitos + emisor): si se
+    # definen, el widget de la cuenta se dibuja como tarjeta de wallet
+    # (docs/roadmap/18-features-y-uiux-propuestas.md B1). Solo se guardan los
+    # últimos 4 dígitos — nunca el número completo, no es una necesidad PCI.
+    bank: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    # visa | mastercard | amex | other
+    card_brand: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    last_four: Mapped[str | None] = mapped_column(String(4), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     household: Mapped[Household] = relationship(back_populates="accounts")
