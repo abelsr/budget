@@ -1,15 +1,17 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
+  BadgeDollarSign,
   ChevronRight,
   LogOut,
   Monitor,
   Moon,
+  Palette,
   Repeat,
-  ScanLine,
   Sun,
   Tags,
-  UserPlus,
+  UserRound,
+  Users,
 } from "lucide-react"
 import { motion } from "motion/react"
 
@@ -18,7 +20,7 @@ import { useAuth } from "@/lib/auth"
 import { useHousehold, useMembers } from "@/lib/queries"
 import { useTheme, type Theme } from "@/lib/theme"
 import { springAppear, springIndicator } from "@/lib/springs"
-import { PageHeader, SectionTitle } from "@/components/ui/surface"
+import { SectionTitle } from "@/components/ui/surface"
 
 /** Nombre largo de las monedas que ya soporta el hogar; si no, se usa el código. */
 const currencyNames: Record<string, string> = {
@@ -33,7 +35,7 @@ const themeOptions: { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: "system", label: "Sistema", icon: Monitor },
 ]
 
-/** Ajustes: cuenta, apariencia, hogar y preferencias. Estilo lista iOS. */
+/** Ajustes: acciones soportadas agrupadas en una lista compacta. */
 export function SettingsPage() {
   const { session, logout } = useAuth()
   const { theme, setTheme } = useTheme()
@@ -52,136 +54,41 @@ export function SettingsPage() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={springAppear}
-      className="flex max-w-2xl flex-col gap-5 lg:max-w-5xl"
+      className="mx-auto flex w-full max-w-xl flex-col gap-5 pb-4"
     >
-      <PageHeader title="Ajustes" />
+      <header className="flex min-h-11 items-center justify-center px-1">
+        <h1 className="text-xl font-bold tracking-tight sm:text-[28px]">Ajustes</h1>
+      </header>
 
-      {/* En escritorio, dos columnas para usar el ancho: izquierda personal,
-          derecha hogar + preferencias. En móvil todo apilado (lista iOS). */}
-      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:gap-6">
-        {/* Columna izquierda: cuenta y apariencia */}
-        <div className="flex flex-col gap-5 lg:gap-6">
-          {/* Cuenta */}
-          <Section>
-            <div className="flex items-center gap-3 px-4 py-3.5">
-              <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-[15px] font-semibold text-primary">
-                {session?.name.charAt(0).toUpperCase() ?? "?"}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[16px] font-semibold">{session?.name}</p>
-                <p className="truncate text-[13px] text-muted-foreground">
-                  {session?.email}
-                </p>
-              </div>
-            </div>
-          </Section>
-
-          {/* Apariencia */}
-          <Section title="Apariencia">
-            <div className="px-4 py-3.5">
-              <div className="flex rounded-xl bg-secondary p-1">
-                {themeOptions.map(({ value, label, icon: Icon }) => {
-                  const active = theme === value
-                  return (
-                    <button
-                      key={value}
-                      onClick={() => setTheme(value)}
-                      className="relative flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[13px] font-medium"
-                    >
-                      {active && (
-                        <motion.span
-                          layoutId="theme-segment"
-                          transition={springIndicator}
-                          className="absolute inset-0 rounded-lg bg-card shadow-sm"
-                        />
-                      )}
-                      <Icon
-                        size={15}
-                        className={`relative ${active ? "text-foreground" : "text-muted-foreground"}`}
-                      />
-                      <span
-                        className={`relative ${active ? "text-foreground" : "text-muted-foreground"}`}
-                      >
-                        {label}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </Section>
+      <Section>
+        <div className="flex items-center gap-3 px-4 py-3.5">
+          <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-[15px] font-semibold text-primary">
+            {session?.name.charAt(0).toUpperCase() ?? "?"}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold">{session?.name}</p>
+            <p className="truncate text-[12px] text-muted-foreground">{session?.email}</p>
+          </div>
         </div>
+        <Row icon={<UserRound size={16} />} label="Mi cuenta" value="Próximamente" disabled />
+        <Row
+          icon={<Users size={16} />}
+          label="Miembros del hogar"
+          value={members.length ? `${members.length}` : undefined}
+          onClick={() => setInviteOpen(true)}
+        />
+        <Row icon={<Tags size={16} />} label="Categorías" to="/app/ajustes/categorias" />
+        <Row icon={<Repeat size={16} />} label="Recurrentes" to="/app/ajustes/recurrentes" />
+        <ThemeRow theme={theme} setTheme={setTheme} />
+        <Row
+          icon={<BadgeDollarSign size={16} />}
+          label="Moneda del hogar"
+          value={household?.currencyCode ?? "—"}
+          detail={currencyNames[household?.currencyCode ?? ""]}
+          last
+        />
+      </Section>
 
-        {/* Columna derecha: hogar, preferencias y moneda */}
-        <div className="flex flex-col gap-5 lg:gap-6">
-          {/* Hogar */}
-          <Section title="Hogar">
-            {members.map((m, i) => (
-              <div
-                key={m.id}
-                className={`flex items-center gap-3 px-4 py-3 ${
-                  i > 0 ? "border-t border-border" : ""
-                }`}
-              >
-                <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-[12px] font-semibold text-primary">
-                  {m.initials}
-                </span>
-                <p className="flex-1 text-[15px] font-medium">{m.name}</p>
-                <span className="text-[12px] text-muted-foreground">
-                  {i === 0 ? "Administrador" : "Miembro"}
-                </span>
-              </div>
-            ))}
-            <button
-              onClick={() => setInviteOpen(true)}
-              className="pressable flex w-full items-center gap-3 border-t border-border px-4 py-3 text-left"
-            >
-              <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <UserPlus size={16} />
-              </span>
-              <p className="flex-1 text-[15px] font-medium">Invitar miembro</p>
-              <ChevronRight size={16} className="text-muted-foreground/50" />
-            </button>
-          </Section>
-
-          {/* Preferencias */}
-          <Section title="Preferencias">
-            <Row
-              icon={<Tags size={16} />}
-              label="Categorías"
-              to="/app/ajustes/categorias"
-            />
-            <Row
-              icon={<Repeat size={16} />}
-              label="Recurrentes"
-              to="/app/ajustes/recurrentes"
-            />
-            <Row
-              icon={<ScanLine size={16} />}
-              label="Escáner con IA"
-              value="Activo"
-              disabled
-              last
-            />
-          </Section>
-
-          {/* Moneda */}
-          <Section title="Moneda del hogar">
-            <div className="flex items-center px-4 py-3.5">
-              <p className="flex-1 text-[15px] font-medium">
-                {currencyNames[household?.currencyCode ?? ""] ??
-                  household?.currencyCode ??
-                  "—"}
-              </p>
-              <span className="tnum text-[14px] text-muted-foreground">
-                {household?.currencyCode ?? ""}
-              </span>
-            </div>
-          </Section>
-        </div>
-      </div>
-
-      {/* Cerrar sesión: ancho completo, fuera de las columnas */}
       <Section>
         <button
           onClick={onLogout}
@@ -225,6 +132,8 @@ function Row({
   disabled,
   last,
   to,
+  onClick,
+  detail,
 }: {
   icon: React.ReactNode
   label: string
@@ -232,6 +141,8 @@ function Row({
   disabled?: boolean
   last?: boolean
   to?: string
+  onClick?: () => void
+  detail?: string
 }) {
   const className = `flex w-full items-center gap-3 px-4 py-3 text-left ${
     !last ? "border-b border-border" : ""
@@ -241,9 +152,12 @@ function Row({
       <span className="flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
         {icon}
       </span>
-      <p className="flex-1 text-[15px] font-medium">{label}</p>
-      {value && <span className="text-[13px] text-muted-foreground">{value}</span>}
-      {to && <ChevronRight size={16} className="text-muted-foreground/50" />}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-[15px] font-medium">{label}</span>
+        {detail && <span className="text-[11px] text-muted-foreground">{detail}</span>}
+      </span>
+      {value && <span className="tnum text-[13px] text-muted-foreground">{value}</span>}
+      {(to || onClick) && <ChevronRight size={16} className="text-muted-foreground/50" />}
     </>
   )
   if (to) {
@@ -253,9 +167,55 @@ function Row({
       </Link>
     )
   }
+  if (!onClick && !disabled) {
+    return <div className={className}>{content}</div>
+  }
   return (
-    <button disabled={disabled} className={className}>
+    <button type="button" disabled={disabled} onClick={onClick} className={className}>
       {content}
     </button>
+  )
+}
+
+function ThemeRow({
+  theme,
+  setTheme,
+}: {
+  theme: Theme
+  setTheme: (theme: Theme) => void
+}) {
+  return (
+    <div className="border-b border-border px-4 py-3">
+      <div className="flex items-center gap-3">
+        <span className="flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+          <Palette size={16} />
+        </span>
+        <span className="flex-1 text-[15px] font-medium">Preferencias</span>
+      </div>
+      <div className="mt-3 flex rounded-xl bg-secondary p-1" aria-label="Tema de la aplicación">
+        {themeOptions.map(({ value, label, icon: Icon }) => {
+          const active = theme === value
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTheme(value)}
+              aria-pressed={active}
+              className="relative flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-medium"
+            >
+              {active && (
+                <motion.span
+                  layoutId="theme-segment"
+                  transition={springIndicator}
+                  className="absolute inset-0 rounded-lg bg-card shadow-sm"
+                />
+              )}
+              <Icon size={14} className={`relative ${active ? "text-foreground" : "text-muted-foreground"}`} />
+              <span className={`relative ${active ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }

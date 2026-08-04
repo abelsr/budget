@@ -1,5 +1,5 @@
 import { motion } from "motion/react"
-import { Receipt } from "lucide-react"
+import { Filter, Receipt, Search } from "lucide-react"
 
 import { formatDayHeader, formatMoney } from "@/lib/format"
 import {
@@ -40,13 +40,35 @@ export function TransactionsPage() {
       transition={springAppear}
       className="flex max-w-3xl flex-col gap-4 lg:max-w-5xl"
     >
-      <PageHeader
-        title="Movimientos"
-        eyebrow={
-          transactions.length > 0 &&
-          `${transactions.length} ${transactions.length === 1 ? "registro" : "registros"}`
-        }
-      />
+      <div className="hidden md:block">
+        <PageHeader
+          title="Movimientos"
+          eyebrow={
+            transactions.length > 0 &&
+            `${transactions.length} ${transactions.length === 1 ? "registro" : "registros"}`
+          }
+        />
+      </div>
+
+      {/* Referencia visual hasta que el roadmap defina búsqueda y filtros. No son
+          botones: así no sugieren una acción que todavía no existe. */}
+      <header className="space-y-2 px-1 md:hidden">
+        <h1 className="text-[18px] leading-tight font-bold tracking-[-0.02em]">
+          Movimientos
+        </h1>
+        <div className="flex items-center gap-2" aria-hidden="true">
+          <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg bg-secondary px-2.5 text-[11px] text-muted-foreground">
+            <Search size={14} strokeWidth={2} />
+            <span>Buscar movimientos</span>
+          </div>
+          <span className="flex size-8 items-center justify-center text-muted-foreground">
+            <Filter size={15} strokeWidth={2} />
+          </span>
+        </div>
+        <p className="sr-only">
+          La búsqueda y los filtros estarán disponibles próximamente.
+        </p>
+      </header>
 
       {days.length === 0 ? (
         <Card>

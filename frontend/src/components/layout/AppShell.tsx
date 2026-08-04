@@ -1,18 +1,43 @@
 import { NavLink, Outlet } from "react-router-dom"
-import { LayoutDashboard, ArrowLeftRight, Wallet, Settings } from "lucide-react"
+import {
+  ArrowLeftRight,
+  Bell,
+  ChevronsUpDown,
+  FolderCog,
+  LayoutDashboard,
+  Settings,
+  Tags,
+  UserRound,
+  Wallet,
+} from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { motion } from "motion/react"
 
 import { springIndicator } from "@/lib/springs"
 import { useHousehold, useMembers } from "@/lib/queries"
+import { useAuth } from "@/lib/auth"
 import { AddTransactionButton } from "@/components/AddTransactionSheet"
 import { BrandMark } from "@/components/BrandMark"
-import { TicketScannerButton } from "@/components/TicketScanner"
 
-const tabs = [
+type NavigationItem = {
+  label: string
+  icon: LucideIcon
+  to?: string
+  disabled?: boolean
+}
+
+const mobileTabs: Array<NavigationItem & { to: string }> = [
   { to: "/app", label: "Resumen", icon: LayoutDashboard },
   { to: "/app/transacciones", label: "Movimientos", icon: ArrowLeftRight },
   { to: "/app/cuentas", label: "Cuentas", icon: Wallet },
   { to: "/app/ajustes", label: "Ajustes", icon: Settings },
+]
+
+const desktopTabs: NavigationItem[] = [
+  ...mobileTabs.slice(0, 3),
+  { to: "/app/ajustes/categorias", label: "Categorías", icon: Tags },
+  { label: "Reportes", icon: FolderCog, disabled: true },
+  mobileTabs[3]!,
 ]
 
 /**
@@ -26,93 +51,120 @@ const tabs = [
 export function AppShell() {
   const { data: members = [] } = useMembers()
   const { data: household, isError: householdError } = useHousehold()
+  const { session } = useAuth()
   const householdName = householdError
     ? "Mi hogar"
     : (household?.name ?? "…")
+  const profileName = session?.name ?? members[0]?.name ?? "Mi perfil"
+  const profileEmail = session?.email ?? ""
+  const profileInitials = profileName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("")
   return (
     <div className="min-h-dvh">
       {/* Sidebar (desktop) */}
-      <aside className="material-bar fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r md:flex">
-        {/* Isólogo de marca y, debajo, el hogar activo */}
-        <div className="px-6 pt-8 pb-6">
-          <BrandMark size={30} />
-          <p className="mt-1.5 truncate text-[13px] font-medium text-muted-foreground">
-            {householdName}
-          </p>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-52 flex-col border-r bg-sidebar md:flex">
+        <div className="px-6 pt-5">
+          <BrandMark size={28} />
         </div>
-        <nav className="flex flex-col gap-1 px-3">
-          {tabs.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === "/app"}
-              className={({ isActive }) =>
-                `pressable relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors ${
-                  isActive
-                    ? "text-primary"
-                    : "text-foreground/70 hover:bg-black/5 dark:hover:bg-white/10"
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {isActive && (
-                    <motion.span
-                      layoutId="sidebar-active"
-                      transition={springIndicator}
-                      className="absolute inset-0 rounded-xl bg-primary/10"
-                    />
-                  )}
-                  <Icon size={20} className="relative" />
-                  <span className="relative">{label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
-          <div className="mx-3 my-2 h-px bg-border" />
-          <TicketScannerButton variant="nav" />
+        <nav aria-label="Navegación principal" className="mt-5 flex flex-col gap-1 px-3">
+          {desktopTabs.map(({ to, label, icon: Icon, disabled }) =>
+            disabled ? (
+              <span
+                key={label}
+                aria-disabled="true"
+                className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-[12px] font-medium text-muted-foreground/60"
+              >
+                <Icon size={16} />
+                {label}
+              </span>
+            ) : (
+              <NavLink
+                key={to}
+                to={to!}
+                end={to === "/app" || to === "/app/ajustes"}
+                className={({ isActive }) =>
+                  `pressable relative flex items-center gap-3 rounded-md px-3 py-2 text-[12px] font-medium transition-colors ${
+                    isActive
+                      ? "text-primary"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <motion.span
+                        layoutId="sidebar-active"
+                        transition={springIndicator}
+                        className="absolute inset-0 rounded-md bg-primary-soft"
+                      />
+                    )}
+                    <Icon size={16} className="relative" />
+                    <span className="relative">{label}</span>
+                  </>
+                )}
+              </NavLink>
+            ),
+          )}
         </nav>
 
-        {/* Footer: miembros del hogar */}
-        <div className="mt-auto flex items-center gap-3 px-6 py-5">
-          <div className="flex -space-x-2">
-            {members.map((m) => (
-              <span
-                key={m.id}
-                title={m.name}
-                className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary ring-2 ring-background"
-              >
-                {m.initials}
-              </span>
-            ))}
+        <div className="mt-auto border-t px-3 py-4">
+          <div
+            className="pressable flex w-full items-center gap-2 rounded-md border bg-card px-3 py-2 text-left text-[11px] font-medium text-sidebar-foreground shadow-sm"
+            aria-label={`Hogar activo: ${householdName}`}
+          >
+            <span className="flex size-5 items-center justify-center rounded bg-primary-soft text-primary">
+              <UserRound size={13} />
+            </span>
+            <span className="min-w-0 flex-1 truncate">{householdName}</span>
+            <ChevronsUpDown size={14} className="text-muted-foreground" aria-hidden="true" />
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium">
-              {members.map((m) => m.name).join(" y ")}
-            </p>
-            <p className="text-[11px] text-muted-foreground">Hogar compartido</p>
+          <div className="mt-5 flex items-center gap-2 px-2">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-semibold text-secondary-foreground">
+              {profileInitials}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[11px] font-medium">{profileName}</p>
+              {profileEmail && (
+                <p className="truncate text-[10px] text-muted-foreground">{profileEmail}</p>
+              )}
+            </div>
           </div>
         </div>
       </aside>
 
       {/* Contenido */}
-      <main className="pb-28 md:pb-10 md:pl-60">
-        <div className="mx-auto w-full max-w-2xl px-4 pt-6 md:max-w-3xl md:pt-10 lg:max-w-6xl lg:px-8 2xl:max-w-7xl">
+      <main className="pb-28 md:pb-10 md:pl-52">
+        <header className="hidden h-15 items-center justify-end border-b bg-card/80 px-8 backdrop-blur-sm md:flex">
+          <span
+            role="status"
+            aria-label="Notificaciones pendientes"
+            className="pressable relative mr-28 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <Bell size={18} />
+            <span className="absolute right-1 top-1 size-1.5 rounded-full bg-destructive" aria-hidden="true" />
+          </span>
+        </header>
+        <div className="mx-auto w-full max-w-2xl px-4 pt-6 md:max-w-3xl md:pt-7 lg:max-w-6xl lg:px-8 2xl:max-w-7xl">
           <Outlet />
         </div>
       </main>
 
-      {/* Botón flotante: registrar */}
+      {/* Un solo drawer conserva el estado entre los triggers móvil y desktop. */}
       <AddTransactionButton />
 
       {/* Tab bar (móvil) */}
       <nav className="material-bar fixed inset-x-0 bottom-0 z-40 border-t pb-[env(safe-area-inset-bottom)] md:hidden">
         <div className="mx-auto flex max-w-md items-stretch justify-around">
-          {tabs.map(({ to, label, icon: Icon }) => (
+          {mobileTabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
-              end={to === "/app"}
+              end={to === "/app" || to === "/app/ajustes"}
               className={({ isActive }) =>
                 `relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors ${
                   isActive ? "text-primary" : "text-muted-foreground"
