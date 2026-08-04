@@ -2,10 +2,10 @@ import { useState } from "react"
 import { CreditCard, Landmark, PiggyBank, Plus, Wallet } from "lucide-react"
 
 import { AccountFormSheet } from "@/components/AccountFormSheet"
+import { Card, EmptyState, IconButton, PageHeader } from "@/components/ui/surface"
 import { formatMoney } from "@/lib/format"
 import { useAccounts } from "@/lib/queries"
 import type { Account, AccountKind } from "@/lib/types"
-
 const kindMeta: Record<AccountKind, { label: string; icon: typeof Wallet }> = {
   cash: { label: "Efectivo", icon: Wallet },
   debit: { label: "Débito", icon: Landmark },
@@ -32,68 +32,69 @@ export function AccountsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex items-start justify-between px-1">
-        <div>
-          <p className="text-[13px] font-medium text-muted-foreground">
-            Total · {formatMoney(total)}
-          </p>
-          <h1 className="text-[34px] leading-tight font-bold tracking-tight">
-            Cuentas
-          </h1>
-        </div>
-        <button
-          aria-label="Crear cuenta"
-          onClick={openCreate}
-          className="pressable mt-1 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
-        >
-          <Plus size={20} strokeWidth={2.5} />
-        </button>
-      </header>
+    <div className="flex max-w-3xl flex-col gap-4 lg:max-w-4xl">
+      <PageHeader
+        title="Cuentas"
+        eyebrow={<>Total · <span className="tnum">{formatMoney(total)}</span></>}
+        action={
+          <IconButton label="Crear cuenta" variant="primary" onClick={openCreate}>
+            <Plus size={20} strokeWidth={2.5} />
+          </IconButton>
+        }
+      />
 
       {accounts.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-center">
-          <span className="flex size-16 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
-            <Wallet size={28} />
-          </span>
-          <p className="mt-2 text-[17px] font-semibold">Sin cuentas</p>
-          <p className="text-[13px] text-muted-foreground">
-            Toca + para crear la primera
-          </p>
-        </div>
+        <Card className="flex min-h-[calc(100dvh-12rem)] flex-col items-center justify-center md:min-h-[calc(100dvh-14rem)]">
+          <EmptyState
+            icon={<Wallet size={26} />}
+            title="Sin cuentas"
+            hint="Una cuenta es dónde vive tu dinero: efectivo, débito, crédito o ahorro. Crea la primera para empezar a registrar."
+            action={
+              <button
+                onClick={openCreate}
+                className="pressable rounded-full bg-primary px-5 py-2.5 text-[14px] font-semibold text-primary-foreground"
+              >
+                Crear cuenta
+              </button>
+            }
+          />
+        </Card>
       ) : (
-        <section className="rounded-3xl bg-card shadow-sm">
-          <ul className="divide-y divide-border/60 py-2">
-            {accounts.map((a) => {
-              const meta = kindMeta[a.kind]
-              const Icon = meta.icon
-              return (
-                <li
-                  key={a.id}
-                  onClick={() => openEdit(a)}
-                  className="pressable flex cursor-pointer items-center gap-3 px-4 py-3"
-                >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {accounts.map((a) => {
+            const meta = kindMeta[a.kind]
+            const Icon = meta.icon
+            return (
+              <button
+                key={a.id}
+                onClick={() => openEdit(a)}
+                className="pressable flex flex-col gap-5 rounded-3xl border border-border bg-card p-5 text-left shadow-sm"
+              >
+                <div className="flex items-start gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
                     <Icon size={20} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[15px] font-medium">{a.name}</p>
-                    <p className="text-[13px] text-muted-foreground">
-                      {meta.label}
-                    </p>
+                    {/* El tipo sólo aporta si no es literalmente el nombre */}
+                    {a.name !== meta.label && (
+                      <p className="text-[13px] text-muted-foreground">
+                        {meta.label}
+                      </p>
+                    )}
                   </div>
-                  <span
-                    className={`tnum shrink-0 text-[15px] font-semibold ${
-                      a.balance < 0 ? "text-expense" : ""
-                    }`}
-                  >
-                    {formatMoney(a.balance)}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
+                </div>
+                <span
+                  className={`tnum text-[20px] leading-none font-bold tracking-tight ${
+                    a.balance < 0 ? "text-expense" : ""
+                  }`}
+                >
+                  {formatMoney(a.balance)}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       )}
 
       <AccountFormSheet

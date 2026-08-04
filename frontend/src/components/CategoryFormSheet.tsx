@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/drawer"
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { ApiError } from "@/lib/api"
+import { CHART_PALETTE_LIGHT } from "@/lib/chart-colors"
 import {
   useCreateCategory,
   useDeleteCategory,
@@ -35,19 +36,17 @@ const ICON_NAMES = [
   "piggy-bank",
 ]
 
+/**
+ * Paleta categórica validada (docs/design-guidelines.md §4) más cuatro
+ * tonos extra para dar variedad sin salirse del sistema. Los ocho primeros
+ * son los que garantizan separación bajo daltonismo en ambos modos.
+ */
 const COLOR_PRESETS = [
-  "#30b0c7",
-  "#ff9f0a",
-  "#0a84ff",
-  "#bf5af2",
-  "#ffd60a",
-  "#ff375f",
-  "#ff6482",
-  "#ac8e68",
-  "#30d158",
-  "#64d2ff",
-  "#8e8e93",
-  "#5e5ce6",
+  ...CHART_PALETTE_LIGHT,
+  "#0e7490", // cian
+  "#4f46e5", // índigo
+  "#e11d48", // rosa fuerte
+  "#64748b", // pizarra
 ]
 
 /**

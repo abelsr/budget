@@ -7,7 +7,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#f2f2f7" />
+    <meta name="theme-color" content="#eff6ff" />
     <script>
       // Aplica el tema guardado antes del primer paint (sin flash blanco)
       try {
@@ -16,10 +16,15 @@
           t === "dark" ||
           ((t === null || t === "system") &&
             matchMedia("(prefers-color-scheme: dark)").matches)
-        if (dark) document.documentElement.classList.add("dark")
+        if (dark) {
+          document.documentElement.classList.add("dark")
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute("content", "#070c16")
+        }
       } catch (e) {}
     </script>
-    <title>Finanzas Familiares</title>
+    <title>budget · finanzas del hogar</title>
   </head>
   <body>
     <div id="root"></div>

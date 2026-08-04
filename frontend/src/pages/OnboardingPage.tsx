@@ -160,7 +160,7 @@ function StepHeader({
 }) {
   return (
     <div className="mb-6 flex flex-col items-center gap-3 text-center">
-      <span className="flex size-16 items-center justify-center rounded-[22px] bg-primary text-primary-foreground shadow-lg shadow-primary/30">
+      <span className="surface-brand flex size-16 items-center justify-center rounded-[22px] shadow-lg">
         {icon}
       </span>
       <div>
@@ -206,7 +206,7 @@ function WelcomeStep({ name }: { name: string }) {
         {bullets.map((b) => (
           <li
             key={b.title}
-            className="flex items-start gap-3 rounded-2xl bg-card p-4 shadow-sm"
+            className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm"
           >
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
               {b.icon}
@@ -278,7 +278,7 @@ function AccountsStep() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={springAppear}
-              className="flex items-center gap-3 rounded-2xl bg-card p-3.5 shadow-sm"
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-sm"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
                 <Icon size={17} />
@@ -296,7 +296,7 @@ function AccountsStep() {
       </ul>
 
       {adding ? (
-        <div className="flex flex-col gap-3 rounded-2xl bg-card p-4 shadow-sm">
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
           <input
             autoFocus
             value={name}
@@ -401,7 +401,7 @@ function DoneStep({
         {items.map((item) => (
           <li
             key={item}
-            className="flex items-center gap-3 rounded-2xl bg-card p-3.5 shadow-sm"
+            className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-sm"
           >
             <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-income/15 text-income">
               <Check size={15} strokeWidth={2.6} />

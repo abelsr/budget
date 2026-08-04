@@ -315,14 +315,17 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
         className="rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
       />
 
-      <Button
-        size="lg"
-        disabled={!canSave || isSaving}
-        onClick={save}
-        className="pressable h-12 rounded-2xl text-[16px] font-semibold"
-      >
-        Guardar
-      </Button>
+      {/* Acción principal siempre visible: el sheet scrollea debajo de ella */}
+      <div className="sticky bottom-0 -mx-5 -mb-8 border-t border-border bg-card px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <Button
+          size="lg"
+          disabled={!canSave || isSaving}
+          onClick={save}
+          className="pressable h-12 w-full rounded-2xl text-[16px] font-semibold"
+        >
+          Guardar
+        </Button>
+      </div>
     </div>
   )
 }

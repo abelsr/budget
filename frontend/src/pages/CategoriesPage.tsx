@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { ChevronLeft, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { motion } from "motion/react"
 
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { CategoryFormSheet } from "@/components/CategoryFormSheet"
 import { useCategories, useUpdateCategory } from "@/lib/queries"
+import { IconButton, PageHeader, SectionTitle, Toggle } from "@/components/ui/surface"
 import { springAppear } from "@/lib/springs"
 import type { Category } from "@/lib/types"
 
@@ -47,25 +48,15 @@ export function CategoriesPage() {
       transition={springAppear}
       className="flex max-w-2xl flex-col gap-5"
     >
-      <header className="flex items-center gap-2 px-1">
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Volver"
-          className="pressable flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <h1 className="flex-1 text-[34px] leading-tight font-bold tracking-tight">
-          Categorías
-        </h1>
-        <button
-          onClick={openCreate}
-          aria-label="Nueva categoría"
-          className="pressable flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground"
-        >
-          <Plus size={20} strokeWidth={2.5} />
-        </button>
-      </header>
+      <PageHeader
+        title="Categorías"
+        back={() => navigate(-1)}
+        action={
+          <IconButton label="Nueva categoría" variant="primary" onClick={openCreate}>
+            <Plus size={20} strokeWidth={2.5} />
+          </IconButton>
+        }
+      />
 
       <CategorySection
         title="Gastos"
@@ -106,10 +97,8 @@ function CategorySection({
 }) {
   return (
     <section>
-      <h2 className="mb-1.5 px-4 text-[13px] font-medium text-muted-foreground">
-        {title}
-      </h2>
-      <div className="overflow-hidden rounded-3xl bg-card shadow-sm">
+      <SectionTitle>{title}</SectionTitle>
+      <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         {categories.length === 0 ? (
           <p className="px-4 py-3.5 text-[13px] text-muted-foreground">
             Sin categorías
@@ -128,7 +117,7 @@ function CategorySection({
                 }
               }}
               className={`pressable flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left ${
-                i > 0 ? "border-t border-border/60" : ""
+                i > 0 ? "border-t border-border" : ""
               } ${c.active ? "" : "opacity-50"}`}
             >
               <CategoryIcon
@@ -138,24 +127,11 @@ function CategorySection({
                 className="size-10"
               />
               <p className="flex-1 text-[15px] font-medium">{c.name}</p>
-              <button
-                role="switch"
-                aria-checked={c.active}
-                aria-label={`${c.active ? "Desactivar" : "Activar"} ${c.name}`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onToggle(c)
-                }}
-                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                  c.active ? "bg-primary" : "bg-muted"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform ${
-                    c.active ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
+              <Toggle
+                checked={c.active}
+                onChange={() => onToggle(c)}
+                label={`${c.active ? "Desactivar" : "Activar"} ${c.name}`}
+              />
             </div>
           ))
         )}
