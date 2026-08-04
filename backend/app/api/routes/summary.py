@@ -9,10 +9,10 @@ from app.models import Transaction
 from app.schemas.summary import (
     CategoryTotal,
     MonthSummaryResponse,
-    RangeMonthTotal,
     RangeSummaryResponse,
 )
 from app.services.recurring import materialize_due
+from app.services.range_summary import build_range_report
 
 router = APIRouter(prefix="/summary", tags=["summary"])
 
@@ -84,34 +84,5 @@ def get_range_summary(
         raise HTTPException(status_code=422, detail="La fecha inicial debe ser anterior a la final")
 
     materialize_due(db, user.household_id)
-    rows = db.execute(
-        select(Transaction.date, Transaction.type, Transaction.amount, Transaction.category_id).where(
-            Transaction.household_id == user.household_id,
-            Transaction.date >= from_date,
-            Transaction.date <= to_date,
-        )
-    ).all()
-
-    monthly_totals: dict[str, dict[str, float]] = {}
-    category_totals: dict[str, float] = {}
-    for tx_date, tx_type, amount, category_id in rows:
-        month = tx_date.strftime("%Y-%m")
-        totals = monthly_totals.setdefault(month, {"income": 0.0, "expense": 0.0})
-        totals[tx_type] += float(amount)
-        if tx_type == "expense":
-            category_totals[category_id] = category_totals.get(category_id, 0.0) + float(amount)
-
-    monthly = [
-        RangeMonthTotal(
-            month=month,
-            income=round(totals["income"], 2),
-            expense=round(totals["expense"], 2),
-            net=round(totals["income"] - totals["expense"], 2),
-        )
-        for month, totals in sorted(monthly_totals.items())
-    ]
-    by_category = [
-        CategoryTotal(category_id=category_id, total=round(total, 2))
-        for category_id, total in sorted(category_totals.items(), key=lambda item: item[1], reverse=True)
-    ]
-    return RangeSummaryResponse(monthly=monthly, by_category=by_category)
+    report = build_range_report(db, user.household_id, from_date, to_date)
+    return RangeSummaryResponse(monthly=report.monthly, by_category=report.by_category)

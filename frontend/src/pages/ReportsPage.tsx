@@ -1,12 +1,13 @@
 import { useState } from "react"
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { BarChart3 } from "lucide-react"
+import { BarChart3, Download } from "lucide-react"
 
 import { Card, EmptyState, PageHeader } from "@/components/ui/surface"
 import { formatMoney, formatMoneyCompact, toISODate } from "@/lib/format"
 import { seriesColor } from "@/lib/chart-colors"
 import { useCategories, useRangeSummary } from "@/lib/queries"
 import { useTheme } from "@/lib/theme"
+import { apiFetchBlob } from "@/lib/api"
 
 function defaultFrom() {
   const date = new Date()
@@ -17,6 +18,8 @@ function defaultFrom() {
 export function ReportsPage() {
   const [from, setFrom] = useState(defaultFrom)
   const [to, setTo] = useState(() => toISODate(new Date()))
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<string | null>(null)
   const { data: summary } = useRangeSummary(from, to)
   const { data: categories = [] } = useCategories()
   const { isDark } = useTheme()
@@ -29,13 +32,38 @@ export function ReportsPage() {
     return { ...row, name: category?.name ?? "Categoría eliminada", color: seriesColor(category?.color ?? "#94a3b8", isDark) }
   })
 
+  async function exportReport(format: "csv" | "xlsx" | "docx" | "pdf") {
+    setExportError(null)
+    setExporting(format)
+    try {
+      const blob = await apiFetchBlob(`/reports/export?format=${format}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `reporte-${from}-a-${to}.${format}`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "No se pudo exportar el reporte.")
+    } finally {
+      setExporting(null)
+    }
+  }
+
   return <div className="flex max-w-5xl flex-col gap-4">
     <PageHeader title="Reportes" eyebrow="Analiza la evolución de tu hogar" />
     <Card className="p-3">
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">Desde<input type="date" value={from} max={to} onChange={(event) => setFrom(event.target.value)} className="h-9 rounded-lg border border-input bg-background px-2 text-[12px] text-foreground outline-none focus:ring-2 focus:ring-ring/30" /></label>
         <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">Hasta<input type="date" value={to} min={from} onChange={(event) => setTo(event.target.value)} className="h-9 rounded-lg border border-input bg-background px-2 text-[12px] text-foreground outline-none focus:ring-2 focus:ring-ring/30" /></label>
+        <fieldset className="flex flex-wrap gap-1" aria-label="Exportar reporte">
+          <legend className="sr-only">Exportar reporte</legend>
+          {(["csv", "xlsx", "docx", "pdf"] as const).map((format) => <button key={format} type="button" onClick={() => void exportReport(format)} disabled={exporting !== null} className="inline-flex h-9 items-center gap-1 rounded-lg border border-input px-2 text-[11px] font-medium uppercase text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"><Download size={13} aria-hidden="true" />{exporting === format ? "Exportando" : format}</button>)}
+        </fieldset>
       </div>
+      {exportError && <p className="mt-2 text-[12px] text-expense" role="alert">No se pudo exportar el reporte: {exportError}</p>}
     </Card>
     {monthly.length === 0 ? <Card><EmptyState icon={<BarChart3 size={26} />} title="Aún no hay datos para este periodo" hint="Elige otro rango o registra movimientos para ver tendencias y categorías." /></Card> : <>
       <div className="grid gap-3 sm:grid-cols-3">
