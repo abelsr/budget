@@ -30,6 +30,9 @@ def _account_out(account: Account, balance: float) -> AccountOut:
         kind=account.kind,
         opening_balance=float(account.opening_balance),
         balance=round(balance, 2),
+        bank=account.bank,
+        card_brand=account.card_brand,
+        last_four=account.last_four,
     )
 
 
@@ -75,6 +78,9 @@ def create_account(
         name=payload.name,
         kind=payload.kind,
         opening_balance=payload.opening_balance,
+        bank=payload.bank,
+        card_brand=payload.card_brand,
+        last_four=payload.last_four,
     )
     db.add(account)
     db.commit()

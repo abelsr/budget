@@ -173,6 +173,9 @@ export interface AccountInput {
   name: string
   kind: Account["kind"]
   openingBalance?: number
+  bank?: string | null
+  cardBrand?: Account["cardBrand"]
+  lastFour?: string | null
 }
 
 export interface CategoryInput {

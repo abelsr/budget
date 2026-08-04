@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { CreditCard, Landmark, PiggyBank, Wallet } from "lucide-react"
 
+import { AccountCard } from "@/components/AccountCard"
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
@@ -9,18 +10,26 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import { ApiError } from "@/lib/api"
+import { BANK_SUGGESTIONS } from "@/lib/brands"
 import {
   useCreateAccount,
   useDeleteAccount,
   useUpdateAccount,
 } from "@/lib/queries"
-import type { Account, AccountKind } from "@/lib/types"
+import type { Account, AccountKind, CardBrand } from "@/lib/types"
 
 const kindOptions: { kind: AccountKind; label: string; icon: typeof Wallet }[] = [
   { kind: "cash", label: "Efectivo", icon: Wallet },
   { kind: "debit", label: "Débito", icon: Landmark },
   { kind: "credit", label: "Crédito", icon: CreditCard },
   { kind: "savings", label: "Ahorro", icon: PiggyBank },
+]
+
+const brandOptions: { value: CardBrand; label: string }[] = [
+  { value: "visa", label: "Visa" },
+  { value: "mastercard", label: "Mastercard" },
+  { value: "amex", label: "Amex" },
+  { value: "other", label: "Otra" },
 ]
 
 interface AccountFormSheetProps {
@@ -63,14 +72,20 @@ function AccountForm({
   const [balanceText, setBalanceText] = useState(
     account ? String(account.openingBalance) : "0",
   )
+  const [bank, setBank] = useState(account?.bank ?? "")
+  const [cardBrand, setCardBrand] = useState<CardBrand | "">(
+    account?.cardBrand ?? "",
+  )
+  const [lastFour, setLastFour] = useState(account?.lastFour ?? "")
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const openingBalance = Number(balanceText.replace(",", ".")) || 0
+  const lastFourValid = lastFour === "" || /^\d{4}$/.test(lastFour)
   const isPending =
     createAccount.isPending ||
     updateAccount.isPending ||
     deleteAccount.isPending
-  const canSave = name.trim().length > 0 && !isPending
+  const canSave = name.trim().length > 0 && lastFourValid && !isPending
 
   const error =
     createAccount.error ?? updateAccount.error ?? deleteAccount.error
@@ -83,7 +98,14 @@ function AccountForm({
 
   function save() {
     if (!canSave) return
-    const input = { name: name.trim(), kind, openingBalance }
+    const input = {
+      name: name.trim(),
+      kind,
+      openingBalance,
+      bank: bank.trim() || null,
+      cardBrand: cardBrand || null,
+      lastFour: lastFour || null,
+    }
     if (account) {
       updateAccount.mutate({ id: account.id, ...input }, { onSuccess: onDone })
     } else {
@@ -169,6 +191,82 @@ function AccountForm({
           aria-label="Saldo inicial"
         />
       </div>
+
+      {/* Datos de tarjeta (opcional) — activan el widget tipo wallet */}
+      <div>
+        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
+          Datos de tarjeta <span className="font-normal">(opcional)</span>
+        </p>
+        <div className="flex flex-col gap-2">
+          <input
+            list="bank-suggestions"
+            value={bank}
+            onChange={(e) => setBank(e.target.value)}
+            placeholder="Banco (ej. BBVA)"
+            className="w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
+            aria-label="Banco"
+          />
+          <datalist id="bank-suggestions">
+            {BANK_SUGGESTIONS.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
+          <div className="flex gap-2">
+            <input
+              inputMode="numeric"
+              maxLength={4}
+              value={lastFour}
+              onChange={(e) =>
+                setLastFour(e.target.value.replace(/\D/g, "").slice(0, 4))
+              }
+              placeholder="Últimos 4 dígitos"
+              className="tnum w-36 rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
+              aria-label="Últimos 4 dígitos de la tarjeta"
+            />
+            <div className="flex flex-1 gap-1.5">
+              {brandOptions.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setCardBrand(value)}
+                  className={`pressable flex-1 rounded-xl px-2 py-2.5 text-[12px] font-medium transition-colors ${
+                    cardBrand === value
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {lastFour !== "" && !lastFourValid && (
+            <p className="text-[12px] text-expense">Deben ser 4 dígitos.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Vista previa del widget tipo wallet */}
+      {lastFour !== "" && (
+        <div>
+          <p className="mb-2 text-[13px] font-medium text-muted-foreground">
+            Vista previa
+          </p>
+          <AccountCard
+            account={{
+              id: account?.id ?? "preview",
+              householdId: account?.householdId ?? "",
+              name: name.trim() || "Nombre de la cuenta",
+              kind,
+              openingBalance,
+              balance: openingBalance,
+              bank: bank.trim() || null,
+              cardBrand: cardBrand || null,
+              lastFour,
+            }}
+          />
+        </div>
+      )}
 
       {errorMessage && (
         <p className="rounded-xl bg-expense/10 px-3 py-2 text-[13px] text-expense">

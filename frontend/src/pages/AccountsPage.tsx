@@ -2,6 +2,7 @@ import { useState } from "react"
 import { CreditCard, Landmark, PiggyBank, Plus, Wallet } from "lucide-react"
 
 import { AccountFormSheet } from "@/components/AccountFormSheet"
+import { AccountCard } from "@/components/AccountCard"
 import { Card, EmptyState, IconButton, PageHeader } from "@/components/ui/surface"
 import { formatMoney } from "@/lib/format"
 import { useAccounts } from "@/lib/queries"
@@ -62,6 +63,17 @@ export function AccountsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {accounts.map((a) => {
+            // Con tarjeta definida → widget tipo wallet; sin ella, la tarjeta
+            // clásica con icono por tipo.
+            if (a.lastFour) {
+              return (
+                <AccountCard
+                  key={a.id}
+                  account={a}
+                  onClick={() => openEdit(a)}
+                />
+              )
+            }
             const meta = kindMeta[a.kind]
             const Icon = meta.icon
             return (
