@@ -125,6 +125,24 @@ export function normalizeText(s: string): string {
 }
 
 /**
+ * Matchers precomputados: cada keyword se normaliza **una sola vez** al cargar
+ * el módulo (no por llamada), y se ordena de mayor a menor longitud para que
+ * `matchBrand` pueda devolver el primer match y salir temprano. El sort es
+ * estable: empates entre keywords del mismo largo conservan el orden de BRANDS,
+ * igual que la búsqueda original de "el más largo gana".
+ */
+interface BrandMatcher {
+  brand: Brand
+  kw: string
+}
+
+const MATCHERS: BrandMatcher[] = BRANDS.flatMap((brand) =>
+  brand.keywords
+    .map((raw) => ({ brand, kw: normalizeText(raw) }))
+    .filter((m) => m.kw.length > 0),
+).sort((a, b) => b.kw.length - a.kw.length)
+
+/**
  * Reconocimiento de comercio por la nota de la transacción. Devuelve la marca
  * cuyo keyword más largo coincida; reglas:
  * - keywords de ≥4 caracteres matchean como substring de la nota normalizada;
@@ -135,18 +153,9 @@ export function matchBrand(note: string | null | undefined): Brand | null {
   const n = normalizeText(note ?? "")
   if (!n) return null
   const words = new Set(n.split(" "))
-  let best: Brand | null = null
-  let bestLen = 0
-  for (const brand of BRANDS) {
-    for (const raw of brand.keywords) {
-      const kw = normalizeText(raw)
-      if (!kw) continue
-      const ok = kw.length >= 4 ? n.includes(kw) : words.has(kw)
-      if (ok && kw.length > bestLen) {
-        best = brand
-        bestLen = kw.length
-      }
-    }
+  for (const { brand, kw } of MATCHERS) {
+    const ok = kw.length >= 4 ? n.includes(kw) : words.has(kw)
+    if (ok) return brand
   }
-  return best
+  return null
 }
