@@ -1,10 +1,11 @@
 import { useState } from "react"
-import { Trash2 } from "lucide-react"
+import { Trash2, X } from "lucide-react"
 import { motion } from "motion/react"
 
 import { Button } from "@/components/ui/button"
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
@@ -135,11 +136,28 @@ function CategoryForm({
   }
 
   return (
-    <div className="flex flex-col gap-5 px-5 pb-8">
-      <DrawerHeader className="p-0 pt-2">
+    <form
+      className="flex max-h-[calc(100dvh-2rem)] flex-col gap-5 overflow-y-auto overscroll-contain px-5 pb-[max(2rem,env(safe-area-inset-bottom))]"
+      onSubmit={(event) => {
+        event.preventDefault()
+        save()
+      }}
+    >
+      <DrawerHeader className="flex-row items-center justify-between p-0 pt-2 text-left">
         <DrawerTitle className="text-center text-[17px] font-semibold">
           {isEditing ? "Editar categoría" : "Nueva categoría"}
         </DrawerTitle>
+        <DrawerClose
+          render={
+            <button
+              type="button"
+              aria-label="Cerrar formulario de categoría"
+              className="pressable flex size-9 items-center justify-center rounded-full bg-secondary text-secondary-foreground"
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          }
+        />
       </DrawerHeader>
 
       {/* Preview en vivo */}
@@ -157,25 +175,27 @@ function CategoryForm({
 
       {/* Nombre */}
       <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
+        <label htmlFor="category-name" className="mb-2 block text-[13px] font-medium text-muted-foreground">
           Nombre
-        </p>
+        </label>
         <input
+          id="category-name"
           autoFocus={!isEditing}
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Ej. Supermercado"
           className="w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
-          aria-label="Nombre de la categoría"
         />
       </div>
 
       {/* Tipo: en edición no se puede cambiar */}
       <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
+        <p id="category-type-label" className="mb-2 text-[13px] font-medium text-muted-foreground">
           Tipo
         </p>
         <div
+          role="group"
+          aria-labelledby="category-type-label"
           className={`flex rounded-xl bg-secondary p-1 ${
             isEditing ? "opacity-50" : ""
           }`}
@@ -183,8 +203,10 @@ function CategoryForm({
           {(["expense", "income"] as const).map((t) => (
             <button
               key={t}
+              type="button"
               disabled={isEditing}
               onClick={() => setType(t)}
+              aria-pressed={type === t}
               className="relative flex-1 rounded-lg py-2 text-[14px] font-medium"
             >
               {type === t && (
@@ -208,17 +230,19 @@ function CategoryForm({
 
       {/* Icono */}
       <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
+        <p id="category-icon-label" className="mb-2 text-[13px] font-medium text-muted-foreground">
           Icono
         </p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-2" role="group" aria-labelledby="category-icon-label">
           {ICON_NAMES.map((name) => {
             const selected = icon === name
             return (
               <button
                 key={name}
+                type="button"
                 onClick={() => setIcon(name)}
                 aria-label={`Icono ${name}`}
+                aria-pressed={selected}
                 className="pressable flex items-center justify-center rounded-2xl py-2"
               >
                 <CategoryIcon
@@ -238,17 +262,19 @@ function CategoryForm({
 
       {/* Color */}
       <div>
-        <p className="mb-2 text-[13px] font-medium text-muted-foreground">
+        <p id="category-color-label" className="mb-2 text-[13px] font-medium text-muted-foreground">
           Color
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3" role="group" aria-labelledby="category-color-label">
           {COLOR_PRESETS.map((preset) => {
             const selected = color === preset
             return (
               <button
                 key={preset}
+                type="button"
                 onClick={() => setColor(preset)}
                 aria-label={`Color ${preset}`}
+                aria-pressed={selected}
                 className={`pressable size-9 rounded-full transition-shadow ${
                   selected ? "ring-2 ring-offset-2 ring-offset-background" : ""
                 }`}
@@ -270,8 +296,8 @@ function CategoryForm({
 
       <Button
         size="lg"
+        type="submit"
         disabled={!canSave}
-        onClick={save}
         className="pressable h-12 rounded-2xl text-[16px] font-semibold"
       >
         Guardar
@@ -279,6 +305,7 @@ function CategoryForm({
 
       {isEditing && (
         <button
+          type="button"
           onClick={remove}
           disabled={deleteCategory.isPending}
           className={`pressable flex h-12 items-center justify-center gap-2 rounded-2xl text-[15px] font-semibold transition-colors ${
@@ -293,6 +320,6 @@ function CategoryForm({
             : "Eliminar categoría"}
         </button>
       )}
-    </div>
+    </form>
   )
 }
