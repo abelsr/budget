@@ -68,13 +68,13 @@ export function DashboardPage() {
       </motion.header>
 
       <div className="grid gap-3 lg:grid-cols-12 lg:gap-4">
-        <div className="lg:col-span-4"><BalanceCard accounts={accounts} visible={balancesVisible} onVisibilityChange={() => setBalancesVisible((current) => !current)} /></div>
-        <div className="lg:col-span-4"><AccountsCard accounts={accounts} concealed={!balancesVisible} /></div>
-        <div className="lg:col-span-4"><FlowChart income={summary?.income ?? 0} expense={summary?.expense ?? 0} transactions={transactions} concealed={!balancesVisible} /></div>
+        <div className="min-w-0 lg:col-span-4"><BalanceCard accounts={accounts} visible={balancesVisible} onVisibilityChange={() => setBalancesVisible((current) => !current)} /></div>
+        <div className="min-w-0 lg:col-span-4"><AccountsCard accounts={accounts} concealed={!balancesVisible} /></div>
+        <div className="min-w-0 lg:col-span-4"><FlowChart income={summary?.income ?? 0} expense={summary?.expense ?? 0} transactions={transactions} concealed={!balancesVisible} /></div>
 
-        <div className="lg:col-span-5"><CategoryCard slices={slices} total={summary?.expense ?? 0} concealed={!balancesVisible} /></div>
-        <div className="lg:col-span-4"><RecentCard transactions={transactions} categories={categories} accounts={accounts} members={members} concealed={!balancesVisible} /></div>
-        <motion.div variants={item} className="lg:col-span-3"><TicketScannerButton /></motion.div>
+        <div className="min-w-0 lg:col-span-5"><CategoryCard slices={slices} total={summary?.expense ?? 0} concealed={!balancesVisible} /></div>
+        <div className="min-w-0 lg:col-span-4"><RecentCard transactions={transactions} categories={categories} accounts={accounts} members={members} concealed={!balancesVisible} /></div>
+        <motion.div variants={item} className="min-w-0 lg:col-span-3"><TicketScannerButton /></motion.div>
       </div>
     </motion.div>
   )
@@ -105,7 +105,7 @@ function BalanceCard({ accounts, visible, onVisibilityChange }: { accounts: Acco
             {visible ? <Eye size={16} /> : <EyeOff size={16} />}
           </button>
         </div>
-        <p className="tnum mt-2 text-[27px] font-bold leading-none tracking-tight lg:text-[30px]">{shown}</p>
+        <p className="tnum mt-2 truncate text-[27px] font-bold leading-none tracking-tight lg:text-[30px]">{shown}</p>
       </div>
     </motion.section>
   )
@@ -121,7 +121,7 @@ function AccountsCard({ accounts, concealed }: { accounts: Account[]; concealed:
         <ul className="mt-2 divide-y divide-border">
           {accounts.map((account) => {
             const Icon = kindIcon[account.kind]
-            return <li key={account.id} className="flex items-center gap-2.5 py-2"><span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary"><Icon size={14} /></span><span className="min-w-0 flex-1 truncate text-[12px] font-medium">{account.name}</span><span className={`tnum text-[12px] font-semibold ${!concealed && account.balance < 0 ? "text-expense" : ""}`}>{maskedMoney(account.balance, concealed)}</span></li>
+            return <li key={account.id} className="flex min-w-0 items-center gap-2.5 py-2"><span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary"><Icon size={14} /></span><span className="min-w-0 flex-1 truncate text-[12px] font-medium">{account.name}</span><span className={`tnum max-w-[45%] shrink truncate text-[12px] font-semibold ${!concealed && account.balance < 0 ? "text-expense" : ""}`}>{maskedMoney(account.balance, concealed)}</span></li>
           })}
         </ul>
       )}
@@ -141,7 +141,7 @@ function FlowChart({ income, expense, transactions, concealed }: { income: numbe
   )
 }
 
-function Stat({ label, amount, tone, concealed }: { label: string; amount: number; tone: string; concealed: boolean }) { return <div><p className="text-[10px] text-muted-foreground">{label}</p><p className={`tnum mt-0.5 text-[13px] font-semibold ${tone}`}>{maskedMoney(amount, concealed)}</p></div> }
+function Stat({ label, amount, tone, concealed }: { label: string; amount: number; tone: string; concealed: boolean }) { return <div className="min-w-0"><p className="text-[10px] text-muted-foreground">{label}</p><p className={`tnum mt-0.5 truncate text-[13px] font-semibold ${tone}`}>{maskedMoney(amount, concealed)}</p></div> }
 
 function dailyFlow(transactions: Transaction[]) {
   const now = new Date(); const year = now.getFullYear(); const month = now.getMonth(); const days = new Map<number, { income: number; expense: number }>()
@@ -161,7 +161,7 @@ function useSlices(byCategory: { categoryId: string; total: number }[] | undefin
 }
 
 function CategoryCard({ slices, total, concealed }: { slices: Slice[]; total: number; concealed: boolean }) {
-  return <motion.section variants={item} className="dashboard-card p-3.5 lg:p-4"><CardHeading title="Gastos por categoría" href="/app/categorias" label="Ver reporte" />{slices.length === 0 ? <p className="py-10 text-[13px] text-muted-foreground">Registra un gasto y aquí verás su reparto.</p> : <div className="mt-3 flex items-center gap-4"><div className="relative size-34 shrink-0" role="img" aria-label={concealed ? "Distribución de gastos por categoría, montos ocultos" : `Distribución de gastos por categoría, total ${formatMoney(total)}`}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={slices} dataKey="total" nameKey="name" innerRadius="63%" outerRadius="96%" paddingAngle={1.5} strokeWidth={0}>{slices.map((slice) => <Cell key={slice.id} fill={slice.color} />)}</Pie><Tooltip content={<SliceTooltip concealed={concealed} />} /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><span className="tnum text-[14px] font-bold">{concealed ? "••••••" : formatMoneyCompact(total)}</span><span className="text-[10px] text-muted-foreground">Total</span></div></div><ul className="min-w-0 flex-1 space-y-1.5">{slices.map((slice) => <li key={slice.id} className="flex items-center gap-1.5 text-[11px]"><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} /><span className="min-w-0 flex-1 truncate">{slice.name}</span><span className="tnum text-muted-foreground">{concealed ? "••••" : formatMoneyCompact(slice.total)}</span><span className="tnum w-7 text-right text-muted-foreground">{Math.round(slice.share * 100)}%</span></li>)}</ul></div>}</motion.section>
+  return <motion.section variants={item} className="dashboard-card min-w-0 p-3.5 lg:p-4"><CardHeading title="Gastos por categoría" href="/app/categorias" label="Ver reporte" />{slices.length === 0 ? <p className="py-10 text-[13px] text-muted-foreground">Registra un gasto y aquí verás su reparto.</p> : <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4"><div className="relative size-34 shrink-0 self-center" role="img" aria-label={concealed ? "Distribución de gastos por categoría, montos ocultos" : `Distribución de gastos por categoría, total ${formatMoney(total)}`}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={slices} dataKey="total" nameKey="name" innerRadius="63%" outerRadius="96%" paddingAngle={1.5} strokeWidth={0}>{slices.map((slice) => <Cell key={slice.id} fill={slice.color} />)}</Pie><Tooltip content={<SliceTooltip concealed={concealed} />} /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><span className="tnum text-[14px] font-bold">{concealed ? "••••••" : formatMoneyCompact(total)}</span><span className="text-[10px] text-muted-foreground">Total</span></div></div><ul className="min-w-0 w-full flex-1 space-y-1.5">{slices.map((slice) => <li key={slice.id} className="flex min-w-0 items-center gap-1.5 text-[11px]"><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} /><span className="min-w-0 flex-1 truncate">{slice.name}</span><span className="tnum max-w-[40%] shrink truncate text-muted-foreground">{concealed ? "••••" : formatMoneyCompact(slice.total)}</span><span className="tnum w-7 shrink-0 text-right text-muted-foreground">{Math.round(slice.share * 100)}%</span></li>)}</ul></div>}</motion.section>
 }
 
 function SliceTooltip({ active, payload, concealed }: { active?: boolean; payload?: { payload: Slice }[]; concealed: boolean }) { if (!active || !payload?.length) return null; const slice = payload[0].payload; return <div className="rounded-md border border-border bg-card px-2 py-1.5 text-[11px] shadow-sm"><p>{slice.name}</p><p className="tnum font-medium">{maskedMoney(slice.total, concealed)} · {Math.round(slice.share * 100)}%</p></div> }
@@ -171,4 +171,4 @@ function RecentCard({ transactions, categories, accounts, members, concealed }: 
   return <motion.section variants={item} className="dashboard-card overflow-hidden"><div className="px-3.5 pt-3.5"><CardHeading title="Movimientos recientes" href="/app/transacciones" label="Ver todos" /></div>{rows.length === 0 ? <p className="px-3.5 py-8 text-[13px] text-muted-foreground">Todavía no hay movimientos.</p> : <ul className="mt-1 divide-y divide-border">{rows.map((transaction) => <TransactionItem key={transaction.id} transaction={transaction} category={categories.find((category) => category.id === transaction.categoryId)} account={accounts.find((account) => account.id === transaction.accountId)} member={members.find((member) => member.id === transaction.memberId)} hideAmount={concealed} />)}</ul>}</motion.section>
 }
 
-function CardHeading({ title, href, label }: { title: string; href: string; label: string }) { return <div className="flex items-center justify-between gap-3"><h2 className="text-[13px] font-semibold">{title}</h2><Link to={href} className="text-[11px] font-medium text-primary">{label}</Link></div> }
+function CardHeading({ title, href, label }: { title: string; href: string; label: string }) { return <div className="flex min-w-0 items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[13px] font-semibold">{title}</h2><Link to={href} className="shrink-0 text-[11px] font-medium text-primary">{label}</Link></div> }

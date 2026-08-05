@@ -107,26 +107,24 @@ function CategorySection({
           categories.map((c, i) => (
             <div
               key={c.id}
-              onClick={() => onEdit(c)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault()
-                  onEdit(c)
-                }
-              }}
-              className={`pressable flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left ${
+              className={`flex w-full items-center gap-3 px-4 py-3 text-left ${
                 i > 0 ? "border-t border-border" : ""
               } ${c.active ? "" : "opacity-50"}`}
             >
-              <CategoryIcon
-                icon={c.icon}
-                color={c.color}
-                size={20}
-                className="size-10"
-              />
-              <p className="flex-1 text-[15px] font-medium">{c.name}</p>
+              <button
+                type="button"
+                onClick={() => onEdit(c)}
+                className="pressable flex min-w-0 flex-1 items-center gap-3 text-left"
+                aria-label={`Editar categoría ${c.name}`}
+              >
+                <CategoryIcon
+                  icon={c.icon}
+                  color={c.color}
+                  size={20}
+                  className="size-10"
+                />
+                <span className="truncate text-[15px] font-medium">{c.name}</span>
+              </button>
               <Toggle
                 checked={c.active}
                 onChange={() => onToggle(c)}

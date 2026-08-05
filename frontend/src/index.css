@@ -84,6 +84,15 @@
     .tnum { font-variant-numeric: tabular-nums; }
 }
 
+/* Los controles compuestos no siempre heredan el foco de las primitivas UI. */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
 @layer utilities {
     .material-bar { background: var(--material-bar); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border-color: var(--material-bar-border); }
     .pressable { transition: transform 100ms ease-out; }
