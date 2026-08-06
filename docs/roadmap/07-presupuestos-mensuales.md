@@ -70,11 +70,9 @@ Implemented mostly as designed, with a few deviations decided during the build:
 - Added a `--warning` color token (`#ff9500` / dark `#ff9f0a`, iOS system
   orange) to `index.css`, matching the existing `--income`/`--expense`
   first-class-token pattern, for the 75–100% amber band.
-- Migration generated against a throwaway Postgres 17 container (the local
-  SQLite `dev.db` can't replay migration `8c41b0e7d2a9`'s `ALTER COLUMN`
-  outside batch mode — a pre-existing limitation, not something this item
-  introduced); verified upgrade + downgrade + upgrade again, and the 9
-  `test_migrations.py` cases pass against real Postgres.
+- Migration generated against a throwaway Postgres 17 container; migrations
+  target PostgreSQL only. Verified upgrade + downgrade + upgrade again, and
+  the 9 `test_migrations.py` cases pass against real Postgres.
 - **Deployed and verified in the browser** against the real database: two
   disposable test households (one for the CRUD/bar/cascade flow, one
   isolated just for the donut-badge check), both deleted afterward via a

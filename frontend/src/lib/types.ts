@@ -170,3 +170,94 @@ export interface SavingsGoal {
   remaining: number
   isCompleted: boolean
 }
+
+export type ImportDateFormat = "DD/MM/YYYY" | "MM/DD/YYYY"
+export type ImportDuplicateReason = "household" | "fingerprint" | "file"
+
+export interface ImportMapping {
+  date: string
+  amount: string
+  description: string
+}
+
+export interface ImportPreviewRow {
+  sourcePosition: number
+  date: string
+  amount: number
+  description: string | null
+  duplicateReasons: ImportDuplicateReason[]
+  selected: boolean
+}
+
+export interface ImportPreview {
+  headers: string[]
+  suggestedMapping: ImportMapping
+  mapping: ImportMapping
+  dateFormat: ImportDateFormat
+  rows: ImportPreviewRow[]
+}
+
+export interface ImportBatch {
+  id: string
+  accountId: string
+  sourceFilename: string
+  mapping: ImportMapping
+  selectedCount: number
+  importedCount: number
+  skippedCount: number
+  createdAt: string
+}
+
+export interface ImportCommitResult {
+  batch: ImportBatch
+  selectedCount: number
+  importedCount: number
+  skippedCount: number
+}
+
+export interface ImportTransactionState {
+  id: string
+  type: TransactionType
+  amount: number
+  categoryId: string | null
+  accountId: string
+  date: string
+  note: string | null
+  deletedAt: string | null
+  deleteReason: string | null
+}
+
+export interface TransactionEditEvent {
+  id: string
+  transactionId: string
+  editedById: string
+  beforeSnapshot: Record<string, unknown>
+  afterSnapshot: Record<string, unknown>
+  createdAt: string
+}
+
+export interface ImportRow {
+  id: string
+  sourcePosition: number
+  sourceSnapshot: Record<string, unknown>
+  transactionBaseline: Record<string, unknown>
+  advisoryReasons: ImportDuplicateReason[]
+  status: string
+  transactionId: string | null
+  currentTransaction: ImportTransactionState | null
+  editEvents: TransactionEditEvent[]
+}
+
+export interface ImportBatchDetail extends ImportBatch {
+  rows: ImportRow[]
+  editEvents: TransactionEditEvent[]
+}
+
+export interface ImportRevertConflict {
+  rowId: string
+  transactionId: string
+}
+
+export interface ImportRevertConflictDetail {
+  conflicts: ImportRevertConflict[]
+}

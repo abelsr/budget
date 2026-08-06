@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
   BadgeDollarSign,
+  FileUp,
   ChevronRight,
   LogOut,
   Monitor,
@@ -80,6 +81,7 @@ export function SettingsPage() {
         />
         <Row icon={<Tags size={16} />} label="Categorías" to="/app/ajustes/categorias" />
         <Row icon={<Repeat size={16} />} label="Recurrentes" to="/app/ajustes/recurrentes" />
+        <Row icon={<FileUp size={16} />} label="Importar movimientos" to="/app/importar" />
         <ThemeRow theme={theme} setTheme={setTheme} />
         <Row
           icon={<BadgeDollarSign size={16} />}

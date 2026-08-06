@@ -9,6 +9,12 @@ import type {
   BudgetStatus,
   Category,
   Household,
+  ImportBatch,
+  ImportBatchDetail,
+  ImportCommitResult,
+  ImportDateFormat,
+  ImportMapping,
+  ImportPreview,
   Member,
   NewTransaction,
   NewTransfer,
@@ -36,6 +42,8 @@ export const keys = {
   budgets: ["budgets"] as const,
   budgetsStatus: ["budgets", "status"] as const,
   goals: ["goals"] as const,
+  importBatches: ["import", "batches"] as const,
+  importBatch: (id: string) => ["import", "batches", id] as const,
 }
 
 export interface MonthSummary {
@@ -145,6 +153,101 @@ export function useRangeSummary(from: string, to: string) {
     queryKey: [...keys.rangeSummary, from, to],
     queryFn: () => apiFetch<RangeSummary>(`/summary/range?from=${from}&to=${to}`),
     enabled: Boolean(from && to),
+  })
+}
+
+export interface ImportPreviewInput {
+  file: File
+  accountId: string
+  mapping?: ImportMapping
+  dateFormat?: ImportDateFormat
+}
+
+export interface ImportCommitInput {
+  file: File
+  accountId: string
+  mapping: ImportMapping
+  dateFormat: ImportDateFormat
+  selectedPositions: number[]
+}
+
+function importFormData(input: ImportPreviewInput | ImportCommitInput) {
+  const formData = new FormData()
+  formData.append("file", input.file)
+  formData.append("accountId", input.accountId)
+  if (input.mapping) formData.append("mapping", JSON.stringify(input.mapping))
+  if (input.dateFormat) formData.append("dateFormat", input.dateFormat)
+  if ("selectedPositions" in input) {
+    formData.append("selectedPositions", JSON.stringify(input.selectedPositions))
+  }
+  return formData
+}
+
+function useImportInvalidator() {
+  const queryClient = useQueryClient()
+  return () => {
+    queryClient.invalidateQueries({ queryKey: keys.transactions })
+    queryClient.invalidateQueries({ queryKey: keys.accounts })
+    queryClient.invalidateQueries({ queryKey: keys.summary })
+    queryClient.invalidateQueries({ queryKey: keys.rangeSummary })
+    queryClient.invalidateQueries({ queryKey: keys.budgets })
+    queryClient.invalidateQueries({ queryKey: keys.budgetsStatus })
+    queryClient.invalidateQueries({ queryKey: keys.importBatches })
+  }
+}
+
+/** Previsualiza bytes locales; el archivo no se persiste hasta el commit. */
+export function usePreviewImport() {
+  return useMutation({
+    mutationFn: (input: ImportPreviewInput) =>
+      apiFetch<ImportPreview>("/import/preview", {
+        method: "POST",
+        body: importFormData(input),
+      }),
+  })
+}
+
+/** Vuelve a subir el mismo archivo para que el servidor lo reprocese al importar. */
+export function useCommitImport() {
+  const invalidate = useImportInvalidator()
+  return useMutation({
+    mutationFn: (input: ImportCommitInput) =>
+      apiFetch<ImportCommitResult>("/import/commit", {
+        method: "POST",
+        body: importFormData(input),
+      }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useImportBatches() {
+  return useQuery({
+    queryKey: keys.importBatches,
+    queryFn: () => apiFetch<ImportBatch[]>("/import/batches"),
+  })
+}
+
+export function useImportBatch(id: string | null) {
+  return useQuery({
+    queryKey: keys.importBatch(id ?? "pending"),
+    queryFn: () => apiFetch<ImportBatchDetail>(`/import/batches/${id}`),
+    enabled: Boolean(id),
+  })
+}
+
+export function useRevertImportBatch() {
+  const invalidate = useImportInvalidator()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<ImportBatch>(`/import/${id}/revert`, { method: "POST" }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useRestoreImportBatch() {
+  const invalidate = useImportInvalidator()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<ImportBatch>(`/import/${id}/restore`, { method: "POST" }),
+    onSuccess: invalidate,
   })
 }
 

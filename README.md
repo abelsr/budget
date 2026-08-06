@@ -98,7 +98,9 @@ cd backend  && uv sync && uv run alembic upgrade head && uv run fastapi dev
 cd frontend && npm install && npm run dev
 ```
 
-The backend uses SQLite (`dev.db`) by default; Vite proxies `/api` to :8000.
+PostgreSQL is mandatory for local backend runtime and Alembic migrations. Set
+`DATABASE_URL` in `backend/.env` from `backend/.env.example`; Vite proxies
+`/api` to :8000. SQLite is used only by fast `create_all` unit tests.
 
 ## Tests and CI
 

@@ -20,11 +20,13 @@ export function setToken(token: string | null) {
 
 export class ApiError extends Error {
   status: number
+  detail: unknown
 
-  constructor(status: number, message: string) {
-    super(message)
+  constructor(status: number, detail: unknown) {
+    super(typeof detail === "string" ? detail : `Error ${status}`)
     this.name = "ApiError"
     this.status = status
+    this.detail = detail
   }
 }
 

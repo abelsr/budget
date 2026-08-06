@@ -22,7 +22,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 |---|---|---|---|---|
 | 06 | [Recurring transactions](06-transacciones-recurrentes.md) | ✅ 2026-07-25 | High | M |
 | 07 | [Monthly budgets](07-presupuestos-mensuales.md) | ✅ 2026-07-25 | High | M |
-| 08 | [CSV import](08-importacion-csv.md) | ⬜ | Medium | L |
+| 08 | [CSV import](08-importacion-csv.md) | ✅ 2026-08-06 | Medium | L |
 | 09 | [Filters and search](09-filtros-busqueda.md) | ✅ 2026-08-04 | Medium | S |
 | 10 | [Profile and password change](10-perfil-y-password.md) | ✅ 2026-08-04 | Medium | S |
 
@@ -111,6 +111,14 @@ may be implemented in parallel.
 
 ## Log
 
+**2026-08-06 — 08 (CSV statement import) completed.**
+
+- CSV imports use a three-step upload, review, and result flow. The server reparses the uploaded file on commit, so user-approved previews cannot be tampered with client-side.
+- Import batches keep normalized source rows, immutable transaction baselines, advisory duplicate reasons, edit events, deterministic account-scoped fingerprints, and reversible soft deletion. Uploaded CSV bytes are never stored.
+- A reverted import is excluded from balances, reports, budgets, attachments, and normal transaction access. Revert is atomic, conflicts when an imported movement changed, and restore preserves the original provenance.
+- PostgreSQL is now the only runtime and Alembic migration target. SQLite remains limited to in-memory `create_all` unit tests.
+- Backend tests passed (168; 12 PostgreSQL-dependent migration tests skipped when no test database URL is configured); CSV import tests passed (18). Frontend lint and production build passed; Fast Refresh and bundle-size warnings predate this work.
+
 **2026-08-05 — 03 and Phase 3 (11–14) completed.**
 
 - **03 PWA:** added an installable manifest, generated 192/512/maskable and Apple icons, an auto-updating service worker that precaches only the shell, and nginx headers that revalidate `sw.js`. `/api` is explicitly excluded from the navigation cache.
@@ -192,11 +200,10 @@ may be implemented in parallel.
   75–100% amber band — and a small red count badge on the donut card's
   heading when any category goes over 100%, which was in the original scope
   but easy to miss since it's not part of the new `BudgetsCard` itself.
-- **Local SQLite `dev.db` can't replay the existing `8c41b0e7d2a9` migration**
-  (raw `ALTER COLUMN`, not batch-wrapped) — a pre-existing limitation, not
-  something this item introduced. Generated and verified the new migration
-  against a throwaway Postgres 17 container instead: upgrade, downgrade,
-  upgrade again, plus all 9 `test_migrations.py` cases.
+- **Migrations target PostgreSQL only.** Generated and verified the new
+  migration against a throwaway Postgres 17 container: upgrade, downgrade,
+  upgrade again, plus all 9 `test_migrations.py` cases. SQLite remains for
+  fast `create_all` unit tests only.
 - **Verified in the browser against the real database**, using two
   disposable test households (deleted afterward via a transactional
   `DELETE` that left household/user/category/transaction counts identical to
