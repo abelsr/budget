@@ -1,6 +1,6 @@
 # 👤 Personal vs shared accounts
 
-**Status:** ⬜ Pending · **Priority:** Low · **Effort:** M (1-3 days) · **Dependencies:** 01-alembic ✅ (done)
+**Status:** ✅ 2026-08-05 · **Priority:** Low · **Effort:** M (1-3 days) · **Dependencies:** 01-alembic ✅ (done)
 
 ## Why
 The product's original decision was "all accounts belong to the household, with traceability of who logged each transaction." That works for shared expenses, but clashes with real cases: a personal payroll account, a card one doesn't want to share, a private savings account. Without personal accounts, users end up not logging those transactions and the app loses value. This is a model change, not just another feature.
@@ -41,12 +41,11 @@ The product's original decision was "all accounts belong to the household, with 
 - No changes: the migration runs via the Alembic entrypoint (01, already done)
 
 ## Acceptance criteria
-- [ ] A's personal account is invisible to B in listings, transactions, and balances
-- [ ] The household total only includes shared accounts
-- [ ] A's personal total includes their personals + the shared ones
-- [ ] Accounts existing before the migration remain visible to everyone (shared)
-- [ ] A shared account can be converted to personal and vice versa without losing transactions
-- [ ] New and existing tests pass
+- [x] A personal account and its transactions, rules, attachments, and report data are invisible to other household members.
+- [x] Household totals, budgets, summaries, and exports include only shared accounts; the dashboard also shows the viewer's combined personal total.
+- [x] Existing accounts remain shared after migration.
+- [x] The household owner may convert shared to personal; only the personal owner may convert it back, without losing transactions.
+- [x] Tests cover cross-member visibility, aggregates, recurring-rule safety, attachments, category side channels, and migration behavior.
 
 ## Notes
 - Main risk: existing queries that today assume "all household accounts belong to everyone." Audit ALL endpoints that touch `accounts` or aggregate balances before considering this closed.

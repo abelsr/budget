@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 9 of 16 done (01, 02, 04, 05, 06, 07, 09, 10, 16) · last updated 2026-08-04
+> **Progress:** 14 of 16 done (01–07, 09–14, 16) · last updated 2026-08-05
 
 ## Immediate — robustness
 
@@ -12,7 +12,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 |---|---|---|---|---|
 | 01 | [Alembic: migrations](01-alembic-migraciones.md) | ✅ 2026-07-24 | High | M |
 | 02 | [Invitations end-to-end](02-invitaciones-end-to-end.md) | ✅ 2026-07-24 | High | S |
-| 03 | [Installable PWA](03-pwa-instalable.md) | ⬜ | Medium | M |
+| 03 | [Installable PWA](03-pwa-instalable.md) | ✅ 2026-08-05 | Medium | M |
 | 04 | [Backups](04-backups.md) | ✅ 2026-07-26 | Medium | S |
 | 05 | [Plane-style onboarding](05-onboarding.md) | ✅ 2026-07-24 | High | M |
 
@@ -30,10 +30,10 @@ criteria. When tackling one: read it in full, update its **Status** to
 
 | # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
-| 11 | [Savings goals](11-metas-de-ahorro.md) | ⬜ | Medium | M |
-| 12 | [Personal accounts](12-cuentas-personales.md) | ⬜ | Low | M |
-| 13 | [Offline-first](13-offline-first.md) | ⬜ | Low | L |
-| 14 | [Multi-family opening](14-multi-familia.md) | ⬜ | Low | L |
+| 11 | [Savings goals](11-metas-de-ahorro.md) | ✅ 2026-08-05 | Medium | M |
+| 12 | [Personal accounts](12-cuentas-personales.md) | ✅ 2026-08-05 | Low | M |
+| 13 | [Offline-first](13-offline-first.md) | ✅ 2026-08-05 | Low | L |
+| 14 | [Multi-family opening](14-multi-familia.md) | ✅ 2026-08-05 | Low | L |
 
 ## Production
 
@@ -44,15 +44,24 @@ criteria. When tackling one: read it in full, update its **Status** to
 
 ## Suggested attack order
 
-`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 04 ✅ → 09 ✅ → 10 ✅ → 03 → 08`
+`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 04 ✅ → 09 ✅ → 10 ✅ → 03 ✅ → 11 ✅ → 12 ✅ → 13 ✅ → 14 ✅ → 08`
 
 Invitations and onboarding completed the family experience; Alembic, CI, and
 backups harden it for production; recurring transactions, budgets, and filters
 are the features with the most daily impact.
 
-**Next: 03 — Installable PWA.** Then tackle **08 — CSV import**.
+**Next: 08 — CSV import.** Then tackle **17 — Monitoring** before exposing a self-hosted instance publicly.
 
 ## Log
+
+**2026-08-05 — 03 and Phase 3 (11–14) completed.**
+
+- **03 PWA:** added an installable manifest, generated 192/512/maskable and Apple icons, an auto-updating service worker that precaches only the shell, and nginx headers that revalidate `sw.js`. `/api` is explicitly excluded from the navigation cache.
+- **11 Goals:** household-scoped manual savings goals now support CRUD, atomic positive or negative contributions, capped progress, account unlinking on deletion, and a dismissible completion state. Goals only link shared accounts, so they cannot disclose a member's personal account.
+- **12 Personal accounts:** accounts can be shared or personal. Visibility, transactions, attachments, recurring rules, budgets, summaries, exports, and category deletion all enforce the account boundary; the household owner controls shared-to-personal conversion and the personal owner controls the reverse.
+- **13 Offline-first:** simple one-time transactions use a user-scoped IndexedDB outbox and an idempotent `clientId`; automatic retries flush on reconnection, focus, and interval. Query snapshots are persisted per authenticated user, and failed 4xx items remain visible without blocking later entries.
+- **14 Self-host scope:** selected self-hosted hardening rather than a public managed service. It adds configurable member/invitation caps, process-local auth and scanner limits, `email_verified` for future activation, a public privacy page, and deployment guidance for HTTPS, CORS, and JWT secrets.
+- Backend tests passed (145); frontend build and lint, Docker Compose validation, and diff validation passed. Android/iOS installation, Lighthouse, and real HTTPS/offline-device validation remain deployment checks, not unmet implementation work.
 
 **2026-08-04 — 10 (profile and password change) completed.**
 

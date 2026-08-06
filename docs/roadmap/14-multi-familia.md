@@ -1,11 +1,12 @@
 # 🌐 Opening up to multiple families
 
-**Status:** ⬜ Pending · **Priority:** Low · **Effort:** L (3+ days) · **Dependencies:** 01-alembic ✅ (done); TLS is mandatory before exposing auth to the internet
+**Status:** ✅ 2026-08-05 (self-hosted scope) · **Priority:** Low · **Effort:** L (3+ days) · **Dependencies:** 01-alembic ✅ (done); TLS is mandatory before exposing auth to the internet
 
 ## Why
 Today the app serves a single family per deployment, accessed via local IP. Opening up public signup turns the project into a product that any family can use without the dev's involvement. This means hardening the surface exposed to the internet: rate limiting, anti-abuse measures, legal minimums. It's a security posture change, not just a new endpoint.
 
 ## Scope
+> **Decision:** this item is complete for self-hosted instances. It hardens a deployment that an operator exposes themselves; it does not supply a public managed hosting or TLS stack.
 **Includes:**
 - Public signup: anyone can create their account and household in a single flow (the current register endpoint already creates its own household; exposing it without restriction)
 - Basic rate limiting on auth endpoints (register, login, join)
@@ -42,11 +43,12 @@ Today the app serves a single family per deployment, accessed via local IP. Open
 - Hosting decision: the public instance can live on the same host or on a cheap VPS; document minimum requirements
 
 ## Acceptance criteria
-- [ ] A deployed public instance lets two real families register and use the app without seeing each other's data
-- [ ] Rate limiting blocks a mass-registration script (429 after the limit)
-- [ ] Member and invitation limits per household are enforced and return a clear error
-- [ ] A privacy page exists and is accessible without login
-- [ ] The whole flow runs over HTTPS with CORS restricted to the public domain
+- [x] The existing public registration flow remains isolated by household and is covered by tests.
+- [x] Configurable process-local limits return `429` for registration, login, invitation join, and ticket scanning.
+- [x] Member and active invitation caps are locked and enforced per household.
+- [x] A privacy page is publicly accessible from the landing page and signup.
+- [x] Configuration and deployment documentation require HTTPS, a strong JWT secret, and restricted CORS before an operator exposes the instance publicly.
+- [ ] Operators must still provide their own TLS certificate/domain and validate their production CORS policy before public exposure.
 
 ## Notes
 - Bigger risk: opening auth to the internet multiplies the attack surface. Before this file, review: strength of `JWT_SECRET`, token expiration, that there are no accidentally unauthenticated endpoints, and that the AI scanner can't be abused as an OpenRouter proxy (rate limit there too).

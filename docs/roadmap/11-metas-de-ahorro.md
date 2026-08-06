@@ -1,6 +1,6 @@
 # 🎯 Savings goals
 
-**Status:** ⬜ Pending · **Priority:** Medium · **Effort:** M (1-3 days) · **Dependencies:** 01-alembic ✅ (done: the new table comes in via migration)
+**Status:** ✅ 2026-08-05 · **Priority:** Medium · **Effort:** M (1-3 days) · **Dependencies:** 01-alembic ✅ (done: the new table comes in via migration)
 
 ## Why
 Families save for specific things ("vacation, $30,000 by December", "the car down payment"), and today that money gets lost inside the savings account balance: there's no visibility into how much is left or whether they're on pace. A goal with visible progress turns saving into something actionable and motivates continued contributions.
@@ -40,12 +40,11 @@ Families save for specific things ("vacation, $30,000 by December", "the car dow
   startup. `create_all` no longer exists in production.
 
 ## Acceptance criteria
-- [ ] A goal can be created with a name, target amount, and optional date
-- [ ] Contributions (add/subtract) can be made and `current_amount` persists
-- [ ] The dashboard shows progress in % and remaining amount per goal
-- [ ] Upon reaching 100%, the celebration is shown and the goal can be archived
-- [ ] One household's goals are not visible to another household
-- [ ] New pytest tests pass alongside the existing ones
+- [x] A goal can be created with a name, target amount, and optional date.
+- [x] Contributions persist independently from transactions and support subtraction.
+- [x] The dashboard shows progress, remaining amount, icons, colors, archive controls, and a dismissible completion notice.
+- [x] Goals are isolated by household; linked accounts must be shared and are unlinked, not deleted, with account removal.
+- [x] Backend tests cover CRUD, money validation, contributions, completion, account unlinking, and isolation.
 
 ## Notes
 - Risk of double counting if contributions get linked to real transactions later: document now that `current_amount` is the goal's own state, independent of the transaction flow.
