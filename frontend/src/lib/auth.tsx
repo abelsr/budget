@@ -8,7 +8,29 @@ import {
 } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
-import { apiFetch, getToken, setToken } from "@/lib/api"
+import { ApiError, apiFetch, getToken, setToken } from "@/lib/api"
+
+const SESSION_KEY = "ff-session"
+const SESSION_TOKEN_KEY = "ff-session-token"
+
+function getStoredSession(): Session | null {
+  try {
+    if (localStorage.getItem(SESSION_TOKEN_KEY) !== getToken()) return null
+    return JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null") as Session | null
+  } catch {
+    return null
+  }
+}
+
+function storeSession(session: Session | null) {
+  if (session) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    localStorage.setItem(SESSION_TOKEN_KEY, getToken() ?? "")
+  } else {
+    localStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem(SESSION_TOKEN_KEY)
+  }
+}
 
 /**
  * Autenticación contra el backend FastAPI.
@@ -92,12 +114,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     fetchMe()
       .then((me) => {
+        storeSession(me)
         if (!cancelled) setSession(me)
       })
-      .catch(() => {
-        // 401 u otro error: token inválido/expirado → limpiar
-        setToken(null)
-        if (!cancelled) setSession(null)
+      .catch((error) => {
+        // A network error must not log out an installed app: its cached query
+        // data remains readable until the server explicitly rejects the token.
+        if (error instanceof ApiError && error.status === 401) {
+          setToken(null)
+          storeSession(null)
+          if (!cancelled) setSession(null)
+        } else if (!cancelled) {
+          setSession(getStoredSession())
+        }
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
@@ -113,9 +142,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Never expose the previous account's cached data under a new token.
       await queryClient.cancelQueries()
       queryClient.clear()
+      storeSession(null)
+      setSession(null)
       const { accessToken } = await tokenRequest()
       setToken(accessToken)
       const me = await fetchMe()
+      storeSession(me)
       setSession(me)
     },
     [queryClient],
@@ -164,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "PATCH",
       body: JSON.stringify({ completed: true }),
     })
+    storeSession(me)
     setSession(me)
   }, [])
 
@@ -172,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "PATCH",
       body: JSON.stringify(profile),
     })
+    storeSession(me)
     setSession(me)
   }, [])
 
@@ -182,14 +216,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "POST",
       body: formData,
     })
+    storeSession(me)
     setSession(me)
   }, [])
 
   const removeAvatar = useCallback(async () => {
     await apiFetch<void>("/auth/me/avatar", { method: "DELETE" })
-    setSession((current) =>
-      current ? { ...current, hasAvatar: false, avatarUpdatedAt: null } : null,
-    )
+    setSession((current) => {
+      const next = current ? { ...current, hasAvatar: false, avatarUpdatedAt: null } : null
+      storeSession(next)
+      return next
+    })
   }, [])
 
   const changePassword = useCallback(
@@ -206,6 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void queryClient.cancelQueries()
     queryClient.clear()
     setToken(null)
+    storeSession(null)
     setSession(null)
   }, [queryClient])
 

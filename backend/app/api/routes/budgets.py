@@ -5,9 +5,10 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import extract, func, select
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Budget, Category, Transaction, User
+from app.models import Account, Budget, Category, Transaction, User
 from app.schemas.budgets import BudgetCreate, BudgetOut, BudgetStatus, BudgetUpdate
 from app.services.recurring import materialize_due
+from app.services.account_access import shared_accounts
 
 router = APIRouter(prefix="/budgets", tags=["budgets"])
 
@@ -29,7 +30,7 @@ def _get_budget(db, household_id: str, budget_id: str) -> Budget:
 
 def _get_expense_category(db, household_id: str, category_id: str) -> Category:
     category = db.get(Category, category_id)
-    if category is None or category.household_id != household_id:
+    if category is None or category.household_id != household_id or category.deleted:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     if category.type != "expense":
         raise HTTPException(
@@ -67,7 +68,7 @@ def get_budgets_status(
     month: Annotated[str | None, Query(pattern=_MONTH_PATTERN)] = None,
 ) -> list[BudgetStatus]:
     household_id = _household_id(user)
-    materialize_due(db, household_id)
+    materialize_due(db, household_id, user.id)
 
     budgets = db.scalars(
         select(Budget).where(Budget.household_id == household_id)
@@ -86,13 +87,14 @@ def get_budgets_status(
     category_ids = [b.category_id for b in budgets]
     base_filter = [
         Transaction.household_id == household_id,
+        shared_accounts(),
         extract("year", Transaction.date) == year,
         extract("month", Transaction.date) == month_num,
         Transaction.type == "expense",
         Transaction.category_id.in_(category_ids),
     ]
     spent_stmt = (
-        select(Transaction.category_id, func.sum(Transaction.amount))
+        select(Transaction.category_id, func.sum(Transaction.amount)).join(Account)
         .where(*base_filter)
         .group_by(Transaction.category_id)
     )

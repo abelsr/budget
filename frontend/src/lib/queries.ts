@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { apiFetch } from "@/lib/api"
+import { ApiError, apiFetch } from "@/lib/api"
+import { useOffline, useOfflineTransactions } from "@/lib/offline"
 import type {
   Account,
   Attachment,
@@ -11,6 +12,7 @@ import type {
   Member,
   NewTransaction,
   RecurringRule,
+  SavingsGoal,
   Transaction,
 } from "@/lib/types"
 
@@ -32,6 +34,7 @@ export const keys = {
   recurringRules: ["recurring-rules"] as const,
   budgets: ["budgets"] as const,
   budgetsStatus: ["budgets", "status"] as const,
+  goals: ["goals"] as const,
 }
 
 export interface MonthSummary {
@@ -120,10 +123,12 @@ export function useTransactions(filters: TransactionFilters = {}) {
   for (const [key, value] of Object.entries(filters)) {
     if (value) search.set(key, value)
   }
-  return useQuery({
+  const query = useQuery({
     queryKey: [...keys.transactions, filters],
     queryFn: () => apiFetch<Transaction[]>(`/transactions?${search}`),
   })
+  const pending = useOfflineTransactions(filters)
+  return { ...query, data: [...pending, ...(query.data ?? [])] }
 }
 
 export function useMonthSummary() {
@@ -190,12 +195,22 @@ export function useRemoveMember() {
 
 export function useAddTransaction() {
   const queryClient = useQueryClient()
+  const { queue } = useOffline()
   return useMutation({
-    mutationFn: (input: NewTransaction) =>
-      apiFetch<Transaction>("/transactions", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
+    mutationFn: async (input: NewTransaction & { offlineEligible?: boolean }) => {
+      const { offlineEligible = true, ...payload } = input
+      const offlinePayload = { ...payload, clientId: crypto.randomUUID() }
+      if (!payload.repeat && offlineEligible && !navigator.onLine) return queue(offlinePayload)
+      try {
+        return await apiFetch<Transaction>("/transactions", {
+          method: "POST",
+          body: JSON.stringify(offlinePayload),
+        })
+      } catch (error) {
+        if (!payload.repeat && offlineEligible && !(error instanceof ApiError)) return queue(offlinePayload)
+        throw error
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.transactions })
       queryClient.invalidateQueries({ queryKey: keys.accounts })
@@ -241,6 +256,7 @@ export interface AccountInput {
   bank?: string | null
   cardBrand?: Account["cardBrand"]
   lastFour?: string | null
+  isPersonal?: boolean
 }
 
 export interface CategoryInput {
@@ -447,6 +463,65 @@ export function useDeleteBudget() {
   const invalidate = useInvalidator(keys.budgets, keys.budgetsStatus)
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/budgets/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Metas de ahorro
+// ---------------------------------------------------------------------------
+
+export interface SavingsGoalInput {
+  name: string
+  targetAmount: number
+  currentAmount?: number
+  targetDate?: string | null
+  accountId?: string | null
+  icon: string
+  color: string
+}
+
+export function useGoals() {
+  return useQuery({
+    queryKey: keys.goals,
+    queryFn: () => apiFetch<SavingsGoal[]>("/goals"),
+  })
+}
+
+export function useCreateGoal() {
+  const invalidate = useInvalidator(keys.goals)
+  return useMutation({
+    mutationFn: (input: SavingsGoalInput) =>
+      apiFetch<SavingsGoal>("/goals", { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateGoal() {
+  const invalidate = useInvalidator(keys.goals)
+  return useMutation({
+    mutationFn: ({ id, ...input }: Partial<SavingsGoalInput & { archived: boolean }> & { id: string }) =>
+      apiFetch<SavingsGoal>(`/goals/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useContributeToGoal() {
+  const invalidate = useInvalidator(keys.goals)
+  return useMutation({
+    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
+      apiFetch<SavingsGoal>(`/goals/${id}/contribute`, {
+        method: "POST",
+        body: JSON.stringify({ amount }),
+      }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteGoal() {
+  const invalidate = useInvalidator(keys.goals)
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/goals/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
   })
 }

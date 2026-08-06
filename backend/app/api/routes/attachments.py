@@ -4,9 +4,12 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Attachment, Transaction, User
+from sqlalchemy import select
+
+from app.models import Account, Attachment, Transaction, User
 from app.schemas.attachments import AttachmentResponse
 from app.services import storage
+from app.services.account_access import visible_accounts
 
 router = APIRouter(tags=["attachments"])
 
@@ -25,9 +28,13 @@ def _household_id(user: User) -> str:
     return user.household_id
 
 
-def _get_attachment(db, household_id: str, attachment_id: str) -> Attachment:
-    attachment = db.get(Attachment, attachment_id)
-    if attachment is None or attachment.household_id != household_id:
+def _get_attachment(db, household_id: str, user_id: str, attachment_id: str) -> Attachment:
+    attachment = db.scalar(select(Attachment).join(Transaction).join(Account).where(
+        Attachment.id == attachment_id,
+        Attachment.household_id == household_id,
+        visible_accounts(user_id),
+    ))
+    if attachment is None:
         raise HTTPException(status_code=404, detail="Adjunto no encontrado")
     return attachment
 
@@ -40,8 +47,12 @@ def upload_attachment(
     file: Annotated[UploadFile, File(...)],
 ) -> AttachmentResponse:
     household_id = _household_id(user)
-    tx = db.get(Transaction, transaction_id)
-    if tx is None or tx.household_id != household_id:
+    tx = db.scalar(select(Transaction).join(Account).where(
+        Transaction.id == transaction_id,
+        Transaction.household_id == household_id,
+        visible_accounts(user.id),
+    ))
+    if tx is None:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
 
     content_type = file.content_type or ""
@@ -82,7 +93,7 @@ def download_attachment(
     attachment_id: str, db: DbDep, user: CurrentUserDep
 ) -> Response:
     household_id = _household_id(user)
-    attachment = _get_attachment(db, household_id, attachment_id)
+    attachment = _get_attachment(db, household_id, user.id, attachment_id)
     try:
         content = storage.get_attachment(attachment.storage_path)
     except storage.StorageError:
@@ -97,7 +108,7 @@ def download_attachment(
 @router.delete("/attachments/{attachment_id}", status_code=204)
 def delete_attachment(attachment_id: str, db: DbDep, user: CurrentUserDep) -> None:
     household_id = _household_id(user)
-    attachment = _get_attachment(db, household_id, attachment_id)
+    attachment = _get_attachment(db, household_id, user.id, attachment_id)
     storage.delete_attachment(attachment.storage_path)
     db.delete(attachment)
     db.commit()

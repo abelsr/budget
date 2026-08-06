@@ -109,3 +109,17 @@ def test_scan_without_token_returns_401(client, session):
     )
 
     assert response.status_code == 401
+
+
+def test_scan_rate_limit_returns_429(client, session, monkeypatch):
+    _, _, headers = _create_user_with_category(session)
+    monkeypatch.setattr(settings, "ticket_scan_limit", 1)
+    monkeypatch.setattr(settings, "openrouter_api_key", None)
+
+    assert client.post(
+        "/tickets/scan", files={"file": ("ticket.png", FAKE_PNG, "image/png")}, headers=headers
+    ).status_code == 501
+    response = client.post(
+        "/tickets/scan", files={"file": ("ticket.png", FAKE_PNG, "image/png")}, headers=headers
+    )
+    assert response.status_code == 429

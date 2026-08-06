@@ -87,6 +87,12 @@ function Nav() {
               {t.nav[key]}
             </a>
           ))}
+          <Link
+            to="/privacy"
+            className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Privacidad
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
@@ -509,6 +515,12 @@ function Footer() {
               {t.nav[key]}
             </a>
           ))}
+          <Link
+            to="/privacy"
+            className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Privacidad
+          </Link>
         </div>
         <p className="text-[12px] text-muted-foreground/70">
           © {new Date().getFullYear()} budget · {t.footer.rights}

@@ -1,5 +1,6 @@
 from datetime import date as date_t
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -15,6 +16,7 @@ class _CamelModel(BaseModel):
 
 
 class TransactionCreate(_CamelModel):
+    client_id: UUID | None = None
     type: TransactionType
     amount: float = Field(gt=0)
     category_id: str
@@ -39,6 +41,7 @@ class TransactionUpdate(_CamelModel):
 class TransactionOut(_CamelModel):
     id: str
     household_id: str
+    client_id: str | None = None
     type: str
     amount: float
     category_id: str

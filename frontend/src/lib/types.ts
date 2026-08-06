@@ -42,6 +42,7 @@ export interface Account {
   cardBrand?: CardBrand | null
   /** Últimos 4 dígitos del número de tarjeta (nunca el número completo). */
   lastFour?: string | null
+  isPersonal: boolean
 }
 
 export interface Category {
@@ -68,6 +69,7 @@ export interface Attachment {
 
 export interface Transaction {
   id: string
+  clientId?: string | null
   householdId: string
   type: TransactionType
   amount: number
@@ -82,6 +84,9 @@ export interface Transaction {
   /** Regla que la generó; null si se capturó a mano. */
   recurringRuleId?: string | null
   attachments: Attachment[]
+  /** Local-only state for an outbox record; it is never sent to the API. */
+  syncStatus?: "pending" | "failed"
+  syncError?: string
 }
 
 export interface NewTransaction {
@@ -134,4 +139,21 @@ export interface BudgetStatus {
   budget: number
   spent: number
   percentage: number
+}
+
+/** Meta de ahorro manual. Sus contribuciones no crean movimientos financieros. */
+export interface SavingsGoal {
+  id: string
+  householdId: string
+  name: string
+  targetAmount: number
+  currentAmount: number
+  targetDate: string | null
+  accountId: string | null
+  icon: string
+  color: string
+  archived: boolean
+  progressPct: number
+  remaining: number
+  isCompleted: boolean
 }

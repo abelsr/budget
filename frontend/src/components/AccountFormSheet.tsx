@@ -78,6 +78,7 @@ function AccountForm({
     account?.cardBrand ?? "",
   )
   const [lastFour, setLastFour] = useState(account?.lastFour ?? "")
+  const [isPersonal, setIsPersonal] = useState(account?.isPersonal ?? false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const openingBalance = Number(balanceText.replace(",", ".")) || 0
@@ -99,6 +100,11 @@ function AccountForm({
 
   function save() {
     if (!canSave) return
+    if (account && account.isPersonal !== isPersonal && !window.confirm(
+      isPersonal
+        ? "Esta cuenta dejará de ser visible para el hogar y ya no sumará a sus balances. ¿Continuar?"
+        : "Esta cuenta y sus movimientos volverán a ser visibles para todo el hogar. ¿Continuar?",
+    )) return
     const input = {
       name: name.trim(),
       kind,
@@ -106,6 +112,7 @@ function AccountForm({
       bank: bank.trim() || null,
       cardBrand: cardBrand || null,
       lastFour: lastFour || null,
+      isPersonal,
     }
     if (account) {
       updateAccount.mutate({ id: account.id, ...input }, { onSuccess: onDone })
@@ -213,6 +220,10 @@ function AccountForm({
         </div>
 
         {/* Datos de tarjeta (opcional) — activan el widget tipo wallet */}
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-secondary px-4 py-3">
+          <input type="checkbox" checked={isPersonal} onChange={(event) => setIsPersonal(event.target.checked)} className="mt-0.5" />
+          <span><span className="block text-[14px] font-medium">Cuenta personal</span><span className="block text-[12px] text-muted-foreground">Solo tú la verás y no suma al total del hogar.</span></span>
+        </label>
         <div>
           <p id="account-card-details-label" className="mb-2 text-[13px] font-medium text-muted-foreground">
             Datos de tarjeta <span className="font-normal">(opcional)</span>
@@ -286,6 +297,7 @@ function AccountForm({
                 bank: bank.trim() || null,
                 cardBrand: cardBrand || null,
                 lastFour,
+                isPersonal,
               }}
             />
           </div>

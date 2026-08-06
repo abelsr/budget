@@ -184,7 +184,7 @@ def export_report(
     if from_date > to_date:
         raise HTTPException(status_code=422, detail="La fecha inicial debe ser anterior a la final")
 
-    materialize_due(db, user.household_id)
+    materialize_due(db, user.household_id, user.id)
     report = build_range_report(db, user.household_id, from_date, to_date)
     renderers = {"csv": _csv_export, "xlsx": _xlsx_export}
     if format in renderers:

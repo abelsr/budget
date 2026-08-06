@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth"
 import { AddTransactionButton } from "@/components/AddTransactionSheet"
 import { BrandMark } from "@/components/BrandMark"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
+import { useOffline } from "@/lib/offline"
 
 type NavigationItem = {
   label: string
@@ -53,6 +54,7 @@ export function AppShell() {
   const { data: members = [] } = useMembers()
   const { data: household, isError: householdError } = useHousehold()
   const { session } = useAuth()
+  const { online, pending, cacheUpdatedAt } = useOffline()
   const householdName = householdError
     ? "Mi hogar"
     : (household?.name ?? "…")
@@ -132,6 +134,7 @@ export function AppShell() {
 
       {/* Contenido */}
       <main className="pb-28 md:pb-10 md:pl-52">
+        {(!online || pending.length > 0) && <OfflineBanner online={online} pending={pending.length} cacheUpdatedAt={cacheUpdatedAt} />}
         <header className="hidden h-15 items-center justify-end border-b bg-card/80 px-8 backdrop-blur-sm md:flex">
           <span
             role="status"
@@ -185,4 +188,10 @@ export function AppShell() {
       </nav>
     </div>
   )
+}
+
+function OfflineBanner({ online, pending, cacheUpdatedAt }: { online: boolean; pending: number; cacheUpdatedAt: number }) {
+  const age = cacheUpdatedAt ? Math.max(0, Math.floor((Date.now() - cacheUpdatedAt) / 60_000)) : null
+  const ageLabel = age === null ? "sin datos guardados" : age < 1 ? "datos actualizados ahora" : `datos de hace ${age} min`
+  return <div role="status" className="sticky top-0 z-30 border-b border-amber-500/30 bg-amber-50 px-4 py-2 text-center text-[12px] font-medium text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">{!online ? `Sin conexión${pending ? ` · ${pending} ${pending === 1 ? "movimiento pendiente" : "movimientos pendientes"}` : ""} · ${ageLabel}` : `${pending} ${pending === 1 ? "movimiento pendiente de subir" : "movimientos pendientes de subir"}`}</div>
 }

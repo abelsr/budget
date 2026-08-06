@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Account, Category, Transaction, User
 from app.schemas.summary import CategoryTotal, RangeMonthTotal
+from app.services.account_access import shared_accounts
 
 
 @dataclass
@@ -47,6 +48,7 @@ def build_range_report(
         .join(User, User.id == Transaction.member_id)
         .where(
             Transaction.household_id == household_id,
+            shared_accounts(),
             Transaction.date >= from_date,
             Transaction.date <= to_date,
         )

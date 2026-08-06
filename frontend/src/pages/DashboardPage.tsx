@@ -18,12 +18,17 @@ import {
   Eye,
   EyeOff,
   Landmark,
+  MoreHorizontal,
+  Plus,
   PiggyBank,
+  X,
   Wallet,
 } from "lucide-react"
 
 import { TicketScannerButton } from "@/components/TicketScanner"
 import { TransactionItem } from "@/components/TransactionItem"
+import { CategoryIcon } from "@/components/CategoryIcon"
+import { SavingsGoalContributionSheet, SavingsGoalFormSheet } from "@/components/SavingsGoalSheets"
 import { useAuth } from "@/lib/auth"
 import { CHART_OTHER, seriesColor } from "@/lib/chart-colors"
 import { formatMoney, formatMoneyCompact, monthLabel } from "@/lib/format"
@@ -32,13 +37,16 @@ import {
   useCategories,
   useMembers,
   useMonthSummary,
+  useGoals,
   useTransactions,
+  useUpdateGoal,
 } from "@/lib/queries"
 import { useTheme } from "@/lib/theme"
-import type { Account, Category, Member, Transaction } from "@/lib/types"
+import type { Account, Category, Member, SavingsGoal, Transaction } from "@/lib/types"
 
 const kindIcon = { cash: Wallet, debit: Landmark, credit: CreditCard, savings: PiggyBank }
 const MAX_SLICES = 6
+const DISMISSED_GOAL_CELEBRATIONS_KEY = "ff-dismissed-goal-celebrations"
 
 const container = {
   hidden: {},
@@ -57,6 +65,7 @@ export function DashboardPage() {
   const { data: members = [] } = useMembers()
   const { data: transactions = [] } = useTransactions()
   const { data: summary } = useMonthSummary()
+  const { data: goals = [] } = useGoals()
   const slices = useSlices(summary?.byCategory, categories)
 
   return (
@@ -75,6 +84,7 @@ export function DashboardPage() {
         <div className="min-w-0 lg:col-span-5"><CategoryCard slices={slices} total={summary?.expense ?? 0} concealed={!balancesVisible} /></div>
         <div className="min-w-0 lg:col-span-4"><RecentCard transactions={transactions} categories={categories} accounts={accounts} members={members} concealed={!balancesVisible} /></div>
         <motion.div variants={item} className="min-w-0 lg:col-span-3"><TicketScannerButton /></motion.div>
+        <div className="min-w-0 lg:col-span-12"><GoalsCard goals={goals} accounts={accounts} concealed={!balancesVisible} /></div>
       </div>
     </motion.div>
   )
@@ -89,8 +99,9 @@ function maskedMoney(amount: number, concealed: boolean) {
 }
 
 function BalanceCard({ accounts, visible, onVisibilityChange }: { accounts: Account[]; visible: boolean; onVisibilityChange: () => void }) {
-  const total = accounts.reduce((sum, account) => sum + account.balance, 0)
-  const shown = visible ? formatMoney(total) : "••••••••"
+  const householdTotal = accounts.filter((account) => !account.isPersonal).reduce((sum, account) => sum + account.balance, 0)
+  const personalTotal = accounts.reduce((sum, account) => sum + account.balance, 0)
+  const shown = visible ? formatMoney(householdTotal) : "••••••••"
 
   return (
     <motion.section variants={item} className="surface-brand dashboard-balance relative min-h-40 overflow-hidden p-4 lg:min-h-47 lg:p-4.5">
@@ -100,12 +111,13 @@ function BalanceCard({ accounts, visible, onVisibilityChange }: { accounts: Acco
       </svg>
       <div className="relative">
         <div className="flex items-center justify-between">
-          <p className="text-[12px] font-medium text-primary-foreground/85">Saldo total</p>
+          <p className="text-[12px] font-medium text-primary-foreground/85">Saldo del hogar</p>
           <button onClick={onVisibilityChange} aria-label={visible ? "Ocultar saldos" : "Mostrar saldos"} className="pressable flex size-8 items-center justify-center rounded-full text-primary-foreground/90 hover:bg-primary-foreground/10">
             {visible ? <Eye size={16} /> : <EyeOff size={16} />}
           </button>
         </div>
         <p className="tnum mt-2 truncate text-[27px] font-bold leading-none tracking-tight lg:text-[30px]">{shown}</p>
+        {accounts.some((account) => account.isPersonal) && <p className="tnum mt-2 text-[11px] text-primary-foreground/80">Tus cuentas: {visible ? formatMoney(personalTotal) : "••••••••"}</p>}
       </div>
     </motion.section>
   )
@@ -121,7 +133,7 @@ function AccountsCard({ accounts, concealed }: { accounts: Account[]; concealed:
         <ul className="mt-2 divide-y divide-border">
           {accounts.map((account) => {
             const Icon = kindIcon[account.kind]
-            return <li key={account.id} className="flex min-w-0 items-center gap-2.5 py-2"><span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary"><Icon size={14} /></span><span className="min-w-0 flex-1 truncate text-[12px] font-medium">{account.name}</span><span className={`tnum max-w-[45%] shrink truncate text-[12px] font-semibold ${!concealed && account.balance < 0 ? "text-expense" : ""}`}>{maskedMoney(account.balance, concealed)}</span></li>
+            return <li key={account.id} className="flex min-w-0 items-center gap-2.5 py-2"><span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary-soft text-primary"><Icon size={14} /></span><span className="flex min-w-0 flex-1 items-center gap-1.5"><span className="truncate text-[12px] font-medium">{account.name}</span>{account.isPersonal && <span className="shrink-0 rounded bg-secondary px-1 py-0.5 text-[9px] font-semibold text-muted-foreground">Personal</span>}</span><span className={`tnum max-w-[45%] shrink truncate text-[12px] font-semibold ${!concealed && account.balance < 0 ? "text-expense" : ""}`}>{maskedMoney(account.balance, concealed)}</span></li>
           })}
         </ul>
       )}
@@ -169,6 +181,41 @@ function SliceTooltip({ active, payload, concealed }: { active?: boolean; payloa
 function RecentCard({ transactions, categories, accounts, members, concealed }: { transactions: Transaction[]; categories: Category[]; accounts: Account[]; members: Member[]; concealed: boolean }) {
   const rows = transactions.slice(0, 5)
   return <motion.section variants={item} className="dashboard-card overflow-hidden"><div className="px-3.5 pt-3.5"><CardHeading title="Movimientos recientes" href="/app/transacciones" label="Ver todos" /></div>{rows.length === 0 ? <p className="px-3.5 py-8 text-[13px] text-muted-foreground">Todavía no hay movimientos.</p> : <ul className="mt-1 divide-y divide-border">{rows.map((transaction) => <TransactionItem key={transaction.id} transaction={transaction} category={categories.find((category) => category.id === transaction.categoryId)} account={accounts.find((account) => account.id === transaction.accountId)} member={members.find((member) => member.id === transaction.memberId)} hideAmount={concealed} />)}</ul>}</motion.section>
+}
+
+function GoalsCard({ goals, accounts, concealed }: { goals: SavingsGoal[]; accounts: Account[]; concealed: boolean }) {
+  const [showArchived, setShowArchived] = useState(false)
+  const [formOpen, setFormOpen] = useState(false)
+  const [contributionOpen, setContributionOpen] = useState(false)
+  const [editing, setEditing] = useState<SavingsGoal | undefined>()
+  const [contributing, setContributing] = useState<SavingsGoal | undefined>()
+  const [dismissedCelebrations, setDismissedCelebrations] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(sessionStorage.getItem(DISMISSED_GOAL_CELEBRATIONS_KEY) ?? "[]"))
+    } catch {
+      return new Set()
+    }
+  })
+  const updateGoal = useUpdateGoal()
+  const visibleGoals = goals.filter((goal) => showArchived || !goal.archived)
+  function edit(goal?: SavingsGoal) { setEditing(goal); setFormOpen(true) }
+  function dismissCelebration(goalId: string) {
+    setDismissedCelebrations((current) => {
+      const next = new Set(current).add(goalId)
+      try {
+        sessionStorage.setItem(DISMISSED_GOAL_CELEBRATIONS_KEY, JSON.stringify([...next]))
+      } catch {
+        // Private browsing or a full storage quota should not block dismissal.
+      }
+      return next
+    })
+  }
+  return <motion.section variants={item} className="dashboard-card p-3.5 lg:p-4">
+    <div className="flex items-center justify-between gap-3"><div><h2 className="text-[13px] font-semibold">Metas de ahorro</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Aportes manuales, independientes de tus movimientos.</p></div><button onClick={() => edit()} className="pressable flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground" aria-label="Crear meta de ahorro"><Plus size={17} /></button></div>
+    {goals.some((goal) => goal.archived) && <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-[11px] text-muted-foreground"><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} /> Mostrar archivadas</label>}
+    {visibleGoals.length === 0 ? <button onClick={() => edit()} className="mt-4 w-full rounded-2xl border border-dashed border-border px-4 py-5 text-left text-[13px] text-muted-foreground">Crea una meta para seguir el avance hacia lo que importa.</button> : <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleGoals.map((goal) => { const account = accounts.find((item) => item.id === goal.accountId); const showCelebration = goal.isCompleted && !goal.archived && !dismissedCelebrations.has(goal.id); return <article key={goal.id} className={`rounded-2xl border border-border p-3 ${goal.archived ? "opacity-60" : ""}`}><div className="flex items-start gap-2.5"><CategoryIcon icon={goal.icon} color={goal.color} className="size-9" size={18} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><p className="truncate text-[13px] font-semibold">{goal.name}</p><button onClick={() => edit(goal)} aria-label={`Editar ${goal.name}`} className="pressable -mr-1 -mt-1 rounded-md p-1 text-muted-foreground"><MoreHorizontal size={16} /></button></div><p className="text-[11px] text-muted-foreground">{account?.name ?? (goal.targetDate ? `Para ${new Date(`${goal.targetDate}T12:00:00`).toLocaleDateString("es-MX", { month: "short", year: "numeric" })}` : "Sin cuenta vinculada")}</p></div></div>{showCelebration && <div role="status" className="animate-in fade-in zoom-in-95 mt-3 flex items-center justify-between gap-2 rounded-xl bg-primary-soft px-3 py-2 text-[12px] font-medium text-primary"><span>Meta completada. Felicidades!</span><button onClick={() => dismissCelebration(goal.id)} aria-label={`Ocultar celebración de ${goal.name}`} className="pressable -mr-1 rounded-md p-1"><X size={15} aria-hidden="true" /></button></div>}<div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${goal.progressPct}%`, backgroundColor: goal.color }} /></div><div className="mt-2 flex items-baseline justify-between gap-2"><p className="tnum truncate text-[13px] font-semibold">{maskedMoney(goal.currentAmount, concealed)} <span className="font-normal text-muted-foreground">de {maskedMoney(goal.targetAmount, concealed)}</span></p><span className="tnum shrink-0 text-[11px] font-semibold" style={{ color: goal.color }}>{goal.progressPct}%</span></div><p className="mt-1 text-[11px] text-muted-foreground">{goal.isCompleted ? "Meta completada" : concealed ? "Restante: ••••" : `Faltan ${formatMoney(goal.remaining)}`}</p><div className="mt-3 flex gap-2">{!goal.archived && <button onClick={() => { setContributing(goal); setContributionOpen(true) }} className="pressable flex-1 rounded-xl bg-secondary px-3 py-2 text-[12px] font-semibold">Aportar</button>}{goal.isCompleted && !goal.archived && <button onClick={() => updateGoal.mutate({ id: goal.id, archived: true })} disabled={updateGoal.isPending} className="pressable rounded-xl px-3 py-2 text-[12px] font-semibold text-primary">Archivar</button>}{goal.archived && <button onClick={() => updateGoal.mutate({ id: goal.id, archived: false })} disabled={updateGoal.isPending} className="pressable rounded-xl bg-secondary px-3 py-2 text-[12px] font-semibold">Reactivar</button>}</div></article> })}</div>}
+    <SavingsGoalFormSheet open={formOpen} onOpenChange={setFormOpen} goal={editing} /><SavingsGoalContributionSheet open={contributionOpen} onOpenChange={setContributionOpen} goal={contributing} />
+  </motion.section>
 }
 
 function CardHeading({ title, href, label }: { title: string; href: string; label: string }) { return <div className="flex min-w-0 items-center justify-between gap-3"><h2 className="min-w-0 truncate text-[13px] font-semibold">{title}</h2><Link to={href} className="shrink-0 text-[11px] font-medium text-primary">{label}</Link></div> }

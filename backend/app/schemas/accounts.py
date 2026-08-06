@@ -28,6 +28,7 @@ class AccountCreate(_CamelModel):
     bank: str | None = Field(default=None, max_length=60)
     card_brand: CardBrand | None = None
     last_four: str | None = None
+    is_personal: bool = False
 
     _clean_bank = field_validator("bank")(_clean_optional)
 
@@ -49,6 +50,7 @@ class AccountUpdate(_CamelModel):
     bank: str | None = Field(default=None, max_length=60)
     card_brand: CardBrand | None = None
     last_four: str | None = None
+    is_personal: bool | None = None
 
     _clean_bank = field_validator("bank")(_clean_optional)
 
@@ -73,3 +75,4 @@ class AccountOut(_CamelModel):
     bank: str | None
     card_brand: str | None
     last_four: str | None
+    is_personal: bool
