@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Eye, FileText, Image as ImageIcon, Repeat, Trash2 } from "lucide-react"
+import { ArrowLeftRight, Eye, FileText, Image as ImageIcon, Repeat, Trash2 } from "lucide-react"
 import { motion } from "motion/react"
 
 import { Badge } from "@/components/ui/badge"
@@ -135,6 +135,8 @@ function ViewMode({
   const deleteTransaction = useDeleteTransaction()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const isIncome = transaction.type === "income"
+  const isTransfer = transaction.type === "transfer"
+  const isInflow = transaction.transferDirection === "inflow"
   const authorName = transaction.authorName ?? member?.name
 
   function remove() {
@@ -151,33 +153,33 @@ function ViewMode({
       <DrawerHeader className="p-0 pt-2">
         <DrawerTitle className="sr-only">Detalle del movimiento</DrawerTitle>
         <div className="flex justify-end">
-          <button
+          {!isTransfer && <button
             onClick={onEdit}
             className="pressable text-[15px] font-medium text-primary"
           >
             Editar
-          </button>
+          </button>}
         </div>
       </DrawerHeader>
 
       {/* Header: icono, monto protagonista, título */}
       <div className="flex flex-col items-center gap-2">
-        <CategoryIcon
+        {isTransfer ? <span className="flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary"><ArrowLeftRight size={24} /></span> : <CategoryIcon
           icon={category?.icon ?? "wallet"}
           color={category?.color ?? CHART_OTHER.light}
           size={26}
           className="size-12"
-        />
+        />}
         <span
           className={`tnum text-4xl font-bold tracking-tight ${
             isIncome ? "text-income" : ""
           }`}
         >
-          {isIncome ? "+" : "−"}
+          {isTransfer ? (isInflow ? "+" : "−") : isIncome ? "+" : "−"}
           {formatMoney(transaction.amount)}
         </span>
         <p className="text-[15px] font-medium text-muted-foreground">
-          {transaction.note || category?.name || "Movimiento"}
+          {transaction.note || (isTransfer ? "Transferencia" : category?.name) || "Movimiento"}
         </p>
         {transaction.recurringRuleId && (
           <Badge variant="secondary" className="gap-1">
@@ -189,8 +191,13 @@ function ViewMode({
 
       {/* Filas de detalle estilo lista iOS */}
       <div className="divide-y divide-border/50 overflow-hidden rounded-2xl bg-secondary">
-        <DetailRow label="Categoría" value={category?.name ?? "—"} />
-        <DetailRow label="Cuenta" value={account?.name ?? "—"} />
+        {isTransfer ? <>
+          <DetailRow label={isInflow ? "Desde cuenta" : "A cuenta"} value={transaction.counterpartyAccountName ?? "—"} />
+          <DetailRow label="Cuenta" value={account?.name ?? "—"} />
+        </> : <>
+          <DetailRow label="Categoría" value={category?.name ?? "—"} />
+          <DetailRow label="Cuenta" value={account?.name ?? "—"} />
+        </>}
         <DetailRow
           label="Fecha"
           value={longDateFmt.format(new Date(transaction.date + "T12:00:00"))}
@@ -216,7 +223,7 @@ function ViewMode({
       {confirmDelete ? (
         <div className="rounded-2xl bg-expense/10 p-4">
           <p className="text-center text-[13px] font-medium text-expense">
-            ¿Eliminar este movimiento? No se puede deshacer.
+            ¿Eliminar esta {isTransfer ? "transferencia" : "movimiento"}? No se puede deshacer.
           </p>
           <div className="mt-3 flex gap-2">
             <button
@@ -239,7 +246,7 @@ function ViewMode({
           onClick={() => setConfirmDelete(true)}
           className="pressable w-full py-3 text-[15px] font-semibold text-expense"
         >
-          Eliminar movimiento
+          Eliminar {isTransfer ? "transferencia" : "movimiento"}
         </button>
       )}
     </div>

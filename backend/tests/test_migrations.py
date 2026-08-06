@@ -55,6 +55,7 @@ APP_TABLES = {
     "recurring_rules",
     "budgets",
     "savings_goals",
+    "transfer_groups",
 }
 
 

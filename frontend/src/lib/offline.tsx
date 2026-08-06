@@ -4,9 +4,9 @@ import { useQueryClient } from "@tanstack/react-query"
 
 import { ApiError, apiFetch, getToken } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import type { NewTransaction, Transaction } from "@/lib/types"
+import type { NewTransaction, NewTransfer, Transaction } from "@/lib/types"
 
-type SimpleTransaction = Omit<NewTransaction, "repeat"> & { clientId: string }
+type SimpleTransaction = (Omit<NewTransaction, "repeat"> | NewTransfer) & { clientId: string }
 
 export type PendingTransaction = {
   clientId: string
@@ -48,11 +48,13 @@ function pendingAsTransaction(entry: PendingTransaction): Transaction {
     householdId: "",
     type: entry.payload.type,
     amount: entry.payload.amount,
-    categoryId: entry.payload.categoryId,
-    accountId: entry.payload.accountId,
+    categoryId: "categoryId" in entry.payload ? entry.payload.categoryId : null,
+    accountId: "accountId" in entry.payload ? entry.payload.accountId : entry.payload.sourceAccountId,
     memberId: "",
     date: entry.payload.date,
     note: entry.payload.note,
+    transferDirection: entry.payload.type === "transfer" ? "outflow" : null,
+    counterpartyAccountId: entry.payload.type === "transfer" ? entry.payload.destinationAccountId : null,
     attachments: [],
     syncStatus: entry.lastError ? "failed" : "pending",
     syncError: entry.lastError,
@@ -62,8 +64,8 @@ function pendingAsTransaction(entry: PendingTransaction): Transaction {
 function isMatchingFilter(entry: PendingTransaction, filters: Record<string, string | undefined>) {
   const { payload } = entry
   if (filters.type && payload.type !== filters.type) return false
-  if (filters.categoryId && payload.categoryId !== filters.categoryId) return false
-  if (filters.accountId && payload.accountId !== filters.accountId) return false
+  if (filters.categoryId && (!("categoryId" in payload) || payload.categoryId !== filters.categoryId)) return false
+  if (filters.accountId && (("accountId" in payload ? payload.accountId : payload.sourceAccountId) !== filters.accountId)) return false
   if (filters.memberId) return false
   if (filters.from && payload.date < filters.from) return false
   if (filters.to && payload.date > filters.to) return false

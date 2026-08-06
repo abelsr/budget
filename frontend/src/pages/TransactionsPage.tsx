@@ -47,6 +47,13 @@ export function TransactionsPage() {
     to: searchParams.get("to") ?? undefined,
   }
   const { data: transactions = [] } = useTransactions(filters)
+  // A complete pair is one user action in the household ledger. When a member
+  // can only see one side (for example, another member's personal account),
+  // retain that independently reconcilable row instead.
+  const visibleTransactions = transactions.filter((transaction) => {
+    if (transaction.type !== "transfer" || transaction.transferDirection !== "inflow" || !transaction.transferGroupId) return true
+    return transactions.filter((candidate) => candidate.transferGroupId === transaction.transferGroupId).length !== 2
+  })
   const hasFilters = Object.values(filters).some(Boolean)
   const quickPeriods = getQuickPeriods()
   const activePeriod = quickPeriods.find(
@@ -95,7 +102,7 @@ export function TransactionsPage() {
   }
 
   const byDay = new Map<string, typeof transactions>()
-  for (const t of transactions) {
+  for (const t of visibleTransactions) {
     const list = byDay.get(t.date) ?? []
     list.push(t)
     byDay.set(t.date, list)
@@ -113,8 +120,8 @@ export function TransactionsPage() {
         <PageHeader
           title="Movimientos"
           eyebrow={
-            transactions.length > 0 &&
-            `${transactions.length} ${transactions.length === 1 ? "registro" : "registros"}`
+            visibleTransactions.length > 0 &&
+            `${visibleTransactions.length} ${visibleTransactions.length === 1 ? "registro" : "registros"}`
           }
         />
       </div>
@@ -141,8 +148,8 @@ export function TransactionsPage() {
         </div>
 
         <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Tipo de movimiento">
-          {(["", "expense", "income"] as const).map((type) => {
-            const label = type === "expense" ? "Gastos" : type === "income" ? "Ingresos" : "Todos"
+          {(["", "expense", "income", "transfer"] as const).map((type) => {
+            const label = type === "expense" ? "Gastos" : type === "income" ? "Ingresos" : type === "transfer" ? "Transferencias" : "Todos"
             return <button key={label} type="button" onClick={() => setFilter("type", type)} aria-pressed={(filters.type ?? "") === type} className={`pressable h-8 shrink-0 rounded-full px-3 text-[12px] font-medium transition-colors ${(filters.type ?? "") === type ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-muted"}`}>{label}</button>
           })}
         </div>
@@ -193,7 +200,7 @@ export function TransactionsPage() {
           </div>
           {days.map(([date, txs], dayIdx) => {
             const dayTotal = txs.reduce(
-              (sum, t) => sum + (t.type === "income" ? t.amount : -t.amount),
+              (sum, t) => sum + (t.type === "income" ? t.amount : t.type === "expense" ? -t.amount : 0),
               0,
             )
             return (
@@ -265,7 +272,7 @@ function ActiveFilterChips({ filters, categories, accounts, members, activePerio
   const periodLabel = activePeriod === "month" ? "Este mes" : activePeriod === "30d" ? "Últimos 30 días" : filters.from || filters.to ? "Fechas personalizadas" : null
   const chips: { name: keyof TransactionFilters | "period"; label: string }[] = [
     filters.q ? { name: "q", label: `Búsqueda: ${filters.q}` } : null,
-    filters.type ? { name: "type", label: filters.type === "expense" ? "Gastos" : "Ingresos" } : null,
+    filters.type ? { name: "type", label: filters.type === "expense" ? "Gastos" : filters.type === "income" ? "Ingresos" : "Transferencias" } : null,
     filters.categoryId ? { name: "categoryId", label: categories.find((category) => category.id === filters.categoryId)?.name ?? "Categoría" } : null,
     filters.accountId ? { name: "accountId", label: accounts.find((account) => account.id === filters.accountId)?.name ?? "Cuenta" } : null,
     filters.memberId ? { name: "memberId", label: members.find((member) => member.id === filters.memberId)?.name ?? "Miembro" } : null,

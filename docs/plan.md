@@ -59,11 +59,15 @@ screen, semantic green/red reserved for money flow). Interaction follows the
 ## Roadmap
 
 1. **MVP:** auth + households + accounts + categories + transactions + dashboard. ✅ **DONE** (+ AI scanner, attachments, dark mode)
-2. **Robustness:** migrations, invitations from the UI, onboarding, PWA, backups. 🚧 **In progress** — Alembic, invitations, onboarding, and backups done; PWA pending
-3. **Phase 2:** recurrence, CSV import, monthly budgets. 🚧 **In progress** — recurrence, budgets, filters, and profile done; CSV pending
-4. **Phase 3:** savings goals, personal accounts (privacy between members), offline-first with sync, multi-family opening. ⬜
+2. **Robustness:** migrations, invitations from the UI, onboarding, PWA, backups. ✅ **DONE**
+3. **Phase 2:** recurrence, CSV import, monthly budgets. 🚧 **In progress** — recurrence, budgets, filters, reports, exports, and profile done; CSV pending
+4. **Phase 3:** savings goals, personal accounts (privacy between members), offline-first with sync, multi-family opening. ✅ **DONE**
+5. **Next cycle:** financial integrity and household planning. Transfers → CSV
+   import → reconciliation → merchant rules → split transactions → monthly
+   rollover budgets → alerts and cash-flow planning. See
+   [docs/roadmap/README.md](roadmap/README.md).
 
-**Concrete next step:** [installable PWA](roadmap/03-pwa-instalable.md).
+**Concrete next step:** [CSV import](roadmap/08-importacion-csv.md).
 Details and log in [docs/roadmap/](roadmap/README.md).
 
 ## Repo structure
@@ -161,7 +165,7 @@ verified end-to-end, including access from a phone over the local IP.
 
 **Immediate (robustness):**
 
-- ⬜ [Real PWA](roadmap/03-pwa-instalable.md): manifest + service worker (installable, offline shell).
+- ✅ [Installable PWA](roadmap/03-pwa-instalable.md): manifest, service worker, and offline shell (2026-08-05).
 
 **Phase 2 (features):**
 
@@ -171,10 +175,10 @@ verified end-to-end, including access from a phone over the local IP.
 
 **Phase 3 (growth):**
 
-- ⬜ [Savings goals](roadmap/11-metas-de-ahorro.md) with progress tracking.
-- ⬜ [Personal accounts](roadmap/12-cuentas-personales.md) (privacy between members).
-- ⬜ [Offline-first](roadmap/13-offline-first.md) with sync queue.
-- ⬜ [Multi-family opening](roadmap/14-multi-familia.md) (public signup).
+- ✅ [Savings goals](roadmap/11-metas-de-ahorro.md) with progress tracking (2026-08-05).
+- ✅ [Personal accounts](roadmap/12-cuentas-personales.md) (privacy between members) (2026-08-05).
+- ✅ [Offline-first](roadmap/13-offline-first.md) with sync queue (2026-08-05).
+- ✅ [Self-host scope](roadmap/14-multi-familia.md) with security hardening (2026-08-05).
 
 **Production:**
 

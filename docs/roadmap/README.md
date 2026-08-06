@@ -41,6 +41,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 |---|---|---|---|---|
 | 16 | [CI with GitHub Actions](16-ci-github-actions.md) | ✅ 2026-07-24 | Medium | M |
 | 17 | [Monitoring](17-monitoreo.md) | ⬜ | Low | S |
+| 19 | [Account reconciliation](19-conciliacion-de-cuentas.md) | ⬜ | High | M |
 
 ## Suggested attack order
 
@@ -50,7 +51,63 @@ Invitations and onboarding completed the family experience; Alembic, CI, and
 backups harden it for production; recurring transactions, budgets, and filters
 are the features with the most daily impact.
 
-**Next: 08 — CSV import.** Then tackle **17 — Monitoring** before exposing a self-hosted instance publicly.
+## Next product cycle — financial integrity and household planning
+
+The competitive review on 2026-08-05 confirmed the product's position as a
+private, self-hosted finance app for Spanish-speaking households. The next
+cycle should strengthen the correctness and usefulness of the financial ledger
+before adding more visual polish, bank aggregation, or generative AI.
+
+| Order | Initiative | Why now | Dependency | Status |
+|---|---|---|---|---|
+| 1 | **Transfers between accounts** | Moving money must not distort income, expenses, budgets, or reports. | None | ✅ 2026-08-05 |
+| 2 | **CSV statement import** | Removes the main adoption and migration barrier without requiring a banking-data provider. | Transfers: imported transfers must be representable correctly. | 08 pending |
+| 3 | **Account reconciliation** | Lets a household verify that its ledger agrees with the bank after manual entry or import. | CSV import | 19 pending |
+| 4 | **Merchants and categorization rules** | Prevents repetitive categorization and improves the quality of reports and budgets. | CSV import | Proposed |
+| 5 | **Split transactions** | A single purchase can belong to several categories; forcing one category makes budgets inaccurate. | Transfers and report invariants | Proposed |
+| 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | Proposal A2 |
+| 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Proposal A5 + proposed forecast |
+| 8 | **Goal plans** | Adds due dates, required periodic contributions, and pause/resume to the shipped manual goals. | Alerts | Proposed |
+| 9 | **Mexican card and instalment support** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and cash-flow forecast | Proposed |
+
+### Deliberately deferred
+
+- **Bank aggregation:** it adds regulatory, privacy, operational, and support
+  costs that conflict with the current self-hosted scope. CSV import plus
+  reconciliation solves the immediate user problem first. Re-evaluate only
+  after validating sustained household usage or a managed-service direction.
+- **Generative financial advice:** do not generate recommendations until
+  transfers, imports, merchant normalization, and reconciliation make the
+  underlying data trustworthy.
+- **Additional dashboard widgets:** existing reports and four export formats
+  are sufficient while ledger correctness and planning features are incomplete.
+- **Full zero-based/envelope budgeting:** consider it later as an advanced,
+  opt-in mode; it should not replace the current low-friction monthly budget
+  experience by default.
+
+**Operational prerequisite:** complete **17 — Monitoring** before exposing a
+self-hosted instance publicly. It is independent from the product sequence and
+may be implemented in parallel.
+
+### Confirmed architecture decisions
+
+- Keep the current stack for this cycle: FastAPI, SQLAlchemy, Alembic,
+  PostgreSQL, React/Vite, TanStack Query, and the existing IndexedDB outbox.
+  Do not add a banking-data provider or a new service merely for these flows.
+- Represent a transfer with a `transfer_groups` record and exactly two linked
+  transaction rows. The UI is a single action, but each account retains one
+  independently reconcilable ledger entry.
+- Preserve CSV provenance through auditable import batches, deterministic row
+  fingerprints, immutable normalized source snapshots, and edit history. Do
+  not retain the original uploaded CSV by default; add local object storage for
+  it only when a user-facing retention option is explicitly introduced.
+- Keep imported and reconciled transactions editable. Changes preserve their
+  provenance and mark any affected reconciliation session as stale instead of
+  locking the user out.
+- Revert an import batch through a shared transaction soft-delete mechanism
+  (`deleted_at` plus a reason), never through hard deletes or compensating
+  movements. Reversal is atomic and excluded rows remain available for audit
+  and possible restoration.
 
 ## Log
 

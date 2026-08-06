@@ -3,7 +3,7 @@
  * Todas las entidades pertenecen a un hogar (multi-tenant desde el día 1).
  */
 
-export type TransactionType = "expense" | "income"
+export type TransactionType = "expense" | "income" | "transfer"
 
 export type AccountKind = "cash" | "debit" | "credit" | "savings"
 
@@ -73,7 +73,7 @@ export interface Transaction {
   householdId: string
   type: TransactionType
   amount: number
-  categoryId: string
+  categoryId: string | null
   accountId: string
   memberId: string
   /** Immutable historical author name; available even after household removal. */
@@ -83,6 +83,10 @@ export interface Transaction {
   note?: string
   /** Regla que la generó; null si se capturó a mano. */
   recurringRuleId?: string | null
+  transferGroupId?: string | null
+  transferDirection?: "outflow" | "inflow" | null
+  counterpartyAccountId?: string | null
+  counterpartyAccountName?: string | null
   attachments: Attachment[]
   /** Local-only state for an outbox record; it is never sent to the API. */
   syncStatus?: "pending" | "failed"
@@ -90,7 +94,7 @@ export interface Transaction {
 }
 
 export interface NewTransaction {
-  type: TransactionType
+  type: "expense" | "income"
   amount: number
   categoryId: string
   accountId: string
@@ -101,6 +105,15 @@ export interface NewTransaction {
    * transacción como su primera ocurrencia (una sola operación atómica).
    */
   repeat?: Frequency
+}
+
+export interface NewTransfer {
+  type: "transfer"
+  amount: number
+  sourceAccountId: string
+  destinationAccountId: string
+  date: string
+  note?: string
 }
 
 /**

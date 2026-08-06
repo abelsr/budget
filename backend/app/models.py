@@ -4,6 +4,7 @@ from datetime import date, datetime
 from sqlalchemy import (
     Date,
     DateTime,
+    CheckConstraint,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -151,16 +152,28 @@ class Transaction(Base):
     __table_args__ = (
         Index("ix_transactions_household_date", "household_id", "date"),
         UniqueConstraint("household_id", "client_id", name="uq_transactions_household_client_id"),
+        CheckConstraint(
+            "(type = 'transfer' AND category_id IS NULL AND transfer_group_id IS NOT NULL "
+            "AND transfer_direction IN ('outflow', 'inflow')) OR "
+            "(type IN ('expense', 'income') AND category_id IS NOT NULL "
+            "AND transfer_group_id IS NULL AND transfer_direction IS NULL)",
+            name="ck_transactions_transfer_shape",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
     # Device-generated UUID used to make offline creation retries idempotent.
     client_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    type: Mapped[str] = mapped_column(String(10))  # expense | income
+    type: Mapped[str] = mapped_column(String(10))  # expense | income | transfer
     amount: Mapped[float] = mapped_column(Numeric(19, 4))
-    category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"))
+    category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
+    transfer_group_id: Mapped[str | None] = mapped_column(
+        ForeignKey("transfer_groups.id"), nullable=True, index=True
+    )
+    # Transfer amounts remain positive; this direction supplies their balance effect.
+    transfer_direction: Mapped[str | None] = mapped_column(String(10), nullable=True)
     # Nombre histórico de API/DB: es el autor inmutable autenticado del movimiento.
     member_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     date: Mapped[date] = mapped_column(Date, index=True)
@@ -176,6 +189,20 @@ class Transaction(Base):
     attachments: Mapped[list["Attachment"]] = relationship(lazy="selectin")
     # La autoría no depende de que la persona siga perteneciendo al hogar.
     author: Mapped[User] = relationship(foreign_keys=[member_id], lazy="selectin")
+
+
+class TransferGroup(Base):
+    __tablename__ = "transfer_groups"
+    __table_args__ = (
+        UniqueConstraint("household_id", "client_id", name="uq_transfer_groups_household_client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    # One idempotency key represents the whole two-row transfer, not either side.
+    client_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_by_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class Attachment(Base):

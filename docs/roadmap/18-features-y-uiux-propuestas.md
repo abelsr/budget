@@ -1,11 +1,38 @@
 # 💡 Feature & UI/UX proposals — beyond the current roadmap
 
-**Status:** 🗣 Proposal · **Author:** opencode + abel · **Date:** 2026-08-03
+**Status:** 🗣 Proposal · **Author:** opencode + abel · **Last updated:** 2026-08-05
 
 This file collects the features and UI/UX work discussed in the chat. Each
 item follows the roadmap convention (why, scope, design, acceptance criteria)
 so it can be promoted to its own `docs/roadmap/XX-*.md` file and implemented
 the moment it is approved.
+
+## Product direction
+
+The product is not aiming to reproduce a managed banking aggregator. Its
+competitive position is a **private, self-hosted, collaborative household
+ledger** for Spanish-speaking families, with fast mobile capture and ownership
+of their financial data. This favors correctness, importability, planning, and
+privacy over feature breadth.
+
+The next implementations must follow this dependency order:
+
+1. Transfers between accounts (A1).
+2. CSV statement import ([08](08-importacion-csv.md)), adapted to preserve
+   import provenance and idempotency.
+3. Account reconciliation.
+4. Merchant normalization and categorization rules.
+5. Split transactions.
+6. Monthly budgets with optional rollover (A2).
+7. Alerts (A5) and a cash-flow calendar/forecast.
+8. Dated, planned savings goals.
+9. Mexican credit-card statement dates, due dates, and months-without-interest
+   instalments.
+
+Do not prioritize bank aggregation or generative financial advice until the
+ledger can correctly represent transfers, imported movements, merchants, and
+reconciled balances. Do not make zero-based budgeting the default experience;
+evaluate it later as an advanced opt-in mode.
 
 **Context.** The current roadmap (see `docs/roadmap/README.md`) already covers
 PWA (03), CSV import (08), filters/search (09), profile/password (10), savings
@@ -28,17 +55,23 @@ and the donut. This is the biggest functional gap in the app.
 - New `type = "transfer"` on `transactions`; `category_id` becomes nullable.
 - Transfers excluded from income/expense/donut everywhere; still reflected in
   account balances (one account up, one down) and in the ledger.
-- Transfer recorded as a single transaction with a source and a destination
-  account (no two-row double entry; the ledger shows one line).
+- Transfer persisted as **two linked transactions**, one debit in the source
+  account and one credit in the destination account. The UI presents them as
+  one action, while each account retains a complete independently reconcilable
+  ledger.
 
 **Design — backend.**
+- `transfer_groups` stores the household, creation metadata, and optional
+  future transfer-level attributes such as a fee or exchange-rate context.
 - `transactions`:
-  - `category_id` nullable (migration + data-safe: existing rows untouched);
-  - new column `transfer_to_account_id` (nullable FK → `accounts`);
-  - rule: when `type == 'transfer'`, `category_id` must be `NULL` and
-    `transfer_to_account_id` must be set; otherwise both must be `NULL`.
-  - Check constraint or service-level validation (recommend service-level,
-    matching how this app validates today, plus a pytest case).
+  - `category_id` becomes nullable for transfer rows (migration + data-safe:
+    existing rows untouched);
+  - a nullable `transfer_group_id` references `transfer_groups` and links the
+    two sides;
+  - both rows have `type = 'transfer'`, opposite signed balance effects, no
+    category, and distinct account IDs;
+  - create, update, and delete always operate on the group atomically. The
+    service validates that a group has exactly two rows with equal amounts.
 - Balance computation (`opening_balance + inflows − outflows`) gains:
   - outflows include source account transfers;
   - inflows include destination account transfers.
@@ -52,12 +85,15 @@ and the donut. This is the biggest functional gap in the app.
 - Quick entry: a "Transfer" mode (from account, to account, amount, date,
   optional note). Shown as a segmented control: Expense / Income / Transfer.
 - Ledger rows show `→ account` for transfers; detail sheet shows both ends.
+  Each account's ledger includes its own side so it can later be reconciled
+  against that account's statement.
 - Transfer never offers a category picker.
 
 **Acceptance criteria.**
 - Moving $500 cash → savings updates both balances and changes neither
   income, expense, nor the donut.
-- The ledger shows one transfer line, not two.
+- Each account ledger shows one side; the all-accounts view groups the linked
+  pair as one transfer action.
 - Summary/dashboard totals ignore transfers; total household balance is
   invariant under a transfer.
 - Deleting a transfer reverses both balances.
@@ -65,7 +101,9 @@ and the donut. This is the biggest functional gap in the app.
 
 **Effort:** M (1–3 days). **Risk:** the balance queries and summary endpoints
 are touched everywhere — audit every place that sums `income − expense`
-before closing (same risk class as 12-personal-accounts, but smaller).
+before closing (same risk class as 12-personal-accounts, but smaller). The
+group-and-pair invariant must be database-backed where possible and covered by
+transactional tests.
 
 ---
 
@@ -227,13 +265,16 @@ destructive path is a two-step confirm and then it's gone forever. A short
 interaction language of the app.
 
 **Scope.**
-- Soft delete on `transactions` (`deleted_at`), restore endpoint, and a
+- Soft delete on `transactions` (`deleted_at` and `delete_reason`), restore endpoint, and a
   toast/snackbar with "Deshacer" after delete and after quick entry.
 - Hard purge of soft-deleted rows after 30 days (housekeeping).
 
 **Design — backend.**
-- `transactions.deleted_at NULL`; all list/detail/summary queries add
+- `transactions.deleted_at NULL` and `delete_reason NULL`; all list/detail/summary queries add
   `deleted_at IS NULL`.
+- Import batch reverts use the same mechanism with
+  `delete_reason = 'import_revert'`, rather than hard-deleting financial
+  history or generating compensating movements.
 - `POST /transactions/{id}/restore` sets it back to NULL (only if it was
   soft-deleted).
 - Housekeeping in the lazy-materialization pass (or entrypoint) deletes rows
