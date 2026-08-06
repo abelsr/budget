@@ -88,7 +88,7 @@ Today, after registering, the user lands directly on an empty dashboard with onl
   `MotionConfig reducedMotion="user"` that already wraps the app.
 
 **Verified:** 41 tests pass, `tsc -b && vite build` clean, `oxlint` with no
-new warnings, migration with `upgrade`/`downgrade`/`check` on SQLite and Postgres.
+new warnings, migration with `upgrade`/`downgrade`/`check` on Postgres.
 
 **Browser walkthrough (2026-07-24, stack in Docker, 430×900 viewport):**
 - New registration → redirects to `/onboarding` with "Welcome, Sofía".

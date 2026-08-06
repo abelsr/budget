@@ -45,6 +45,7 @@ def get_month_summary(
 
     base_filter = [
         Transaction.household_id == user.household_id,
+        Transaction.deleted_at.is_(None),
         shared_accounts(),
         extract("year", Transaction.date) == year,
         extract("month", Transaction.date) == month_num,

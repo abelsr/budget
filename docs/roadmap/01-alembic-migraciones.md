@@ -46,12 +46,12 @@ Today the schema is created with `Base.metadata.create_all` on backend startup. 
 
 - `backend/alembic/env.py`: reads `Base.metadata` from `app.database` and imports `app.models`;
   the URL comes from `settings.database_url` (`alembic.ini` is left with
-  an empty `sqlalchemy.url`, the file is committed). `render_as_batch` only on SQLite.
+  an empty `sqlalchemy.url`, the file is committed). Alembic targets PostgreSQL only.
 - `alembic/versions/5d15cfc79c35_esquema_inicial.py`: the 8 tables. Reviewed
   by hand: autogenerate had rendered the `created_at` columns as
   `sa.text('(CURRENT_TIMESTAMP)')` (a literal from the dialect it was generated with) and
   the indexes in batch mode; these were changed to `sa.func.now()` and `op.create_index`
-  so the result is identical on Postgres and SQLite.
+  so the generated schema uses portable SQLAlchemy defaults.
 - `backend/app/main.py`: `create_all` removed.
 - `backend/app/db_bootstrap.py` + `backend/entrypoint.sh`: the container migrates before uvicorn.
   **Bridge for pre-Alembic databases:** if it finds the tables without
@@ -61,10 +61,8 @@ Today the schema is created with `Base.metadata.create_all` on backend startup. 
 - `Dockerfile`: copies `alembic/`, `alembic.ini` and `entrypoint.sh`.
 - `backend/README.md`: workflow documented.
 
-**Verified on SQLite:** `upgrade head` → 8 tables + `alembic_version`;
-`alembic check` → no diff against the models; `downgrade base` → clean;
-bootstrap on a fresh database, on a legacy database made with `create_all` (stamps,
-doesn't re-create) and on a second startup (no-op). The 37 tests pass.
+**Unit tests:** `create_all` runs on in-memory SQLite for speed and isolation;
+SQLite is not an Alembic or runtime target.
 
 **Verified on Postgres with the stack running (2026-07-24):**
 - The bridge did its job against the real database: container log →

@@ -48,6 +48,7 @@ def build_range_report(
         .join(User, User.id == Transaction.member_id)
         .where(
             Transaction.household_id == household_id,
+            Transaction.deleted_at.is_(None),
             shared_accounts(),
             Transaction.type.in_(["income", "expense"]),
             Transaction.date >= from_date,

@@ -1,6 +1,6 @@
 # 📥 CSV import
 
-**Status:** ⬜ Pending · **Priority:** Medium · **Effort:** L (3+ days) · **Dependencies:** None
+**Status:** ✅ 2026-08-06 · **Priority:** Medium · **Effort:** L (3+ days) · **Dependencies:** None
 
 ## Why
 Populate the history from bank statements without manual entry. Without this, migrating to the app means weeks of lost data or tedious data entry.
@@ -51,17 +51,17 @@ Populate the history from bank statements without manual entry. Without this, mi
 - No changes (in-memory parsing; the CSV is not stored).
 
 ## Acceptance criteria
-- [ ] A real bank CSV imports N rows as transactions with correct date, amount, and note.
-- [ ] Duplicates are detected in the preview and can be excluded with a global or per-row checkbox.
-- [ ] Retrying the same import does not duplicate transactions (duplicates appear flagged on the second attempt).
-- [ ] A CSV with more than 1000 rows is rejected with a clear message.
-- [ ] Imported transactions appear with the "Unclassified" category and the chosen destination account.
-- [ ] Re-importing a file creates no duplicate transactions, including after a
+- [x] A real bank CSV imports N rows as transactions with correct date, amount, and note.
+- [x] Duplicates are detected in the preview and can be excluded with a global or per-row checkbox.
+- [x] Retrying the same import does not duplicate transactions (duplicates appear flagged on the second attempt).
+- [x] A CSV with more than 1000 rows is rejected with a clear message.
+- [x] Imported transactions appear with the "Unclassified" category and the chosen destination account.
+- [x] Re-importing a file creates no duplicate transactions, including after a
   user has edited the note of a previously imported transaction.
-- [ ] An import batch exposes its source file metadata, counts, and created
+- [x] An import batch exposes its source file metadata, counts, and created
   transactions; an unchanged batch can be soft-deleted atomically and restored
   without losing its provenance.
-- [ ] Tests: parsing, duplicate detection, idempotent commit, row limit.
+- [x] Tests: parsing, duplicate detection, idempotent commit, row limit.
 
 ## Notes
 - Risk: ambiguous date formats (DD/MM vs MM/DD) — the mapping in step 2 must let the user choose the format explicitly.

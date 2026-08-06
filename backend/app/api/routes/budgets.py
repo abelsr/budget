@@ -87,6 +87,7 @@ def get_budgets_status(
     category_ids = [b.category_id for b in budgets]
     base_filter = [
         Transaction.household_id == household_id,
+        Transaction.deleted_at.is_(None),
         shared_accounts(),
         extract("year", Transaction.date) == year,
         extract("month", Transaction.date) == month_num,

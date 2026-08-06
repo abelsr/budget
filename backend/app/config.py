@@ -7,8 +7,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Dev: SQLite. Docker/prod: postgresql+psycopg://budget:budget@db:5432/budget
-    database_url: str = "sqlite:///./dev.db"
+    database_url: str = "postgresql+psycopg://budget:budget@localhost:5432/budget"
 
     jwt_secret: str = "dev-secret-change-me"
     jwt_algorithm: str = "HS256"
