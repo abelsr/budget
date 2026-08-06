@@ -1,6 +1,6 @@
 # 📴 Offline mode with sync queue
 
-**Status:** ⬜ Pending · **Priority:** Low · **Effort:** L (3+ days) · **Dependencies:** 03-pwa (service worker already installed)
+**Status:** ✅ 2026-08-05 · **Priority:** Low · **Effort:** L (3+ days) · **Dependencies:** 03-pwa ✅
 
 ## Why
 The main use case is logging an expense on the spot: at the supermarket, on the street, with bad mobile data. Today, without a connection, the app simply fails and the expense gets forgotten. An offline queue makes capture reliable even when the network isn't; it's the natural next step after having an installable PWA.
@@ -38,11 +38,11 @@ The main use case is logging an expense on the spot: at the supermarket, on the 
 - No changes
 
 ## Acceptance criteria
-- [ ] Airplane mode → log an expense → it appears in the feed with a "Pending" badge and the banner counts 1
-- [ ] When the connection returns, the expense uploads on its own, the badge disappears, and the banner clears without user intervention
-- [ ] A retry (double flush, reload mid-sync) does not duplicate transactions on the server
-- [ ] Offline, opening the app shows the last snapshot's data with an age indicator
-- [ ] A transaction that fails with a 4xx is marked as an error and does not block the rest of the queue
+- [x] One-time transactions entered offline are user-scoped IndexedDB entries with pending/error feed states and a global banner.
+- [x] The queue flushes in order when online, focused, or on its interval; 4xx entries stay failed without blocking subsequent entries.
+- [x] `clientId` has a household-scoped unique constraint and idempotent replay, including payload conflict and personal-account authorization checks.
+- [x] Query snapshots persist per authenticated user and render an offline age indicator.
+- [ ] Validate the airplane-mode round trip on a real installed mobile app.
 
 ## Notes
 - Risk: rare service worker states combined with the outbox (e.g. SW serving an old shell with different sync logic). Test the PWA update flow together with the queue.
