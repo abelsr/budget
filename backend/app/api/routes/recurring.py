@@ -1,10 +1,10 @@
 from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Account, Category, RecurringRule, Transaction, User
+from app.models import Account, Category, RecurringRule, Transaction, TransactionEditEvent, User
 from app.schemas.recurring import (
     RecurringRuleCreate,
     RecurringRuleOut,
@@ -138,13 +138,28 @@ def update_rule(
 def delete_rule(rule_id: str, db: DbDep, user: CurrentUserDep) -> None:
     household_id = _household_id(user)
     rule = _get_rule(db, household_id, user.id, rule_id)
-    # Las transacciones ya generadas se quedan: son dinero que se movió. Solo
-    # sueltan el enlace (pierden el badge) para que la FK deje borrar la regla.
-    db.execute(
-        update(Transaction)
-        .where(Transaction.recurring_rule_id == rule.id)
-        .values(recurring_rule_id=None)
-        .execution_options(synchronize_session=False)
-    )
+    # A reverted transaction retains its historical rule reference. The FK is
+    # restrictive, so deleting its rule would either corrupt that history or
+    # leave an invalid reference.
+    if db.scalar(select(Transaction.id).where(
+        Transaction.recurring_rule_id == rule.id,
+        Transaction.deleted_at.is_not(None),
+    ).limit(1)) is not None:
+        raise HTTPException(status_code=409, detail="La regla tiene movimientos revertidos")
+    transactions = db.scalars(select(Transaction).where(
+        Transaction.recurring_rule_id == rule.id,
+        Transaction.deleted_at.is_(None),
+    )).all()
+    for transaction in transactions:
+        if transaction.import_batch_id is not None:
+            db.add(TransactionEditEvent(
+                transaction_id=transaction.id,
+                edited_by_id=user.id,
+                before_snapshot={"recurring_rule_id": rule.id},
+                after_snapshot={"recurring_rule_id": None},
+            ))
+        transaction.recurring_rule_id = None
+    # Flush child references before deleting the restrictive FK parent.
+    db.flush()
     db.delete(rule)
     db.commit()

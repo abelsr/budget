@@ -55,9 +55,6 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            # SQLite no soporta ALTER de columnas: batch mode reconstruye la
-            # tabla. Inofensivo en Postgres, necesario si alguien migra dev.db.
-            render_as_batch=connection.dialect.name == "sqlite",
         )
 
         with context.begin_transaction():

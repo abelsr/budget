@@ -16,6 +16,7 @@ recién creada y la borra al terminar: nunca tocan la base apuntada por la URL.
 """
 
 import os
+import threading
 from collections.abc import Iterator
 
 import pytest
@@ -56,6 +57,10 @@ APP_TABLES = {
     "budgets",
     "savings_goals",
     "transfer_groups",
+    "import_batches",
+    "import_rows",
+    "import_fingerprints",
+    "transaction_edit_events",
 }
 
 
@@ -191,6 +196,226 @@ def test_esquema_migrado_coincide_con_los_modelos(database_url: str) -> None:
             "models.py tiene cambios sin migración; corre "
             f"`uv run alembic revision --autogenerate`. Diff: {exc}"
         )
+
+
+def test_import_batch_scope_fk_uses_the_batch_candidate_key(database_url: str) -> None:
+    command.upgrade(alembic_config(database_url), "head")
+
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            inspector = inspect(connection)
+            batch_candidates = inspector.get_unique_constraints("import_batches")
+            transaction_foreign_keys = inspector.get_foreign_keys("transactions")
+    finally:
+        engine.dispose()
+
+    assert any(
+        candidate["name"] == "uq_import_batches_id_household_account"
+        and candidate["column_names"] == ["id", "household_id", "account_id"]
+        for candidate in batch_candidates
+    )
+    assert any(
+        foreign_key["name"] == "fk_transactions_import_batch_scope"
+        and foreign_key["constrained_columns"]
+        == ["import_batch_id", "household_id", "account_id"]
+        and foreign_key["referred_table"] == "import_batches"
+        and foreign_key["referred_columns"] == ["id", "household_id", "account_id"]
+        for foreign_key in transaction_foreign_keys
+    )
+
+
+def test_import_revert_conditional_update_detects_a_concurrent_edit(database_url: str) -> None:
+    """PostgreSQL row locks force revert to recheck a PATCH committed first."""
+    command.upgrade(alembic_config(database_url), "head")
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(text(
+                "INSERT INTO households (id, name, currency_code) VALUES ('h1', 'Uno', 'MXN')"
+            ))
+            connection.execute(text(
+                "INSERT INTO users (id, email, hashed_password, name, household_id) "
+                "VALUES ('u1', 'u1@example.com', 'hash', 'Uno', 'h1')"
+            ))
+            connection.execute(text(
+                "INSERT INTO accounts (id, household_id, name, kind, opening_balance) "
+                "VALUES ('a1', 'h1', 'Cuenta', 'debit', 0)"
+            ))
+            connection.execute(text(
+                "INSERT INTO categories (id, household_id, name, icon, color, type, active, deleted) "
+                "VALUES ('c1', 'h1', 'Sin clasificar', 'tag', '#000000', 'expense', true, false)"
+            ))
+            connection.execute(text(
+                "INSERT INTO import_batches "
+                "(id, household_id, account_id, created_by_id, source_filename, mapping, "
+                "selected_count, imported_count, skipped_count) "
+                "VALUES ('b1', 'h1', 'a1', 'u1', 'one.csv', '{}', 1, 1, 0)"
+            ))
+            connection.execute(text(
+                "INSERT INTO transactions "
+                "(id, household_id, type, amount, category_id, account_id, member_id, date, note, import_batch_id) "
+                "VALUES ('t1', 'h1', 'expense', 12.3400, 'c1', 'a1', 'u1', '2026-01-01', 'original', 'b1')"
+            ))
+
+        patch = engine.connect()
+        patch_transaction = patch.begin()
+        patch.execute(text("SELECT id FROM transactions WHERE id = 't1' AND deleted_at IS NULL FOR UPDATE"))
+        started = threading.Event()
+        finished = threading.Event()
+        result: dict[str, int] = {}
+
+        def revert_worker() -> None:
+            connection = engine.connect()
+            transaction = connection.begin()
+            try:
+                started.set()
+                connection.execute(text("SELECT id FROM transactions WHERE id = 't1' FOR UPDATE"))
+                result["rowcount"] = connection.execute(text(
+                    "UPDATE transactions SET deleted_at = now(), delete_reason = 'import_revert' "
+                    "WHERE id = 't1' AND deleted_at IS NULL AND type = 'expense' "
+                    "AND amount = 12.3400 AND category_id = 'c1' AND account_id = 'a1' "
+                    "AND date = '2026-01-01' AND note = 'original'"
+                )).rowcount
+                transaction.rollback()
+            finally:
+                connection.close()
+                finished.set()
+
+        worker = threading.Thread(target=revert_worker)
+        worker.start()
+        assert started.wait(1)
+        patch.execute(text("UPDATE transactions SET note = 'edited' WHERE id = 't1'"))
+        patch_transaction.commit()
+        assert finished.wait(5)
+        worker.join()
+        assert result["rowcount"] == 0
+        assert _scalar(database_url, "SELECT deleted_at IS NULL FROM transactions WHERE id = 't1'") is True
+    finally:
+        engine.dispose()
+
+
+def test_import_provenance_constraints_reject_invalid_links(database_url: str) -> None:
+    command.upgrade(alembic_config(database_url), "head")
+    engine = create_engine(database_url)
+
+    def assert_integrity_error(sql: str) -> None:
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(text(sql))
+
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO households (id, name, currency_code) VALUES "
+                    "('h1', 'Uno', 'MXN'), ('h2', 'Dos', 'MXN')"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO users (id, email, hashed_password, name, household_id) VALUES "
+                    "('u1', 'u1@example.com', 'hash', 'Uno', 'h1'), "
+                    "('u2', 'u2@example.com', 'hash', 'Dos', 'h2')"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO accounts (id, household_id, name, kind, opening_balance) VALUES "
+                    "('a1', 'h1', 'Cuenta uno', 'debit', 0), "
+                    "('a2', 'h2', 'Cuenta dos', 'debit', 0)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO categories (id, household_id, name, icon, color, type, active, deleted) VALUES "
+                    "('c1', 'h1', 'Uno', 'circle', '#000000', 'expense', true, false), "
+                    "('c2', 'h2', 'Dos', 'circle', '#000000', 'expense', true, false)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO import_batches "
+                    "(id, household_id, account_id, created_by_id, source_filename, mapping, "
+                    "selected_count, imported_count, skipped_count) VALUES "
+                    "('b1', 'h1', 'a1', 'u1', 'one.csv', '{}', 0, 0, 0), "
+                    "('b2', 'h1', 'a1', 'u1', 'two.csv', '{}', 0, 0, 0)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO transactions "
+                    "(id, household_id, type, amount, category_id, account_id, member_id, date, import_batch_id) "
+                    "VALUES "
+                    "('t1', 'h1', 'expense', 1, 'c1', 'a1', 'u1', '2026-01-01', 'b1'), "
+                    "('t2', 'h1', 'expense', 1, 'c1', 'a1', 'u1', '2026-01-01', 'b2')"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO import_rows "
+                    "(id, batch_id, source_position, source_snapshot, transaction_baseline, advisory_reasons, status, transaction_id) "
+                    "VALUES "
+                    "('r1', 'b1', 1, '{}', '{}', '[]', 'imported', 't1'), "
+                    "('r2', 'b2', 1, '{}', '{}', '[]', 'imported', 't2'), "
+                    "('r3', 'b1', 2, '{}', '{}', '[]', 'skipped', NULL)"
+                )
+            )
+
+        assert_integrity_error(
+            "INSERT INTO import_batches "
+            "(id, household_id, account_id, created_by_id, source_filename, mapping, "
+            "selected_count, imported_count, skipped_count) "
+            "VALUES ('bad-account', 'h1', 'a2', 'u1', 'bad.csv', '{}', 0, 0, 0)"
+        )
+        assert_integrity_error(
+            "INSERT INTO import_batches "
+            "(id, household_id, account_id, created_by_id, source_filename, mapping, "
+            "selected_count, imported_count, skipped_count) "
+            "VALUES ('bad-creator', 'h1', 'a1', 'u2', 'bad.csv', '{}', 0, 0, 0)"
+        )
+        assert_integrity_error(
+            "INSERT INTO transactions "
+            "(id, household_id, type, amount, category_id, account_id, member_id, date, import_batch_id) "
+            "VALUES ('bad-transaction', 'h2', 'expense', 1, 'c2', 'a2', 'u2', '2026-01-01', 'b1')"
+        )
+        assert_integrity_error(
+            "INSERT INTO import_rows "
+            "(id, batch_id, source_position, source_snapshot, transaction_baseline, advisory_reasons, status, transaction_id) "
+            "VALUES ('bad-row', 'b1', 3, '{}', '{}', '[]', 'imported', 't2')"
+        )
+        assert_integrity_error(
+            "INSERT INTO import_rows "
+            "(id, batch_id, source_position, source_snapshot, transaction_baseline, advisory_reasons, status) "
+            "VALUES ('duplicate-row', 'b1', 2, '{}', '{}', '[]', 'skipped')"
+        )
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO import_fingerprints "
+                    "(id, batch_id, household_id, account_id, fingerprint, import_row_id, transaction_id) "
+                    "VALUES ('f1', 'b1', 'h1', 'a1', 'duplicate', 'r1', 't1')"
+                )
+            )
+
+        assert_integrity_error(
+            "INSERT INTO import_fingerprints "
+            "(id, batch_id, household_id, account_id, fingerprint, import_row_id, transaction_id) "
+            "VALUES ('bad-scope', 'b1', 'h2', 'a2', 'scope', 'r1', 't1')"
+        )
+        assert_integrity_error(
+            "INSERT INTO import_fingerprints "
+            "(id, batch_id, household_id, account_id, fingerprint, import_row_id, transaction_id) "
+            "VALUES ('bad-provenance', 'b2', 'h1', 'a1', 'provenance', 'r1', 't1')"
+        )
+        assert_integrity_error(
+            "INSERT INTO import_fingerprints "
+            "(id, batch_id, household_id, account_id, fingerprint, import_row_id, transaction_id) "
+            "VALUES ('duplicate-fingerprint', 'b2', 'h1', 'a1', 'duplicate', 'r2', 't2')"
+        )
+    finally:
+        engine.dispose()
 
 
 def test_downgrade_base_deja_la_base_limpia(database_url: str) -> None:

@@ -32,6 +32,7 @@ def _get_attachment(db, household_id: str, user_id: str, attachment_id: str) -> 
     attachment = db.scalar(select(Attachment).join(Transaction).join(Account).where(
         Attachment.id == attachment_id,
         Attachment.household_id == household_id,
+        Transaction.deleted_at.is_(None),
         visible_accounts(user_id),
     ))
     if attachment is None:
@@ -50,6 +51,7 @@ def upload_attachment(
     tx = db.scalar(select(Transaction).join(Account).where(
         Transaction.id == transaction_id,
         Transaction.household_id == household_id,
+        Transaction.deleted_at.is_(None),
         visible_accounts(user.id),
     ))
     if tx is None:

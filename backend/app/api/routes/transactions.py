@@ -7,7 +7,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Account, Category, RecurringRule, Transaction, TransferGroup, User
+from app.models import (
+    Account,
+    Category,
+    RecurringRule,
+    Transaction,
+    TransactionEditEvent,
+    TransferGroup,
+    User,
+)
 from app.schemas.transactions import (
     TransactionCreate,
     TransactionOut,
@@ -27,12 +35,18 @@ def _household_id(user: User) -> str:
     return user.household_id
 
 
-def _get_transaction(db, household_id: str, user_id: str, transaction_id: str) -> Transaction:
-    tx = db.scalar(select(Transaction).join(Account).where(
+def _get_transaction(
+    db, household_id: str, user_id: str, transaction_id: str, *, for_update: bool = False
+) -> Transaction:
+    stmt = select(Transaction).join(Account).where(
         Transaction.id == transaction_id,
         Transaction.household_id == household_id,
+        Transaction.deleted_at.is_(None),
         visible_accounts(user_id),
-    ))
+    )
+    if for_update:
+        stmt = stmt.with_for_update(of=Transaction)
+    tx = db.scalar(stmt)
     if tx is None:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
     return tx
@@ -55,6 +69,7 @@ def _tx_out(tx: Transaction, db=None, user_id: str | None = None) -> Transaction
             .where(
                 Transaction.transfer_group_id == tx.transfer_group_id,
                 Transaction.id != tx.id,
+                Transaction.deleted_at.is_(None),
             )
             .limit(1)
         )
@@ -105,7 +120,21 @@ def _money(value: Decimal | float) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.0001"))
 
 
+def _snapshot(tx: Transaction, fields: tuple[str, ...]) -> dict[str, object]:
+    snapshot: dict[str, object] = {}
+    for field in fields:
+        value = getattr(tx, field)
+        if isinstance(value, Decimal):
+            value = float(value)
+        elif isinstance(value, date):
+            value = value.isoformat()
+        snapshot[field] = value
+    return snapshot
+
+
 def _assert_replay_access(tx: Transaction, household_id: str, user_id: str, db) -> None:
+    if tx.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Transacción no encontrada")
     account = db.get(Account, tx.account_id)
     if account is None or account.household_id != household_id or not can_operate(account, user_id):
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
@@ -128,8 +157,14 @@ def _validate_transfer_accounts(db, household_id: str, user_id: str, source_id: 
     return source, destination
 
 
-def _transfer_rows(db, group_id: str) -> list[Transaction]:
-    rows = db.scalars(select(Transaction).where(Transaction.transfer_group_id == group_id)).all()
+def _transfer_rows(db, group_id: str, *, for_update: bool = False) -> list[Transaction]:
+    stmt = select(Transaction).where(
+        Transaction.transfer_group_id == group_id,
+        Transaction.deleted_at.is_(None),
+    )
+    if for_update:
+        stmt = stmt.with_for_update()
+    rows = db.scalars(stmt).all()
     if len(rows) != 2 or {row.transfer_direction for row in rows} != {"outflow", "inflow"}:
         raise HTTPException(status_code=409, detail="La transferencia está incompleta")
     if _money(rows[0].amount) != _money(rows[1].amount) or rows[0].account_id == rows[1].account_id:
@@ -172,7 +207,11 @@ def list_transactions(
 ) -> list[TransactionOut]:
     household_id = _household_id(user)
     materialize_due(db, household_id, user.id)
-    stmt = select(Transaction).join(Account).where(Transaction.household_id == household_id, visible_accounts(user.id))
+    stmt = select(Transaction).join(Account).where(
+        Transaction.household_id == household_id,
+        Transaction.deleted_at.is_(None),
+        visible_accounts(user.id),
+    )
     if month is not None and (from_date is not None or to_date is not None):
         raise HTTPException(
             status_code=422,
@@ -222,10 +261,21 @@ def create_transaction(
             existing_transaction = db.scalar(select(Transaction).where(
                 Transaction.household_id == household_id,
                 Transaction.client_id == client_id,
+                Transaction.deleted_at.is_(None),
             ))
             if existing_transaction is not None:
                 _assert_replay_access(existing_transaction, household_id, user.id, db)
                 raise HTTPException(status_code=409, detail="El clientId ya se usó con un movimiento distinto")
+            reverted_transaction = db.scalar(select(Transaction.id).where(
+                Transaction.household_id == household_id,
+                Transaction.client_id == client_id,
+                Transaction.deleted_at.is_not(None),
+            ).limit(1))
+            if reverted_transaction is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="El clientId ya se usó con una transacción revertida",
+                )
             existing_group = db.scalar(select(TransferGroup).where(
                 TransferGroup.household_id == household_id,
                 TransferGroup.client_id == client_id,
@@ -282,6 +332,7 @@ def create_transaction(
             select(Transaction).where(
                 Transaction.household_id == household_id,
                 Transaction.client_id == client_id,
+                Transaction.deleted_at.is_(None),
             )
         )
         if existing is not None:
@@ -318,10 +369,16 @@ def create_transaction(
             select(Transaction).where(
                 Transaction.household_id == household_id,
                 Transaction.client_id == client_id,
+                Transaction.deleted_at.is_(None),
             )
         )
         if existing is None:
-            raise
+            # The unique key may belong to a reverted row, which must never be
+            # returned as a successful offline replay.
+            raise HTTPException(
+                status_code=409,
+                detail="El clientId ya se usó con una transacción revertida",
+            ) from None
         _assert_replay_access(existing, household_id, user.id, db)
         if not _same_create_payload(existing, payload, db):
             raise HTTPException(
@@ -368,11 +425,14 @@ def update_transaction(
     transaction_id: str, payload: TransactionUpdate, db: DbDep, user: CurrentUserDep
 ) -> TransactionOut:
     household_id = _household_id(user)
-    tx = _get_transaction(db, household_id, user.id, transaction_id)
+    # PATCH and import revert share this row lock. If revert wins while PATCH is
+    # waiting, the deleted_at predicate below makes PATCH return 404 instead of
+    # changing a reverted transaction.
+    tx = _get_transaction(db, household_id, user.id, transaction_id, for_update=True)
     if tx.type == "transfer":
         if tx.transfer_group_id is None:
             raise HTTPException(status_code=409, detail="La transferencia está incompleta")
-        rows = _transfer_rows(db, tx.transfer_group_id)
+        rows = _transfer_rows(db, tx.transfer_group_id, for_update=True)
         _assert_transfer_access(rows, household_id, user.id, db)
         data = payload.model_dump(exclude_unset=True)
         source = next(row for row in rows if row.transfer_direction == "outflow")
@@ -384,12 +444,22 @@ def update_transaction(
         if "category_id" in data or data.get("type") not in (None, "transfer"):
             raise HTTPException(status_code=422, detail="Una transferencia no usa categoría ni tipo de movimiento")
         _validate_transfer_accounts(db, household_id, user.id, source_id, destination_id)
+        before_snapshots: dict[str, dict[str, object]] = {}
         for row in rows:
+            before_snapshots[row.id] = _snapshot(row, ("amount", "date", "note", "account_id"))
             row.amount = data.get("amount", row.amount)
             row.date = data.get("date", row.date)
             row.note = data.get("note", row.note)
         source.account_id = source_id
         destination.account_id = destination_id
+        for row in rows:
+            before = before_snapshots[row.id]
+            after = _snapshot(row, ("amount", "date", "note", "account_id"))
+            if row.import_batch_id is not None and before != after:
+                db.add(TransactionEditEvent(
+                    transaction_id=row.id, edited_by_id=user.id,
+                    before_snapshot=before, after_snapshot=after,
+                ))
         db.commit()
         db.refresh(tx)
         return _tx_out(tx, db, user.id)
@@ -400,8 +470,15 @@ def update_transaction(
     account_id = data.get("account_id", tx.account_id)
     if "category_id" in data or "account_id" in data:
         _validate_refs(db, household_id, user.id, category_id, account_id)
+    before = _snapshot(tx, tuple(data))
     for field, value in data.items():
         setattr(tx, field, value)
+    after = _snapshot(tx, tuple(data))
+    if tx.import_batch_id is not None and before != after:
+        db.add(TransactionEditEvent(
+            transaction_id=tx.id, edited_by_id=user.id,
+            before_snapshot=before, after_snapshot=after,
+        ))
     db.commit()
     db.refresh(tx)
     return _tx_out(tx)
@@ -411,6 +488,8 @@ def update_transaction(
 def delete_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) -> None:
     household_id = _household_id(user)
     tx = _get_transaction(db, household_id, user.id, transaction_id)
+    if tx.import_batch_id is not None:
+        raise HTTPException(status_code=409, detail="No se puede eliminar una transacción importada")
     if tx.type == "transfer":
         if tx.transfer_group_id is None:
             raise HTTPException(status_code=409, detail="La transferencia está incompleta")
@@ -419,6 +498,8 @@ def delete_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) -> 
         group = db.get(TransferGroup, tx.transfer_group_id)
         db.delete(rows[0])
         db.delete(rows[1])
+        # The group is the FK parent; remove both transfer rows first.
+        db.flush()
         if group is not None:
             db.delete(group)
         db.commit()

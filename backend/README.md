@@ -1,6 +1,6 @@
 # Backend — Family Finances
 
-REST API in FastAPI + SQLAlchemy (sync) + PostgreSQL (SQLite in dev/tests).
+REST API in FastAPI + SQLAlchemy (sync) + PostgreSQL.
 Multi-tenant: all data is isolated by `household_id`.
 
 ## Local development
@@ -10,8 +10,8 @@ uv sync
 uv run fastapi dev          # http://127.0.0.1:8000 (docs at /docs)
 ```
 
-Uses SQLite (`dev.db`) by default. For local Postgres, copy `.env.example`
-to `.env` and adjust `DATABASE_URL`.
+PostgreSQL is required for local runtime and Alembic. Copy `.env.example` to
+`.env` and set `DATABASE_URL` for a local PostgreSQL instance.
 
 ## Migrations (Alembic)
 
@@ -38,8 +38,8 @@ it applies migrations and, if it finds a database created with the old
 initial migration instead of recreating anything. That bridge is temporary
 and can be removed once no pre-Alembic databases remain.
 
-Tests don't use Alembic: they create the schema with `create_all` on an
-in-memory SQLite database (faster and isolated).
+Tests don't use Alembic: unit tests create the schema with `create_all` on an
+in-memory SQLite database (faster and isolated). Migration tests use PostgreSQL.
 
 ## Tests
 
