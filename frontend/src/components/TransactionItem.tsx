@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Paperclip, Repeat } from "lucide-react"
+import { AlertCircle, CloudUpload, Paperclip, Repeat } from "lucide-react"
 
 import { formatMoney, formatShortDate } from "@/lib/format"
 import type { Account, Category, Member, Transaction } from "@/lib/types"
@@ -40,6 +40,7 @@ export function TransactionItem({
   const hasAttachments = transaction.attachments.length > 0
   const isRecurring = Boolean(transaction.recurringRuleId)
   const authorName = transaction.authorName ?? member?.name
+  const syncLabel = transaction.syncStatus === "failed" ? transaction.syncError ?? "No se pudo subir" : "Pendiente de subir"
 
   // Comercio reconocido por la nota → medallón de marca (fallback: categoría).
   const brand = matchBrand(transaction.note)
@@ -63,7 +64,7 @@ export function TransactionItem({
           ledger ? "md:grid md:grid-cols-[minmax(0,1fr)_10rem_auto] md:gap-4" : ""
         }`}
         role="button"
-        onClick={() => setOpen(true)}
+        onClick={() => !transaction.syncStatus && setOpen(true)}
       >
         {brand ? (
           <BrandMedallion brand={brand} className="size-10 shrink-0" />
@@ -96,7 +97,19 @@ export function TransactionItem({
               />
             )}
             {hasAttachments && <Paperclip size={13} className="shrink-0" />}
+            {transaction.syncStatus && (
+              <span
+                title={syncLabel}
+                className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                  transaction.syncStatus === "failed" ? "bg-destructive/10 text-destructive" : "bg-primary-soft text-primary"
+                }`}
+              >
+                {transaction.syncStatus === "failed" ? <AlertCircle size={11} /> : <CloudUpload size={11} />}
+                {transaction.syncStatus === "failed" ? "Error al subir" : "Pendiente"}
+              </span>
+            )}
           </p>
+          {transaction.syncStatus === "failed" && <p className="mt-0.5 truncate text-[11px] text-destructive">No se subió: {syncLabel}</p>}
         </div>
         {ledger && (
           <span className="hidden min-w-0 truncate text-right text-[13px] text-muted-foreground md:block">
@@ -111,14 +124,7 @@ export function TransactionItem({
           {hideAmount ? "••••••" : <>{isIncome ? "+" : "−"}{formatMoney(transaction.amount)}</>}
         </span>
       </li>
-      <TransactionDetailSheet
-        open={open}
-        onOpenChange={setOpen}
-        transaction={transaction}
-        category={category}
-        account={account}
-        member={member}
-      />
+      {!transaction.syncStatus && <TransactionDetailSheet open={open} onOpenChange={setOpen} transaction={transaction} category={category} account={account} member={member} />}
     </>
   )
 }

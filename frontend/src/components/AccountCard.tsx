@@ -77,7 +77,7 @@ export function AccountCard({
               {account.bank || account.name}
             </p>
           </div>
-          {logo?.kind === "path" ? (
+          {account.isPersonal ? <span className="rounded-md bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white">Personal</span> : logo?.kind === "path" ? (
             <svg
               viewBox="0 0 24 24"
               width={34}

@@ -144,7 +144,7 @@ def test_materializa_todas_las_ocurrencias_atrasadas(session, world):
         session, world, frequency="weekly", next_run_date=date(2026, 6, 1)
     )
 
-    created = materialize_due(session, world["h1"].id, today=date(2026, 6, 20))
+    created = materialize_due(session, world["h1"].id, world["u1"].id, today=date(2026, 6, 20))
 
     assert created == 3
     dates = sorted(
@@ -158,8 +158,8 @@ def test_materializar_dos_veces_no_duplica(session, world):
     make_rule(session, world, frequency="weekly", next_run_date=date(2026, 6, 1))
     today = date(2026, 6, 20)
 
-    assert materialize_due(session, world["h1"].id, today=today) == 3
-    assert materialize_due(session, world["h1"].id, today=today) == 0
+    assert materialize_due(session, world["h1"].id, world["u1"].id, today=today) == 3
+    assert materialize_due(session, world["h1"].id, world["u1"].id, today=today) == 0
     assert session.query(Transaction).count() == 3
 
 
@@ -167,7 +167,7 @@ def test_mensual_del_31_sobrevive_a_los_meses_cortos(session, world):
     """Enero 31 → febrero 28 → marzo 31: el ancla no se pierde al recortar."""
     make_rule(session, world, frequency="monthly", next_run_date=date(2026, 1, 31))
 
-    materialize_due(session, world["h1"].id, today=date(2026, 3, 31))
+    materialize_due(session, world["h1"].id, world["u1"].id, today=date(2026, 3, 31))
 
     dates = sorted(tx.date for tx in session.query(Transaction).all())
     assert dates == [date(2026, 1, 31), date(2026, 2, 28), date(2026, 3, 31)]
@@ -176,7 +176,7 @@ def test_mensual_del_31_sobrevive_a_los_meses_cortos(session, world):
 def test_la_transaccion_generada_hereda_los_datos_de_la_regla(session, world):
     rule = make_rule(session, world, next_run_date=date(2026, 7, 1))
 
-    materialize_due(session, world["h1"].id, today=date(2026, 7, 1))
+    materialize_due(session, world["h1"].id, world["u1"].id, today=date(2026, 7, 1))
 
     tx = session.query(Transaction).one()
     assert tx.type == rule.type
@@ -192,20 +192,20 @@ def test_la_transaccion_generada_hereda_los_datos_de_la_regla(session, world):
 def test_regla_pausada_no_materializa(session, world):
     make_rule(session, world, next_run_date=date(2026, 7, 1), active=False)
 
-    assert materialize_due(session, world["h1"].id, today=date(2026, 7, 20)) == 0
+    assert materialize_due(session, world["h1"].id, world["u1"].id, today=date(2026, 7, 20)) == 0
     assert session.query(Transaction).count() == 0
 
 
 def test_regla_futura_no_materializa(session, world):
     make_rule(session, world, next_run_date=date(2026, 8, 1))
 
-    assert materialize_due(session, world["h1"].id, today=date(2026, 7, 25)) == 0
+    assert materialize_due(session, world["h1"].id, world["u1"].id, today=date(2026, 7, 25)) == 0
 
 
 def test_materializar_no_toca_otros_hogares(session, world):
     make_rule(session, world, next_run_date=date(2026, 7, 1))
 
-    assert materialize_due(session, world["h2"].id, today=date(2026, 7, 20)) == 0
+    assert materialize_due(session, world["h2"].id, world["u2"].id, today=date(2026, 7, 20)) == 0
     assert session.query(Transaction).count() == 0
 
 

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Account, Category, Household, Invitation, User
 from app.api.routes import auth
+from app.config import settings
 from app.services import storage
 
 
@@ -35,6 +36,7 @@ def test_register_creates_user_household_token_and_categories(client, session: S
 
     user = session.scalar(select(User).where(User.email == "ana@example.com"))
     assert user is not None
+    assert user.email_verified is False
     assert user.household_id is not None
     household = session.get(Household, user.household_id)
     assert household is not None
@@ -78,6 +80,31 @@ def test_login_success_and_wrong_password(client):
     )
     assert resp.status_code == 401
     assert resp.json()["detail"] == "Credenciales incorrectas"
+
+
+def test_auth_rate_limits_return_429(client, monkeypatch):
+    monkeypatch.setattr(settings, "auth_register_limit", 1)
+    monkeypatch.setattr(settings, "auth_login_limit", 1)
+    monkeypatch.setattr(settings, "auth_join_limit", 1)
+
+    assert _register(client).status_code == 201
+    response = _register(client, "another@example.com")
+    assert response.status_code == 429
+    assert response.headers["retry-after"]
+
+    assert client.post(
+        "/auth/login", json={"email": "ana@example.com", "password": "password123"}
+    ).status_code == 200
+    assert client.post(
+        "/auth/login", json={"email": "ana@example.com", "password": "password123"}
+    ).status_code == 429
+
+    assert client.post("/auth/join", json={
+        "token": "missing", "email": "join@example.com", "password": "password123", "name": "Join"
+    }).status_code == 404
+    assert client.post("/auth/join", json={
+        "token": "missing", "email": "other@example.com", "password": "password123", "name": "Other"
+    }).status_code == 429
 
 
 def test_me_requires_token_and_returns_user(client):
@@ -189,6 +216,26 @@ def test_join_rejects_invitation_at_exact_expiry(client, session: Session, monke
 
     assert response.status_code == 410
     assert response.json()["detail"] == "Invitación inválida o expirada"
+
+
+def test_join_rejects_when_household_member_limit_is_reached(client, session, monkeypatch):
+    token = _register(client).json()["accessToken"]
+    owner = client.get("/auth/me", headers=_headers(token)).json()
+    monkeypatch.setattr(settings, "max_members_per_household", 1)
+    session.add(Invitation(
+        household_id=owner["householdId"],
+        token="member-limit",
+        created_by_id=owner["id"],
+        expires_at=_now() + timedelta(days=1),
+    ))
+    session.commit()
+
+    response = client.post("/auth/join", json={
+        "token": "member-limit", "email": "bob@example.com", "password": "password123", "name": "Bob"
+    })
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Este hogar alcanzó el máximo de miembros"
+    assert session.scalar(select(User).where(User.email == "bob@example.com")) is None
 
 
 def _headers(token: str) -> dict[str, str]:

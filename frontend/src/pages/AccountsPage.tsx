@@ -17,7 +17,9 @@ const kindMeta: Record<AccountKind, { label: string; icon: typeof Wallet }> = {
 /** Cuentas del hogar con sus saldos. */
 export function AccountsPage() {
   const { data: accounts = [] } = useAccounts()
-  const total = accounts.reduce((sum, a) => sum + a.balance, 0)
+  const sharedAccounts = accounts.filter((account) => !account.isPersonal)
+  const personalAccounts = accounts.filter((account) => account.isPersonal)
+  const total = sharedAccounts.reduce((sum, a) => sum + a.balance, 0)
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | undefined>()
@@ -61,8 +63,23 @@ export function AccountsPage() {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {accounts.map((a) => {
+        <div className="space-y-6">
+          <AccountSection title="Del hogar" accounts={sharedAccounts} onEdit={openEdit} />
+          <AccountSection title="Personales" accounts={personalAccounts} onEdit={openEdit} empty="Crea una cuenta personal para llevarla en privado." />
+        </div>
+      )}
+
+      <AccountFormSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        account={editingAccount}
+      />
+    </div>
+  )
+}
+
+function AccountSection({ title, accounts, onEdit, empty }: { title: string; accounts: Account[]; onEdit: (account: Account) => void; empty?: string }) {
+  return <section><h2 className="mb-2 text-[13px] font-semibold text-muted-foreground">{title}</h2>{accounts.length === 0 ? <p className="rounded-2xl border border-dashed border-border px-4 py-5 text-[13px] text-muted-foreground">{empty ?? "Aún no hay cuentas compartidas."}</p> : <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{accounts.map((a) => {
             // Con tarjeta definida → widget tipo wallet; sin ella, la tarjeta
             // clásica con icono por tipo.
             if (a.lastFour) {
@@ -70,7 +87,7 @@ export function AccountsPage() {
                 <AccountCard
                   key={a.id}
                   account={a}
-                  onClick={() => openEdit(a)}
+                  onClick={() => onEdit(a)}
                 />
               )
             }
@@ -79,15 +96,15 @@ export function AccountsPage() {
             return (
               <button
                 key={a.id}
-                onClick={() => openEdit(a)}
+                onClick={() => onEdit(a)}
                 className="pressable flex flex-col gap-5 rounded-3xl border border-border bg-card p-5 text-left shadow-sm"
               >
                 <div className="flex items-start gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
                     <Icon size={20} />
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-medium">{a.name}</p>
+                   <div className="min-w-0 flex-1">
+                     <div className="flex items-center gap-2"><p className="truncate text-[15px] font-medium">{a.name}</p>{a.isPersonal && <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">Personal</span>}</div>
                     {/* El tipo sólo aporta si no es literalmente el nombre */}
                     {a.name !== meta.label && (
                       <p className="text-[13px] text-muted-foreground">
@@ -105,15 +122,5 @@ export function AccountsPage() {
                 </span>
               </button>
             )
-          })}
-        </div>
-      )}
-
-      <AccountFormSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        account={editingAccount}
-      />
-    </div>
-  )
+          })}</div>}</section>
 }

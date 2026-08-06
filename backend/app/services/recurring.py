@@ -20,7 +20,8 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import RecurringRule, Transaction
+from app.models import Account, RecurringRule, Transaction
+from app.services.account_access import visible_accounts
 
 #: Frecuencias soportadas. Quincenal/anual/personalizada quedan fuera del
 #: alcance de esta fase.
@@ -62,7 +63,7 @@ def next_future_run(rule: RecurringRule, today: date) -> date:
 
 
 def materialize_due(
-    db: Session, household_id: str, today: date | None = None
+    db: Session, household_id: str, user_id: str, today: date | None = None
 ) -> int:
     """Genera las transacciones pendientes del hogar y devuelve cuántas creó.
 
@@ -71,9 +72,10 @@ def materialize_due(
     """
     today = today or date.today()
     rules = db.scalars(
-        select(RecurringRule)
+        select(RecurringRule).join(Account)
         .where(
             RecurringRule.household_id == household_id,
+            visible_accounts(user_id),
             RecurringRule.active.is_(True),
             RecurringRule.next_run_date <= today,
         )

@@ -14,6 +14,7 @@ import { LoginPage } from "@/pages/LoginPage"
 import { OnboardingPage } from "@/pages/OnboardingPage"
 import { LandingPage } from "@/pages/LandingPage"
 import { ReportsPage } from "@/pages/ReportsPage"
+import { PrivacyPage } from "@/pages/PrivacyPage"
 
 const ONBOARDING_PATH = "/onboarding"
 /** La app vive bajo /app; / es la landing pública. */
@@ -79,6 +80,7 @@ function App() {
               </LandingI18nProvider>
             }
           />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route element={<RequireAuth />}>
             {/* Fuera del AppShell: el wizard ocupa la pantalla completa */}
             <Route path="onboarding" element={<OnboardingPage />} />

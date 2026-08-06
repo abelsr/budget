@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Household, Invitation, User
+from app.config import settings
+from app.models import Account, Household, Invitation, User
 from app.schemas.households import (
     ActiveInvitationResponse,
     HouseholdResponse,
@@ -69,7 +70,23 @@ def get_my_household_members(db: DbDep, user: CurrentUserDep) -> list[MemberResp
 
 @router.post("/me/invitations", response_model=InvitationResponse, status_code=201)
 def create_invitation(db: DbDep, user: CurrentUserDep) -> InvitationResponse:
-    household = _require_owner(db, user)
+    household = db.scalar(
+        select(Household)
+        .where(Household.id == user.household_id, Household.owner_id == user.id)
+        .with_for_update()
+    )
+    if household is None:
+        _require_owner(db, user)
+        raise HTTPException(status_code=404, detail="Hogar no encontrado")
+    active_count = db.scalar(
+        select(func.count(Invitation.id)).where(
+            Invitation.household_id == household.id,
+            Invitation.used_at.is_(None),
+            Invitation.expires_at > _now(),
+        )
+    )
+    if active_count >= settings.max_active_invitations_per_household:
+        raise HTTPException(status_code=409, detail="Este hogar alcanzó el máximo de invitaciones activas")
     invitation = Invitation(
         household_id=household.id,
         created_by_id=user.id,
@@ -144,5 +161,7 @@ def remove_member(member_id: str, db: DbDep, user: CurrentUserDep) -> None:
         raise HTTPException(status_code=404, detail="Miembro no encontrado")
     if member.id == household.owner_id:
         raise HTTPException(status_code=409, detail="La persona propietaria no puede eliminarse del hogar")
+    if db.scalar(select(Account.id).where(Account.owner_id == member.id).limit(1)):
+        raise HTTPException(status_code=409, detail="No se puede expulsar a una persona con cuentas personales")
     member.household_id = None
     db.commit()

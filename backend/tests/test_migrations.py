@@ -43,7 +43,7 @@ pytestmark = pytest.mark.skipif(
     reason="requiere MIGRATIONS_TEST_DATABASE_URL apuntando a un Postgres",
 )
 
-#: Las 8 tablas del esquema, sin contar `alembic_version`.
+#: Tablas de la aplicación, sin contar `alembic_version`.
 APP_TABLES = {
     "households",
     "users",
@@ -53,6 +53,8 @@ APP_TABLES = {
     "transactions",
     "attachments",
     "recurring_rules",
+    "budgets",
+    "savings_goals",
 }
 
 
@@ -221,6 +223,7 @@ def test_los_datos_sobreviven_a_las_migraciones(database_url: str) -> None:
     assert _scalar(database_url, "SELECT count(*) FROM users") == 2
     assert _scalar(database_url, "SELECT name FROM users WHERE id = 'u1'") == "Ana"
     assert _scalar(database_url, "SELECT count(*) FROM households") == 2
+    assert _scalar(database_url, "SELECT count(*) FROM accounts WHERE owner_id IS NOT NULL") == 0
     assert _scalar(database_url, "SELECT owner_id FROM households WHERE id = 'h1'") == "u1"
     assert _scalar(
         database_url, "SELECT owner_id FROM households WHERE id = 'h_orphan'"

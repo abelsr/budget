@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { motion } from "motion/react"
 
 import { BrandMark } from "@/components/BrandMark"
@@ -225,6 +225,13 @@ export function LoginPage() {
             cuenta.
           </p>
         )}
+        <p className="mt-3 text-center text-[13px] text-muted-foreground">
+          Al crear una cuenta, aceptas que los datos de tu hogar se guarden en
+          esta instancia. {" "}
+          <Link to="/privacy" className="font-medium text-primary hover:underline">
+            Ver privacidad
+          </Link>
+        </p>
       </motion.div>
     </div>
   )

@@ -129,6 +129,20 @@ def test_create_invitation(client, session, setup_data):
     assert before + timedelta(days=7) <= invitation.expires_at <= after + timedelta(days=7)
 
 
+def test_create_invitation_enforces_active_limit(client, setup_data, monkeypatch):
+    data = setup_data
+    monkeypatch.setattr(settings, "max_active_invitations_per_household", 1)
+
+    assert client.post(
+        "/households/me/invitations", headers=_auth_headers(data["user"])
+    ).status_code == 201
+    response = client.post(
+        "/households/me/invitations", headers=_auth_headers(data["user"])
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Este hogar alcanzó el máximo de invitaciones activas"
+
+
 def test_only_owner_can_administer_invitations(client, session, setup_data, monkeypatch):
     data = setup_data
     member_headers = _auth_headers(data["member2"])

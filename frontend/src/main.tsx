@@ -5,6 +5,8 @@ import './index.css'
 import App from './App.tsx'
 import { ThemeProvider } from '@/lib/theme'
 import { AuthProvider } from '@/lib/auth'
+import { OfflineProvider } from '@/lib/offline'
+import { AuthenticatedQueryCache } from '@/lib/query-cache'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,7 +22,11 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <App />
+          <AuthenticatedQueryCache>
+            <OfflineProvider>
+              <App />
+            </OfflineProvider>
+          </AuthenticatedQueryCache>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

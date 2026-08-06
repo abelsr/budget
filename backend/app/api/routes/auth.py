@@ -3,12 +3,14 @@ import warnings
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Body, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Request, Response, UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DbDep
 from app.core.security import create_access_token, hash_password, verify_password
+from app.core.rate_limit import client_ip, limiter
+from app.config import settings
 from app.models import Account, Category, Household, Invitation, User, new_id
 from app.schemas.auth import (
     ChangePasswordRequest,
@@ -38,8 +40,36 @@ def _get_user_by_email(db: DbDep, email: str) -> User | None:
     return db.scalar(select(User).where(User.email == email))
 
 
+def _limit_register(request: Request) -> None:
+    limiter.check(
+        f"register:{client_ip(request)}",
+        settings.auth_register_limit,
+        settings.auth_register_window_seconds,
+    )
+
+
+def _limit_login(request: Request) -> None:
+    limiter.check(
+        f"login:{client_ip(request)}",
+        settings.auth_login_limit,
+        settings.auth_login_window_seconds,
+    )
+
+
+def _limit_join(request: Request) -> None:
+    limiter.check(
+        f"join:{client_ip(request)}",
+        settings.auth_join_limit,
+        settings.auth_join_window_seconds,
+    )
+
+
 @router.post("/register", status_code=201, response_model=TokenResponse)
-def register(db: DbDep, body: Annotated[RegisterRequest, Body()]):
+def register(
+    db: DbDep,
+    body: Annotated[RegisterRequest, Body()],
+    _: Annotated[None, Depends(_limit_register)],
+):
     if _get_user_by_email(db, body.email) is not None:
         raise HTTPException(status_code=409, detail="El correo ya está registrado")
 
@@ -70,7 +100,11 @@ def register(db: DbDep, body: Annotated[RegisterRequest, Body()]):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(db: DbDep, body: Annotated[LoginRequest, Body()]):
+def login(
+    db: DbDep,
+    body: Annotated[LoginRequest, Body()],
+    _: Annotated[None, Depends(_limit_login)],
+):
     user = _get_user_by_email(db, body.email)
     if user is None or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
@@ -275,7 +309,11 @@ def set_onboarding(
 
 
 @router.post("/join", status_code=201, response_model=TokenResponse)
-def join(db: DbDep, body: Annotated[JoinRequest, Body()]):
+def join(
+    db: DbDep,
+    body: Annotated[JoinRequest, Body()],
+    _: Annotated[None, Depends(_limit_join)],
+):
     invitation = db.scalar(
         select(Invitation).where(Invitation.token == body.token).with_for_update()
     )
@@ -284,6 +322,20 @@ def join(db: DbDep, body: Annotated[JoinRequest, Body()]):
     now = _now()
     if invitation.used_at is not None or invitation.expires_at <= now:
         raise HTTPException(status_code=410, detail="Invitación inválida o expirada")
+    # Locking the household serializes joins with invitation creation and other
+    # joins, so the member count remains valid under concurrent requests.
+    household = db.scalar(
+        select(Household)
+        .where(Household.id == invitation.household_id)
+        .with_for_update()
+    )
+    if household is None:
+        raise HTTPException(status_code=404, detail="Hogar no encontrado")
+    member_count = db.scalar(
+        select(func.count(User.id)).where(User.household_id == household.id)
+    )
+    if member_count >= settings.max_members_per_household:
+        raise HTTPException(status_code=409, detail="Este hogar alcanzó el máximo de miembros")
     if _get_user_by_email(db, body.email) is not None:
         raise HTTPException(status_code=409, detail="El correo ya está registrado")
 

@@ -61,6 +61,29 @@ docker compose up -d --build
 The backend applies Alembic migrations on startup (`backend/entrypoint.sh`), so an
 empty database is ready to go on its own.
 
+## Security configuration
+
+This compose file is for a single-process self-host. Keep the backend and
+database off the public network and terminate HTTPS at a reverse proxy before
+exposing the frontend. Do not publish registration on plain HTTP.
+
+- Set `JWT_SECRET` to a unique random value of at least 32 bytes, for example
+  `openssl rand -hex 32`. It must never use the compose development default or
+  be committed. Changing it signs out every user.
+- Set `CORS_ORIGINS` to a JSON list containing only the exact HTTPS frontend
+  origins, such as `["https://budget.example.com"]`. Do not use `*`: requests
+  include credentials.
+- Auth and ticket scanning are protected by process-local rate limits. Tune
+  `AUTH_*_LIMIT`, `AUTH_*_WINDOW_SECONDS`, `TICKET_SCAN_LIMIT`, and
+  `TICKET_SCAN_WINDOW_SECONDS` in `.env` if needed. They are not shared among
+  multiple backend replicas; add a shared limiter before scaling horizontally.
+- `MAX_MEMBERS_PER_HOUSEHOLD` and
+  `MAX_ACTIVE_INVITATIONS_PER_HOUSEHOLD` default to 10 and 5. Checks are
+  serialized with the household row, so concurrent invitations or joins cannot
+  exceed them.
+- User email addresses are stored with `email_verified=false`. There is no mail
+  provider or verification flow in this self-host scope.
+
 ## Local development
 
 ```bash

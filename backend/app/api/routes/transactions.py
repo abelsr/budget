@@ -1,8 +1,10 @@
 from datetime import date
+from decimal import Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, DbDep
 from app.models import Account, Category, RecurringRule, Transaction, User
@@ -12,6 +14,7 @@ from app.schemas.transactions import (
     TransactionUpdate,
 )
 from app.services.recurring import advance, materialize_due
+from app.services.account_access import can_operate, visible_accounts
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -24,19 +27,23 @@ def _household_id(user: User) -> str:
     return user.household_id
 
 
-def _get_transaction(db, household_id: str, transaction_id: str) -> Transaction:
-    tx = db.get(Transaction, transaction_id)
-    if tx is None or tx.household_id != household_id:
+def _get_transaction(db, household_id: str, user_id: str, transaction_id: str) -> Transaction:
+    tx = db.scalar(select(Transaction).join(Account).where(
+        Transaction.id == transaction_id,
+        Transaction.household_id == household_id,
+        visible_accounts(user_id),
+    ))
+    if tx is None:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
     return tx
 
 
-def _validate_refs(db, household_id: str, category_id: str, account_id: str) -> None:
+def _validate_refs(db, household_id: str, user_id: str, category_id: str, account_id: str) -> None:
     category = db.get(Category, category_id)
-    if category is None or category.household_id != household_id:
+    if category is None or category.household_id != household_id or category.deleted:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     account = db.get(Account, account_id)
-    if account is None or account.household_id != household_id:
+    if account is None or account.household_id != household_id or not can_operate(account, user_id):
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
 
@@ -44,6 +51,7 @@ def _tx_out(tx: Transaction) -> TransactionOut:
     return TransactionOut(
         id=tx.id,
         household_id=tx.household_id,
+        client_id=tx.client_id,
         type=tx.type,
         amount=float(tx.amount),
         category_id=tx.category_id,
@@ -55,6 +63,34 @@ def _tx_out(tx: Transaction) -> TransactionOut:
         recurring_rule_id=tx.recurring_rule_id,
         attachments=tx.attachments,
     )
+
+
+def _same_create_payload(tx: Transaction, payload: TransactionCreate, db) -> bool:
+    """A client ID identifies one immutable create request, never a mutable draft."""
+    if (
+        tx.type != payload.type
+        or _money(tx.amount) != _money(payload.amount)
+        or tx.category_id != payload.category_id
+        or tx.account_id != payload.account_id
+        or tx.date != payload.date
+        or tx.note != payload.note
+    ):
+        return False
+    if payload.repeat is None:
+        return tx.recurring_rule_id is None
+    rule = db.get(RecurringRule, tx.recurring_rule_id)
+    return rule is not None and rule.frequency == payload.repeat
+
+
+def _money(value: Decimal | float) -> Decimal:
+    """Compare amounts at the database's fixed four-decimal money scale."""
+    return Decimal(str(value)).quantize(Decimal("0.0001"))
+
+
+def _assert_replay_access(tx: Transaction, household_id: str, user_id: str, db) -> None:
+    account = db.get(Account, tx.account_id)
+    if account is None or account.household_id != household_id or not can_operate(account, user_id):
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
 
 @router.get("")
@@ -73,8 +109,8 @@ def list_transactions(
     to_date: Annotated[date | None, Query(alias="to")] = None,
 ) -> list[TransactionOut]:
     household_id = _household_id(user)
-    materialize_due(db, household_id)
-    stmt = select(Transaction).where(Transaction.household_id == household_id)
+    materialize_due(db, household_id, user.id)
+    stmt = select(Transaction).join(Account).where(Transaction.household_id == household_id, visible_accounts(user.id))
     if month is not None and (from_date is not None or to_date is not None):
         raise HTTPException(
             status_code=422,
@@ -106,7 +142,7 @@ def list_transactions(
         stmt = stmt.where(Transaction.type == transaction_type)
     stmt = stmt.order_by(Transaction.date.desc(), Transaction.created_at.desc())
     stmt = stmt.limit(limit).offset(offset)
-    transactions = db.scalars(stmt).all()
+    transactions = db.scalars(stmt.execution_options(populate_existing=True)).all()
     return [_tx_out(tx) for tx in transactions]
 
 
@@ -115,9 +151,26 @@ def create_transaction(
     payload: TransactionCreate, db: DbDep, user: CurrentUserDep
 ) -> TransactionOut:
     household_id = _household_id(user)
-    _validate_refs(db, household_id, payload.category_id, payload.account_id)
+    client_id = str(payload.client_id) if payload.client_id is not None else None
+    if client_id is not None:
+        existing = db.scalar(
+            select(Transaction).where(
+                Transaction.household_id == household_id,
+                Transaction.client_id == client_id,
+            )
+        )
+        if existing is not None:
+            _assert_replay_access(existing, household_id, user.id, db)
+            if not _same_create_payload(existing, payload, db):
+                raise HTTPException(
+                    status_code=409,
+                    detail="El clientId ya se usó con un movimiento distinto",
+                )
+            return _tx_out(existing)
+    _validate_refs(db, household_id, user.id, payload.category_id, payload.account_id)
     tx = Transaction(
         household_id=household_id,
+        client_id=client_id,
         type=payload.type,
         amount=payload.amount,
         category_id=payload.category_id,
@@ -126,6 +179,30 @@ def create_transaction(
         date=payload.date,
         note=payload.note,
     )
+    # Flush the unique key before creating a recurrence. A concurrent retry can
+    # then roll back to the savepoint without leaving a second rule behind.
+    try:
+        with db.begin_nested():
+            db.add(tx)
+            db.flush()
+    except IntegrityError:
+        if client_id is None:
+            raise
+        existing = db.scalar(
+            select(Transaction).where(
+                Transaction.household_id == household_id,
+                Transaction.client_id == client_id,
+            )
+        )
+        if existing is None:
+            raise
+        _assert_replay_access(existing, household_id, user.id, db)
+        if not _same_create_payload(existing, payload, db):
+            raise HTTPException(
+                status_code=409,
+                detail="El clientId ya se usó con un movimiento distinto",
+            ) from None
+        return _tx_out(existing)
     if payload.repeat is not None:
         from datetime import timedelta
 
@@ -155,7 +232,6 @@ def create_transaction(
         db.add(rule)
         db.flush()  # el id se asigna al flush y hace falta para ligar
         tx.recurring_rule_id = rule.id
-    db.add(tx)
     db.commit()
     db.refresh(tx)
     return _tx_out(tx)
@@ -166,12 +242,12 @@ def update_transaction(
     transaction_id: str, payload: TransactionUpdate, db: DbDep, user: CurrentUserDep
 ) -> TransactionOut:
     household_id = _household_id(user)
-    tx = _get_transaction(db, household_id, transaction_id)
+    tx = _get_transaction(db, household_id, user.id, transaction_id)
     data = payload.model_dump(exclude_unset=True)
     category_id = data.get("category_id", tx.category_id)
     account_id = data.get("account_id", tx.account_id)
     if "category_id" in data or "account_id" in data:
-        _validate_refs(db, household_id, category_id, account_id)
+        _validate_refs(db, household_id, user.id, category_id, account_id)
     for field, value in data.items():
         setattr(tx, field, value)
     db.commit()
@@ -182,6 +258,6 @@ def update_transaction(
 @router.delete("/{transaction_id}", status_code=204)
 def delete_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) -> None:
     household_id = _household_id(user)
-    tx = _get_transaction(db, household_id, transaction_id)
+    tx = _get_transaction(db, household_id, user.id, transaction_id)
     db.delete(tx)
     db.commit()

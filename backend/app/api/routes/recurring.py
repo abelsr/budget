@@ -11,6 +11,7 @@ from app.schemas.recurring import (
     RecurringRuleUpdate,
 )
 from app.services.recurring import MAX_BACKFILL_DAYS, materialize_due, next_future_run
+from app.services.account_access import can_operate, visible_accounts
 
 router = APIRouter(prefix="/recurring-rules", tags=["recurring"])
 
@@ -21,19 +22,23 @@ def _household_id(user: User) -> str:
     return user.household_id
 
 
-def _get_rule(db, household_id: str, rule_id: str) -> RecurringRule:
-    rule = db.get(RecurringRule, rule_id)
-    if rule is None or rule.household_id != household_id:
+def _get_rule(db, household_id: str, user_id: str, rule_id: str) -> RecurringRule:
+    rule = db.scalar(select(RecurringRule).join(Account).where(
+        RecurringRule.id == rule_id,
+        RecurringRule.household_id == household_id,
+        visible_accounts(user_id),
+    ))
+    if rule is None:
         raise HTTPException(status_code=404, detail="Regla no encontrada")
     return rule
 
 
-def _validate_refs(db, household_id: str, category_id: str, account_id: str) -> None:
+def _validate_refs(db, household_id: str, user_id: str, category_id: str, account_id: str) -> None:
     category = db.get(Category, category_id)
-    if category is None or category.household_id != household_id:
+    if category is None or category.household_id != household_id or category.deleted:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     account = db.get(Account, account_id)
-    if account is None or account.household_id != household_id:
+    if account is None or account.household_id != household_id or not can_operate(account, user_id):
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
 
@@ -66,10 +71,11 @@ def list_rules(db: DbDep, user: CurrentUserDep) -> list[RecurringRuleOut]:
     household_id = _household_id(user)
     # Materializa antes de listar: si no, la pantalla mostraría "próxima" en
     # una fecha que ya pasó, que es justo lo que el usuario viene a revisar.
-    materialize_due(db, household_id)
+    materialize_due(db, household_id, user.id)
     rules = db.scalars(
         select(RecurringRule)
-        .where(RecurringRule.household_id == household_id)
+        .join(Account)
+        .where(RecurringRule.household_id == household_id, visible_accounts(user.id))
         .order_by(RecurringRule.next_run_date, RecurringRule.id)
     ).all()
     return [_rule_out(rule) for rule in rules]
@@ -80,7 +86,7 @@ def create_rule(
     payload: RecurringRuleCreate, db: DbDep, user: CurrentUserDep
 ) -> RecurringRuleOut:
     household_id = _household_id(user)
-    _validate_refs(db, household_id, payload.category_id, payload.account_id)
+    _validate_refs(db, household_id, user.id, payload.category_id, payload.account_id)
     _validate_next_run_date(payload.next_run_date)
     rule = RecurringRule(
         household_id=household_id,
@@ -107,9 +113,16 @@ def update_rule(
     rule_id: str, payload: RecurringRuleUpdate, db: DbDep, user: CurrentUserDep
 ) -> RecurringRuleOut:
     household_id = _household_id(user)
-    rule = _get_rule(db, household_id, rule_id)
+    rule = _get_rule(db, household_id, user.id, rule_id)
     data = payload.model_dump(exclude_unset=True)
     reactivating = data.get("active") is True and not rule.active
+    if reactivating:
+        category = db.get(Category, rule.category_id)
+        if category is None or category.deleted:
+            raise HTTPException(
+                status_code=409,
+                detail="La categoría de la regla fue eliminada",
+            )
     for field, value in data.items():
         setattr(rule, field, value)
     # Reanudar salta lo que estuvo pausado: quien apagó la regla en marzo no
@@ -124,7 +137,7 @@ def update_rule(
 @router.delete("/{rule_id}", status_code=204)
 def delete_rule(rule_id: str, db: DbDep, user: CurrentUserDep) -> None:
     household_id = _household_id(user)
-    rule = _get_rule(db, household_id, rule_id)
+    rule = _get_rule(db, household_id, user.id, rule_id)
     # Las transacciones ya generadas se quedan: son dinero que se movió. Solo
     # sueltan el enlace (pierden el badge) para que la FK deje borrar la regla.
     db.execute(

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
+from app.core.rate_limit import limiter
 from app.main import app
 
 
@@ -23,6 +24,13 @@ def session_fixture():
     with TestingSessionLocal() as session:
         yield session
     Base.metadata.drop_all(engine)
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    limiter.clear()
+    yield
+    limiter.clear()
 
 
 @pytest.fixture(name="client")

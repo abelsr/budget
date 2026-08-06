@@ -4,6 +4,8 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbDep
+from app.config import settings
+from app.core.rate_limit import limiter
 from app.models import Category
 from app.schemas.tickets import TicketScanResponse
 from app.services.vision import (
@@ -25,6 +27,12 @@ async def scan_ticket(
 ) -> TicketScanResponse:
     if current_user.household_id is None:
         raise HTTPException(status_code=400, detail="El usuario no tiene hogar")
+
+    limiter.check(
+        f"ticket-scan:{current_user.household_id}",
+        settings.ticket_scan_limit,
+        settings.ticket_scan_window_seconds,
+    )
 
     if file.content_type is None or not file.content_type.startswith("image/"):
         raise HTTPException(

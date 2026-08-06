@@ -104,6 +104,8 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
         date,
         note: note.trim() || undefined,
         repeat: repeat ?? undefined,
+        // Attachments and recurring rules are deliberately online-only.
+        offlineEligible: !file,
       },
       {
         onSuccess: (created) => {

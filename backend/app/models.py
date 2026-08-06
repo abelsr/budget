@@ -56,6 +56,8 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    # Kept false until an email delivery/verification flow is deliberately added.
+    email_verified: Mapped[bool] = mapped_column(default=False, server_default="false")
     hashed_password: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(120))
     sex: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -98,8 +100,18 @@ class Account(Base):
 
     __tablename__ = "accounts"
 
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id", "household_id"],
+            ["users.id", "users.household_id"],
+            name="fk_accounts_owner_membership",
+        ),
+    )
+
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    # NULL = shared. A non-null value is constrained to a current household member.
+    owner_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(120))
     # cash | debit | credit | savings
     kind: Mapped[str] = mapped_column(String(20))
@@ -127,6 +139,9 @@ class Category(Base):
     color: Mapped[str] = mapped_column(String(7))  # hex, ej. "#30b0c7"
     type: Mapped[str] = mapped_column(String(10))  # expense | income
     active: Mapped[bool] = mapped_column(default=True)
+    # Tombstones retain private transaction references after a peer deletes the
+    # shared category, without exposing it again in category management.
+    deleted: Mapped[bool] = mapped_column(default=False)
 
     household: Mapped[Household] = relationship(back_populates="categories")
 
@@ -135,10 +150,13 @@ class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (
         Index("ix_transactions_household_date", "household_id", "date"),
+        UniqueConstraint("household_id", "client_id", name="uq_transactions_household_client_id"),
     )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    # Device-generated UUID used to make offline creation retries idempotent.
+    client_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     type: Mapped[str] = mapped_column(String(10))  # expense | income
     amount: Mapped[float] = mapped_column(Numeric(19, 4))
     category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"))
@@ -218,3 +236,26 @@ class Budget(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     __table_args__ = (UniqueConstraint("household_id", "category_id"),)
+
+
+class SavingsGoal(Base):
+    """A manual household savings target. Contributions do not create transactions."""
+
+    __tablename__ = "savings_goals"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    target_amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    current_amount: Mapped[float] = mapped_column(Numeric(19, 4), default=0)
+    target_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    account_id: Mapped[str | None] = mapped_column(
+        ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    icon: Mapped[str] = mapped_column(String(60), default="piggy-bank")
+    color: Mapped[str] = mapped_column(String(7), default="#30b0c7")
+    archived: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )

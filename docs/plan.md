@@ -16,7 +16,7 @@ Self-hosted, but with a multi-tenant schema ready to grow into a multi-family pr
 |---|---|
 | Core problem | Expense/income tracking (the foundation; budgets/goals come later) |
 | Family model | Individual accounts per person + joining a **household** via invitation links |
-| Financial accounts | With balance (cash, debit, credit, savings), **all shared** by the household; each transaction records which member made it |
+| Financial accounts | With balance (cash, debit, credit, savings). Shared accounts belong to the household; personal accounts belong to one current household member and are visible and operable only by that member. Household balances, budgets, summaries, reports, and goals use shared accounts only; each transaction records which member made it |
 | Categories | Defaults with icon/color copied when the household is created; editable (rename, add, disable); **flat list** (no subcategories in MVP) |
 | Currency | **One per household**, chosen at creation; amounts in `NUMERIC(19,4)` |
 | Capture | **Manual only** in MVP; fast mobile form (<10 seconds): amount, category, account, date, optional note. **Plus:** AI receipt scanning (upload/take photo → extraction → editable review → save) |
