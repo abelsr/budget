@@ -23,7 +23,7 @@ def upgrade() -> None:
         sa.Column("household_id", sa.String(length=32), nullable=False),
         sa.Column("client_id", sa.String(length=36), nullable=True),
         sa.Column("created_by_id", sa.String(length=32), nullable=False),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=True),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(["created_by_id"], ["users.id"]),
         sa.ForeignKeyConstraint(["household_id"], ["households.id"]),
         sa.PrimaryKeyConstraint("id"),
