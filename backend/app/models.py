@@ -5,6 +5,8 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
+    Index,
     Numeric,
     String,
     Text,
@@ -22,24 +24,46 @@ def new_id() -> str:
 
 class Household(Base):
     __tablename__ = "households"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["owner_id", "id"],
+            ["users.id", "users.household_id"],
+            name="fk_households_owner_membership",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(120))
     currency_code: Mapped[str] = mapped_column(String(3), default="MXN")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Se guarda como columna, sin relación ORM, para evitar ambigüedad con
+    # User.household_id, que representa la membresía. NULL solo conserva un
+    # hogar legado sin miembros; los hogares nuevos siempre reciben propietario.
+    owner_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
-    members: Mapped[list["User"]] = relationship(back_populates="household")
+    members: Mapped[list["User"]] = relationship(
+        back_populates="household", foreign_keys="User.household_id"
+    )
     accounts: Mapped[list["Account"]] = relationship(back_populates="household")
     categories: Mapped[list["Category"]] = relationship(back_populates="household")
 
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("id", "household_id", name="uq_users_id_household_id"),)
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(120))
+    sex: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    avatar_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    avatar_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
     household_id: Mapped[str | None] = mapped_column(
         ForeignKey("households.id"), nullable=True
     )
@@ -51,7 +75,9 @@ class User(Base):
         DateTime, nullable=True
     )
 
-    household: Mapped[Household | None] = relationship(back_populates="members")
+    household: Mapped[Household | None] = relationship(
+        back_populates="members", foreign_keys=[household_id]
+    )
 
 
 class Invitation(Base):
@@ -107,6 +133,9 @@ class Category(Base):
 
 class Transaction(Base):
     __tablename__ = "transactions"
+    __table_args__ = (
+        Index("ix_transactions_household_date", "household_id", "date"),
+    )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
@@ -114,6 +143,7 @@ class Transaction(Base):
     amount: Mapped[float] = mapped_column(Numeric(19, 4))
     category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"))
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
+    # Nombre histórico de API/DB: es el autor inmutable autenticado del movimiento.
     member_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     date: Mapped[date] = mapped_column(Date, index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -126,6 +156,8 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     attachments: Mapped[list["Attachment"]] = relationship(lazy="selectin")
+    # La autoría no depende de que la persona siga perteneciendo al hogar.
+    author: Mapped[User] = relationship(foreign_keys=[member_id], lazy="selectin")
 
 
 class Attachment(Base):

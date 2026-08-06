@@ -6,14 +6,21 @@
 This is a **family** finance app, but today there's no way to add members from the UI: the "Invite member" button in Settings is disabled with the text "Coming soon". However the API (`POST /households/me/invitations`) and the join screen (`/login?invite=TOKEN`) already exist and work. All that's missing is connecting the dots on the frontend.
 
 ## Scope
+> **Superseded administration policy (2026-08-05):** invitations and membership
+> administration are now owner-only. The owner can create, list, and revoke
+> active invitations and can remove another member; all active members can view
+> the member directory. The historical scope below describes the original
+> invitation-link delivery work.
+
 **Includes:**
 - Enable the "Invite member" button in Settings > Household
 - Show the full invitation link with copy and share buttons
 - Indicate the link's expiration (7 days)
 
 **Doesn't include:**
-- Revoking active invitations
-- Roles/permissions per member (everyone is equal today)
+- Revoking active invitations *(at the time; superseded by the owner policy above)*
+- Roles/permissions per member *(at the time, everyone was equal; superseded by
+  the owner policy above)*
 - Sending the link by email (self-hosted without SMTP; the user shares the link through their own channel)
 
 ## Proposed design
@@ -65,6 +72,28 @@ Settings, and a clear error when reusing the link.
 
 **Note:** in step 05 this content was extracted into `frontend/src/components/InviteLink.tsx`
 to reuse it in the wizard; `InviteSheet` now just wraps it in the drawer.
+
+## Implementation and verification (2026-08-05)
+
+- **Endpoints and policy:** `GET /households/me/members` is available to every
+  active household member as a read-only directory. Only the owner may use
+  `POST`/`GET /households/me/invitations`, `DELETE
+  /households/me/invitations/{invitation_id}`, and `DELETE
+  /households/me/members/{member_id}`. The owner cannot remove themself.
+- **UI:** Settings exposes a Household Members drawer to all active members.
+  It shows the directory to everyone and shows invitation creation, active
+  invitation listing/revocation, and removal controls only to the owner.
+- **Invitation lifecycle:** creation, listing, consumption, and revocation
+  apply the active-invitation rules (unused and unexpired); consumption and
+  revocation serialize their state transition by locking the invitation row.
+- **Removal and history:** removing a member detaches their household
+  membership without changing the transaction author, so historical records
+  retain their attribution.
+- **Verification:** backend coverage verifies the owner-only API policy,
+  directory access, self-removal rejection, invitation lifecycle lock intent
+  and state transitions, and retained transaction attribution after removal.
+  Real concurrent PostgreSQL behavior remains CI/deployment verification
+  pending.
 
 ## Notes
 - Registration via invitation already exists on the login screen ("Join" mode reading `?invite=TOKEN`); this task is mostly UI.

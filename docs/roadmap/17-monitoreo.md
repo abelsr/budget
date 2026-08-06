@@ -1,6 +1,6 @@
 # 📡 Monitoring and alerts
 
-**Status:** ⬜ Pending · **Priority:** Low · **Effort:** S (<1 day) · **Dependencies:** 15-https-caddy (only if monitoring is external, like Better Stack; local Uptime Kuma doesn't need it)
+**Status:** ⬜ Pending · **Priority:** Low · **Effort:** S (<1 day) · **Dependencies:** None; external monitoring needs a publicly reachable TLS endpoint
 
 ## Why
 This is a self-hosted system used by real people: if the backend dies on a Friday, nobody finds out until someone tries to log an expense. Also, attachments grow in the MinIO volume with no apparent limit, and a full disk brings Postgres down. A minimum of structured logs and two alerts (downtime, disk) covers 90% of the likely disasters.
@@ -31,7 +31,7 @@ This is a self-hosted system used by real people: if the backend dies on a Frida
 
 ### Infra
 - **Recommended option:** an `uptime-kuma` service in the same compose (image `louislam/uptime-kuma`), HTTP monitor against `http://backend:8000/health` every 60s, notification via Telegram/Discord/email (Kuma supports all of these without needing to configure your own SMTP)
-- **External option:** Better Stack free tier pointing at `https://finanzas.dominio.com/health` (requires 15); useful because it alerts even if the whole host dies, not just the backend
+- **External option:** Better Stack free tier pointing at a public `https://…/health` endpoint; useful because it alerts even if the whole host dies, not just the backend
 - Disk alert: a cron script on the host (`df /` + webhook to Telegram/ntfy), since Uptime Kuma itself doesn't cover this — the script is simple and sufficient
 - Document in the README: where to view the Kuma dashboard (port 3001, ideally LAN-only or behind Tailscale) and what to do when each alert arrives
 

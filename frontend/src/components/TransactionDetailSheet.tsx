@@ -135,6 +135,7 @@ function ViewMode({
   const deleteTransaction = useDeleteTransaction()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const isIncome = transaction.type === "income"
+  const authorName = transaction.authorName ?? member?.name
 
   function remove() {
     deleteTransaction.mutate(transaction.id, {
@@ -194,7 +195,7 @@ function ViewMode({
           label="Fecha"
           value={longDateFmt.format(new Date(transaction.date + "T12:00:00"))}
         />
-        <DetailRow label="Miembro" value={member?.name ?? "—"} />
+        <DetailRow label="Miembro" value={authorName ?? "—"} />
       </div>
 
       {/* Comprobantes */}

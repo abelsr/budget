@@ -23,13 +23,16 @@ def make_headers(user: User) -> dict[str, str]:
 @pytest.fixture(name="world")
 def world_fixture(session):
     """Dos hogares, cada uno con cuenta + categoría de gasto + de ingreso."""
-    h1 = Household(name="Hogar Uno")
-    h2 = Household(name="Hogar Dos")
-    session.add_all([h1, h2])
-    session.commit()
-    u1 = User(email="uno@example.com", hashed_password="x", name="Uno", household_id=h1.id)
-    u2 = User(email="dos@example.com", hashed_password="x", name="Dos", household_id=h2.id)
+    u1 = User(email="uno@example.com", hashed_password="x", name="Uno")
+    u2 = User(email="dos@example.com", hashed_password="x", name="Dos")
     session.add_all([u1, u2])
+    session.flush()
+    h1 = Household(name="Hogar Uno", owner_id=u1.id)
+    h2 = Household(name="Hogar Dos", owner_id=u2.id)
+    session.add_all([h1, h2])
+    session.flush()
+    u1.household_id = h1.id
+    u2.household_id = h2.id
     session.commit()
     a1 = Account(household_id=h1.id, name="Débito", kind="debit", opening_balance=0)
     a2 = Account(household_id=h2.id, name="Débito", kind="debit", opening_balance=0)

@@ -9,8 +9,8 @@ the moment it is approved.
 
 **Context.** The current roadmap (see `docs/roadmap/README.md`) already covers
 PWA (03), CSV import (08), filters/search (09), profile/password (10), savings
-goals (11), personal accounts (12), offline-first (13), multi-family (14),
-HTTPS (15), and monitoring (17). The proposals below fill gaps that are
+goals (11), personal accounts (12), offline-first (13), multi-family (14), and
+monitoring (17). The proposals below fill gaps that are
 **not** in that roadmap, plus the UI/UX batch the user asked about.
 
 ---

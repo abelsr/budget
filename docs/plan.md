@@ -1,7 +1,7 @@
 # Plan: Family Finance App
 
 > Living document with agreed-upon design and architecture decisions.
-> Last updated: 2026-07-25
+> Last updated: 2026-08-04
 
 ## Vision
 
@@ -34,7 +34,7 @@ Self-hosted, but with a multi-tenant schema ready to grow into a multi-family pr
 | AI | **OpenRouter** (async OpenAI SDK) for the receipt scanner; configurable model, default `google/gemini-3.6-flash` |
 | Frontend | **React + Vite** (TypeScript), Tailwind CSS + shadcn/ui, TanStack Query, Recharts, Motion (springs) |
 | Platform | **Responsive web / PWA** (a single codebase for mobile and desktop) |
-| Deployment | **Docker Compose**: nginx (static build) + FastAPI + PostgreSQL + MinIO; HTTPS with Caddy/reverse proxy (pending) |
+| Deployment | **Docker Compose**: nginx (static build) + FastAPI + PostgreSQL + MinIO |
 | Quality | pytest for the backend (78 tests + 9 migration tests against Postgres); frontend validated with typecheck and build; CI on GitHub Actions |
 
 ## Design language (frontend)
@@ -60,15 +60,11 @@ screen, semantic green/red reserved for money flow). Interaction follows the
 
 1. **MVP:** auth + households + accounts + categories + transactions + dashboard. ✅ **DONE** (+ AI scanner, attachments, dark mode)
 2. **Robustness:** migrations, invitations from the UI, onboarding, PWA, backups. 🚧 **In progress** — Alembic, invitations, onboarding, and backups done; PWA pending
-3. **Phase 2:** recurrence, CSV import, monthly budgets. 🚧 **In progress** — recurrence and budgets done; CSV, filters, and profile pending
+3. **Phase 2:** recurrence, CSV import, monthly budgets. 🚧 **In progress** — recurrence, budgets, filters, and profile done; CSV pending
 4. **Phase 3:** savings goals, personal accounts (privacy between members), offline-first with sync, multi-family opening. ⬜
 
-**Concrete next step:** HTTPS with Caddy
-([15](roadmap/15-https-caddy.md)), still blocked on installing Tailscale on the
-host (path already chosen). While that stays pending, the unblocked short items
-are filters and search ([09](roadmap/09-filtros-busqueda.md)) and profile and
-password change ([10](roadmap/10-perfil-y-password.md)). Details and log in
-[docs/roadmap/](roadmap/README.md).
+**Concrete next step:** [installable PWA](roadmap/03-pwa-instalable.md).
+Details and log in [docs/roadmap/](roadmap/README.md).
 
 ## Repo structure
 
@@ -86,7 +82,8 @@ budget/
 ## Current status (2026-07-24)
 
 **Repo published on GitHub.** Full stack running on Docker Compose
-(frontend nginx :8081, backend :8000, Postgres 17, MinIO :9000/:9001) and
+(frontend nginx :8081, backend :8000, Postgres 17, MinIO S3 API internal on
+the Compose network, console localhost-only on :9001) and
 verified end-to-end, including access from a phone over the local IP.
 
 ### Progress — what's already built and verified
@@ -112,8 +109,15 @@ verified end-to-end, including access from a phone over the local IP.
 - ✅ **Dashboard:** total and per-account balance, income vs. expenses for the month,
   category donut chart, recent transactions; 2-column layout on desktop.
 - ✅ **Multi-member household:** strict isolation by `household_id`
-  (verified), members in sidebar/settings, and **invitations from the UI**
-  (Settings > Household → link with copy/share, valid 7 days, single use).
+  (verified). Each household has an owner; all active members can view the
+  directory, while only the owner can create, list, and revoke invitations or
+  remove other members. Detaching a member preserves the author attribution of
+   their historical transactions. Existing households are backfilled with an
+   owner, except legacy zero-member households, which can remain ownerless;
+   all newly created and active households have an owner. A composite database
+   invariant keeps the owner in their own
+  household. Invitations are managed from the UI (Settings > Household → link
+  with copy/share, valid 7 days, single use).
 - ✅ **Onboarding:** 4-step wizard after registering (welcome → accounts
   → invite family → done), with skip always available; those who join via
   invitation don't see it.
@@ -152,7 +156,8 @@ verified end-to-end, including access from a phone over the local IP.
 > Full details in **[docs/roadmap/](roadmap/README.md)** — one file per
 > pending item with why, scope, design, and acceptance criteria, plus the
 > log of what's already done. Closed: 01 (Alembic), 02 (invitations),
-> 04 (backups), 05 (onboarding), 06 (recurring), 07 (budgets), 16 (CI).
+> 04 (backups), 05 (onboarding), 06 (recurring), 07 (budgets), 09 (filters),
+> 10 (profile and password), 16 (CI).
 
 **Immediate (robustness):**
 
@@ -161,8 +166,8 @@ verified end-to-end, including access from a phone over the local IP.
 **Phase 2 (features):**
 
 - ⬜ [CSV import](roadmap/08-importacion-csv.md) of account statements.
-- ⬜ [Filters and search](roadmap/09-filtros-busqueda.md) in Transactions.
-- ⬜ [Profile and password change](roadmap/10-perfil-y-password.md).
+- ✅ [Filters and search](roadmap/09-filtros-busqueda.md) in Transactions (2026-08-04).
+- ✅ [Profile and password change](roadmap/10-perfil-y-password.md) (2026-08-04).
 
 **Phase 3 (growth):**
 
@@ -173,8 +178,5 @@ verified end-to-end, including access from a phone over the local IP.
 
 **Production:**
 
-- ⬜ [HTTPS with Caddy](roadmap/15-https-caddy.md) + custom domain. **Next.**
-  Also enables `navigator.clipboard` on mobile (today the invitation link
-  uses the `execCommand` fallback because HTTP over IP is not a secure context).
 - ✅ [CI with GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build + **migrations against a real Postgres** on every push and PR, passing (2026-07-24). Strict branch protection on `main` since 2026-07-25: the 4 checks are required (including for the owner), so changes now go through branch + PR.
 - ⬜ [Monitoring](roadmap/17-monitoreo.md): JSON logs, downtime and disk alerts.

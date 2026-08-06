@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom"
+import { Link, NavLink, Outlet } from "react-router-dom"
 import {
   ArrowLeftRight,
   Bell,
@@ -18,6 +18,7 @@ import { useHousehold, useMembers } from "@/lib/queries"
 import { useAuth } from "@/lib/auth"
 import { AddTransactionButton } from "@/components/AddTransactionSheet"
 import { BrandMark } from "@/components/BrandMark"
+import { ProfileAvatar } from "@/components/ProfileAvatar"
 
 type NavigationItem = {
   label: string
@@ -57,12 +58,6 @@ export function AppShell() {
     : (household?.name ?? "…")
   const profileName = session?.name ?? members[0]?.name ?? "Mi perfil"
   const profileEmail = session?.email ?? ""
-  const profileInitials = profileName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("")
   return (
     <div className="min-h-dvh">
       {/* Sidebar (desktop) */}
@@ -123,17 +118,15 @@ export function AppShell() {
             <span className="min-w-0 flex-1 truncate">{householdName}</span>
             <ChevronsUpDown size={14} className="text-muted-foreground" aria-hidden="true" />
           </div>
-          <div className="mt-5 flex items-center gap-2 px-2">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-semibold text-secondary-foreground">
-              {profileInitials}
-            </span>
+          <Link to="/app/ajustes" className="pressable mt-5 flex items-center gap-2 rounded-md px-2 py-1" aria-label="Abrir ajustes de mi cuenta">
+            <ProfileAvatar name={profileName} hasAvatar={session?.hasAvatar ?? false} avatarUpdatedAt={session?.avatarUpdatedAt ?? null} className="size-7 shrink-0 rounded-full bg-secondary text-[10px] font-semibold text-secondary-foreground" />
             <div className="min-w-0">
               <p className="truncate text-[11px] font-medium">{profileName}</p>
               {profileEmail && (
                 <p className="truncate text-[10px] text-muted-foreground">{profileEmail}</p>
               )}
             </div>
-          </div>
+          </Link>
         </div>
       </aside>
 

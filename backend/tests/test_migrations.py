@@ -20,6 +20,7 @@ from collections.abc import Iterator
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 
 from alembic import command
 from alembic.script import ScriptDirectory
@@ -114,10 +115,22 @@ def _seed_household_and_user(database_url: str, email: str = "ana@example.com") 
             )
             connection.execute(
                 text(
-                    "INSERT INTO users (id, email, hashed_password, name, household_id) "
-                    "VALUES ('u1', :email, 'hash', 'Ana', 'h1')"
+                    "INSERT INTO households (id, name, currency_code) "
+                    "VALUES ('h_orphan', 'Casa Vacía', 'MXN')"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO users (id, email, hashed_password, name, household_id, created_at) "
+                    "VALUES ('u1', :email, 'hash', 'Ana', 'h1', '2000-01-01')"
                 ),
                 {"email": email},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO users (id, email, hashed_password, name, household_id, created_at) "
+                    "VALUES ('u2', 'luis@example.com', 'hash', 'Luis', 'h1', '2100-01-01')"
+                )
             )
     finally:
         engine.dispose()
@@ -205,9 +218,22 @@ def test_los_datos_sobreviven_a_las_migraciones(database_url: str) -> None:
 
     command.upgrade(config, "head")
 
-    assert _scalar(database_url, "SELECT count(*) FROM users") == 1
+    assert _scalar(database_url, "SELECT count(*) FROM users") == 2
     assert _scalar(database_url, "SELECT name FROM users WHERE id = 'u1'") == "Ana"
-    assert _scalar(database_url, "SELECT count(*) FROM households") == 1
+    assert _scalar(database_url, "SELECT count(*) FROM households") == 2
+    assert _scalar(database_url, "SELECT owner_id FROM households WHERE id = 'h1'") == "u1"
+    assert _scalar(
+        database_url, "SELECT owner_id FROM households WHERE id = 'h_orphan'"
+    ) is None
+    engine = create_engine(database_url)
+    try:
+        with pytest.raises(IntegrityError):
+            with engine.begin() as connection:
+                connection.execute(
+                    text("UPDATE households SET owner_id = 'u2' WHERE id = 'h_orphan'")
+                )
+    finally:
+        engine.dispose()
     # La migración del onboarding marca a los usuarios que ya existían: si no,
     # verían un wizard que no les toca.
     assert _scalar(

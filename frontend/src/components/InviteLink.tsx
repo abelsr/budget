@@ -5,6 +5,7 @@ import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { ApiError } from "@/lib/api"
 import { copyText } from "@/lib/clipboard"
+import { formatUtcDateTime } from "@/lib/datetime"
 import { useCreateInvitation, type Invitation } from "@/lib/queries"
 import { springAppear } from "@/lib/springs"
 
@@ -57,7 +58,7 @@ export function InviteLink({ autoGenerate = false, onGenerated }: InviteLinkProp
     ? new URL(invitation.inviteUrl, window.location.origin).toString()
     : null
   const expiresLabel = invitation
-    ? expiryFmt.format(new Date(invitation.expiresAt))
+    ? formatUtcDateTime(invitation.expiresAt, expiryFmt)
     : null
 
   const errorMessage =
@@ -108,7 +109,7 @@ export function InviteLink({ autoGenerate = false, onGenerated }: InviteLinkProp
   return (
     <div className="flex flex-col gap-4">
       {errorMessage ? (
-        <p className="rounded-xl bg-expense/10 px-3 py-2 text-center text-[13px] text-expense">
+        <p role="alert" aria-live="assertive" className="rounded-xl bg-expense/10 px-3 py-2 text-center text-[13px] text-expense">
           {errorMessage}
         </p>
       ) : !inviteLink ? (
@@ -137,7 +138,7 @@ export function InviteLink({ autoGenerate = false, onGenerated }: InviteLinkProp
       )}
 
       {copyFailed && (
-        <p className="rounded-xl bg-expense/10 px-3 py-2 text-center text-[13px] text-expense">
+        <p role="alert" aria-live="assertive" className="rounded-xl bg-expense/10 px-3 py-2 text-center text-[13px] text-expense">
           No se pudo copiar automáticamente. Selecciona el link y cópialo a mano.
         </p>
       )}

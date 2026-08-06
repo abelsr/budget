@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch, getToken, setToken } from "@/lib/api"
 
@@ -26,6 +27,18 @@ export interface Session {
   householdId: string | null
   /** false → el wizard de `/onboarding` está pendiente. */
   onboardingCompleted: boolean
+  sex: Sex | null
+  birthDate: string | null
+  hasAvatar: boolean
+  avatarUpdatedAt: string | null
+}
+
+export type Sex = "female" | "male" | "non_binary" | "prefer_not_to_say"
+
+export interface ProfileUpdate {
+  name?: string
+  sex?: Sex | null
+  birthDate?: string | null
 }
 
 interface TokenResponse {
@@ -52,6 +65,10 @@ interface AuthContextValue {
   ) => Promise<void>
   /** Marca el wizard inicial como terminado (o saltado). */
   completeOnboarding: () => Promise<void>
+  updateProfile: (profile: ProfileUpdate) => Promise<void>
+  uploadAvatar: (file: File) => Promise<void>
+  removeAvatar: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
   logout: () => void
 }
 
@@ -62,6 +79,7 @@ function fetchMe(): Promise<Session> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient()
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -91,19 +109,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Guarda el token del endpoint y luego hidrata la sesión con /auth/me. */
   const authenticate = useCallback(
-    async (tokenRequest: Promise<TokenResponse>) => {
-      const { accessToken } = await tokenRequest
+    async (tokenRequest: () => Promise<TokenResponse>) => {
+      // Never expose the previous account's cached data under a new token.
+      await queryClient.cancelQueries()
+      queryClient.clear()
+      const { accessToken } = await tokenRequest()
       setToken(accessToken)
       const me = await fetchMe()
       setSession(me)
     },
-    [],
+    [queryClient],
   )
 
   const login = useCallback(
     (email: string, password: string) =>
       authenticate(
-        apiFetch<TokenResponse>("/auth/login", {
+        () => apiFetch<TokenResponse>("/auth/login", {
           method: "POST",
           body: JSON.stringify({ email, password }),
         }),
@@ -114,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     (email: string, password: string, name: string, householdName: string) =>
       authenticate(
-        apiFetch<TokenResponse>("/auth/register", {
+        () => apiFetch<TokenResponse>("/auth/register", {
           method: "POST",
           body: JSON.stringify({ email, password, name, householdName }),
         }),
@@ -125,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const join = useCallback(
     (inviteToken: string, email: string, password: string, name: string) =>
       authenticate(
-        apiFetch<TokenResponse>("/auth/join", {
+        () => apiFetch<TokenResponse>("/auth/join", {
           method: "POST",
           body: JSON.stringify({
             token: inviteToken,
@@ -146,10 +167,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(me)
   }, [])
 
+  const updateProfile = useCallback(async (profile: ProfileUpdate) => {
+    const me = await apiFetch<Session>("/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(profile),
+    })
+    setSession(me)
+  }, [])
+
+  const uploadAvatar = useCallback(async (file: File) => {
+    const formData = new FormData()
+    formData.append("file", file)
+    const me = await apiFetch<Session>("/auth/me/avatar", {
+      method: "POST",
+      body: formData,
+    })
+    setSession(me)
+  }, [])
+
+  const removeAvatar = useCallback(async () => {
+    await apiFetch<void>("/auth/me/avatar", { method: "DELETE" })
+    setSession((current) =>
+      current ? { ...current, hasAvatar: false, avatarUpdatedAt: null } : null,
+    )
+  }, [])
+
+  const changePassword = useCallback(
+    (currentPassword: string, newPassword: string) =>
+      apiFetch<void>("/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+        clearTokenOnUnauthorized: false,
+      }),
+    [],
+  )
+
   const logout = useCallback(() => {
+    void queryClient.cancelQueries()
+    queryClient.clear()
     setToken(null)
     setSession(null)
-  }, [])
+  }, [queryClient])
 
   return (
     <AuthContext.Provider
@@ -160,6 +218,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         join,
         completeOnboarding,
+        updateProfile,
+        uploadAvatar,
+        removeAvatar,
+        changePassword,
         logout,
       }}
     >
