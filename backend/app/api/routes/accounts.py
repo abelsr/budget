@@ -51,10 +51,10 @@ def list_accounts(db: DbDep, user: CurrentUserDep) -> list[AccountOut]:
         .order_by(Account.created_at, Account.id)
     ).all()
     totals = db.execute(
-        select(Transaction.account_id, Transaction.type, func.sum(Transaction.amount))
+        select(Transaction.account_id, func.coalesce(Transaction.transfer_direction, Transaction.type), func.sum(Transaction.amount))
         .join(Account, Account.id == Transaction.account_id)
         .where(Transaction.household_id == household_id, visible_accounts(user.id))
-        .group_by(Transaction.account_id, Transaction.type)
+        .group_by(Transaction.account_id, func.coalesce(Transaction.transfer_direction, Transaction.type))
     ).all()
     agg: dict[str, dict[str, float]] = {}
     for account_id, tx_type, total in totals:
@@ -65,7 +65,9 @@ def list_accounts(db: DbDep, user: CurrentUserDep) -> list[AccountOut]:
         balance = (
             float(account.opening_balance)
             + sums.get("income", 0.0)
+            + sums.get("inflow", 0.0)
             - sums.get("expense", 0.0)
+            - sums.get("outflow", 0.0)
         )
         result.append(_account_out(account, balance))
     return result
@@ -128,13 +130,17 @@ def update_account(
     db.commit()
     db.refresh(account)
     totals = db.execute(
-        select(Transaction.type, func.sum(Transaction.amount))
+        select(func.coalesce(Transaction.transfer_direction, Transaction.type), func.sum(Transaction.amount))
         .where(Transaction.account_id == account.id)
-        .group_by(Transaction.type)
+        .group_by(func.coalesce(Transaction.transfer_direction, Transaction.type))
     ).all()
     sums = {tx_type: float(total or 0) for tx_type, total in totals}
     balance = (
-        float(account.opening_balance) + sums.get("income", 0.0) - sums.get("expense", 0.0)
+        float(account.opening_balance)
+        + sums.get("income", 0.0)
+        + sums.get("inflow", 0.0)
+        - sums.get("expense", 0.0)
+        - sums.get("outflow", 0.0)
     )
     return _account_out(account, balance)
 

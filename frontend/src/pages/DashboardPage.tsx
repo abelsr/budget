@@ -157,7 +157,7 @@ function Stat({ label, amount, tone, concealed }: { label: string; amount: numbe
 
 function dailyFlow(transactions: Transaction[]) {
   const now = new Date(); const year = now.getFullYear(); const month = now.getMonth(); const days = new Map<number, { income: number; expense: number }>()
-  for (const transaction of transactions) { const date = new Date(`${transaction.date}T12:00:00`); if (date.getFullYear() !== year || date.getMonth() !== month) continue; const row = days.get(date.getDate()) ?? { income: 0, expense: 0 }; row[transaction.type] += transaction.amount; days.set(date.getDate(), row) }
+  for (const transaction of transactions) { if (transaction.type === "transfer") continue; const date = new Date(`${transaction.date}T12:00:00`); if (date.getFullYear() !== year || date.getMonth() !== month) continue; const row = days.get(date.getDate()) ?? { income: 0, expense: 0 }; row[transaction.type] += transaction.amount; days.set(date.getDate(), row) }
   return [...days.entries()].sort(([a], [b]) => a - b).map(([day, amounts]) => ({ label: String(day), ...amounts }))
 }
 

@@ -76,6 +76,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   const [amountText, setAmountText] = useState("")
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [accountId, setAccountId] = useState<string | null>(null)
+  const [destinationAccountId, setDestinationAccountId] = useState<string | null>(null)
   const [date, setDate] = useState(() => toISODate(new Date()))
   const [note, setNote] = useState("")
   const [repeat, setRepeat] = useState<Frequency | null>(null)
@@ -90,23 +91,19 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   const effectiveAccountId = accountId ?? accounts.find((a) => a.kind === "debit")?.id ?? accounts[0]?.id
   const selectedCategory = visibleCategories.find((c) => c.id === categoryId)
   const selectedAccount = accounts.find((a) => a.id === effectiveAccountId)
-  const canSave = amount > 0 && categoryId !== null && effectiveAccountId && date
+  const effectiveDestinationAccountId = destinationAccountId ?? accounts.find((a) => a.id !== effectiveAccountId)?.id
+  const canSave = amount > 0 && effectiveAccountId && date && (type === "transfer"
+    ? Boolean(effectiveDestinationAccountId && effectiveDestinationAccountId !== effectiveAccountId)
+    : categoryId !== null)
   const isSaving = addTransaction.isPending || uploadAttachment.isPending
 
   function save() {
-    if (!canSave || !categoryId || !effectiveAccountId) return
+    if (!canSave || !effectiveAccountId) return
+    const payload = type === "transfer"
+      ? { type, amount, sourceAccountId: effectiveAccountId, destinationAccountId: effectiveDestinationAccountId!, date, note: note.trim() || undefined, offlineEligible: true }
+      : { type, amount, categoryId: categoryId!, accountId: effectiveAccountId, date, note: note.trim() || undefined, repeat: repeat ?? undefined, offlineEligible: !file }
     addTransaction.mutate(
-      {
-        type,
-        amount,
-        categoryId,
-        accountId: effectiveAccountId,
-        date,
-        note: note.trim() || undefined,
-        repeat: repeat ?? undefined,
-        // Attachments and recurring rules are deliberately online-only.
-        offlineEligible: !file,
-      },
+      payload,
       {
         onSuccess: (created) => {
           if (file) {
@@ -157,14 +154,15 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
         }}
       >
         <div className="flex flex-col gap-5 px-5 pt-4 pb-5">
-          <div className="grid grid-cols-2 rounded-lg border border-border bg-secondary p-0.5" role="group" aria-label="Tipo de movimiento">
-          {(["expense", "income"] as const).map((t) => (
+          <div className="grid grid-cols-3 rounded-lg border border-border bg-secondary p-0.5" role="group" aria-label="Tipo de movimiento">
+          {(["expense", "income", "transfer"] as const).map((t) => (
             <button
               type="button"
               key={t}
               onClick={() => {
                 setType(t)
                 setCategoryId(null)
+                if (t === "transfer") setDestinationAccountId((current) => current ?? accounts.find((a) => a.id !== effectiveAccountId)?.id ?? null)
               }}
               aria-pressed={type === t}
               className="relative rounded-md py-2 text-[13px] font-medium"
@@ -181,7 +179,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
                   type === t ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
-                {t === "expense" ? "Gasto" : "Ingreso"}
+                {t === "expense" ? "Gasto" : t === "income" ? "Ingreso" : "Transferir"}
               </span>
             </button>
           ))}
@@ -200,7 +198,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          <div className="space-y-2">
+          {type !== "transfer" && <div className="space-y-2">
             <label htmlFor="transaction-category" className="block text-[12px] font-semibold text-muted-foreground">
               Categoría
             </label>
@@ -232,11 +230,11 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
                 className="pointer-events-none absolute right-3 text-muted-foreground"
               />
             </div>
-          </div>
+          </div>}
 
           <div className="space-y-2">
             <label htmlFor="transaction-account" className="block text-[12px] font-semibold text-muted-foreground">
-              Cuenta
+               {type === "transfer" ? "Desde cuenta" : "Cuenta"}
             </label>
             <div className="relative flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[12px] font-semibold text-primary">
@@ -260,6 +258,18 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
               />
             </div>
           </div>
+
+          {type === "transfer" && <div className="space-y-2">
+            <label htmlFor="transaction-destination-account" className="block text-[12px] font-semibold text-muted-foreground">A cuenta</label>
+            <div className="relative flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[12px] font-semibold text-primary">→</span>
+              <select id="transaction-destination-account" value={effectiveDestinationAccountId ?? ""} onChange={(e) => setDestinationAccountId(e.target.value || null)} className="min-w-0 flex-1 appearance-none rounded-sm bg-transparent pr-7 text-[14px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card">
+                <option value="">Selecciona una cuenta destino</option>
+                {accounts.filter((account) => account.id !== effectiveAccountId).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+              </select>
+              <ChevronDown size={16} aria-hidden="true" className="pointer-events-none absolute right-3 text-muted-foreground" />
+            </div>
+          </div>}
 
           <div className="space-y-2">
             <label htmlFor="transaction-date" className="block text-[12px] font-semibold text-muted-foreground">Fecha</label>
@@ -287,7 +297,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          <details className="rounded-xl border border-border bg-secondary/40 px-3">
+          {type !== "transfer" && <details className="rounded-xl border border-border bg-secondary/40 px-3">
             <summary className="flex h-11 cursor-pointer list-none items-center gap-2 text-[13px] font-medium text-muted-foreground">
               <Repeat size={15} aria-hidden="true" />
               Opciones adicionales
@@ -362,7 +372,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
                 )}
               </div>
             </div>
-          </details>
+          </details>}
         </div>
 
         <div className="sticky bottom-0 mt-auto border-t border-border bg-popover px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">

@@ -11,6 +11,7 @@ import type {
   Household,
   Member,
   NewTransaction,
+  NewTransfer,
   RecurringRule,
   SavingsGoal,
   Transaction,
@@ -54,6 +55,7 @@ export interface TransactionFilters {
   accountId?: string
   memberId?: string
   type?: Transaction["type"]
+  includeTransfers?: boolean
   from?: string
   to?: string
 }
@@ -121,7 +123,7 @@ export function useMembers() {
 export function useTransactions(filters: TransactionFilters = {}) {
   const search = new URLSearchParams({ limit: "200" })
   for (const [key, value] of Object.entries(filters)) {
-    if (value) search.set(key, value)
+    if (value) search.set(key, String(value))
   }
   const query = useQuery({
     queryKey: [...keys.transactions, filters],
@@ -197,17 +199,17 @@ export function useAddTransaction() {
   const queryClient = useQueryClient()
   const { queue } = useOffline()
   return useMutation({
-    mutationFn: async (input: NewTransaction & { offlineEligible?: boolean }) => {
+    mutationFn: async (input: (NewTransaction | NewTransfer) & { offlineEligible?: boolean }) => {
       const { offlineEligible = true, ...payload } = input
       const offlinePayload = { ...payload, clientId: crypto.randomUUID() }
-      if (!payload.repeat && offlineEligible && !navigator.onLine) return queue(offlinePayload)
+      if (!("repeat" in payload && payload.repeat) && offlineEligible && !navigator.onLine) return queue(offlinePayload)
       try {
         return await apiFetch<Transaction>("/transactions", {
           method: "POST",
           body: JSON.stringify(offlinePayload),
         })
       } catch (error) {
-        if (!payload.repeat && offlineEligible && !(error instanceof ApiError)) return queue(offlinePayload)
+        if (!("repeat" in payload && payload.repeat) && offlineEligible && !(error instanceof ApiError)) return queue(offlinePayload)
         throw error
       }
     },
@@ -331,7 +333,7 @@ export function useUpdateTransaction() {
     keys.budgetsStatus,
   )
   return useMutation({
-    mutationFn: ({ id, ...input }: Partial<NewTransaction> & { id: string }) =>
+    mutationFn: ({ id, ...input }: { id: string } & Record<string, unknown>) =>
       apiFetch<Transaction>(`/transactions/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
     onSuccess: invalidate,
   })

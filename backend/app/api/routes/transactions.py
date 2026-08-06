@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Account, Category, RecurringRule, Transaction, User
+from app.models import Account, Category, RecurringRule, Transaction, TransferGroup, User
 from app.schemas.transactions import (
     TransactionCreate,
     TransactionOut,
@@ -47,7 +47,21 @@ def _validate_refs(db, household_id: str, user_id: str, category_id: str, accoun
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
 
-def _tx_out(tx: Transaction) -> TransactionOut:
+def _tx_out(tx: Transaction, db=None, user_id: str | None = None) -> TransactionOut:
+    counterparty = None
+    if tx.transfer_group_id and db is not None and user_id is not None:
+        counterparty = db.scalar(
+            select(Transaction)
+            .where(
+                Transaction.transfer_group_id == tx.transfer_group_id,
+                Transaction.id != tx.id,
+            )
+            .limit(1)
+        )
+        if counterparty is not None:
+            account = db.get(Account, counterparty.account_id)
+            if account is None or not can_operate(account, user_id):
+                counterparty = None
     return TransactionOut(
         id=tx.id,
         household_id=tx.household_id,
@@ -62,6 +76,10 @@ def _tx_out(tx: Transaction) -> TransactionOut:
         note=tx.note,
         recurring_rule_id=tx.recurring_rule_id,
         attachments=tx.attachments,
+        transfer_group_id=tx.transfer_group_id,
+        transfer_direction=tx.transfer_direction,
+        counterparty_account_id=counterparty.account_id if counterparty else None,
+        counterparty_account_name=(db.get(Account, counterparty.account_id).name if counterparty else None),
     )
 
 
@@ -93,6 +111,49 @@ def _assert_replay_access(tx: Transaction, household_id: str, user_id: str, db) 
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
 
+def _validate_transfer_accounts(db, household_id: str, user_id: str, source_id: str, destination_id: str) -> tuple[Account, Account]:
+    source = db.get(Account, source_id)
+    destination = db.get(Account, destination_id)
+    if (
+        source is None
+        or destination is None
+        or source.household_id != household_id
+        or destination.household_id != household_id
+        or not can_operate(source, user_id)
+        or not can_operate(destination, user_id)
+    ):
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+    if source.id == destination.id:
+        raise HTTPException(status_code=422, detail="La cuenta origen y destino deben ser distintas")
+    return source, destination
+
+
+def _transfer_rows(db, group_id: str) -> list[Transaction]:
+    rows = db.scalars(select(Transaction).where(Transaction.transfer_group_id == group_id)).all()
+    if len(rows) != 2 or {row.transfer_direction for row in rows} != {"outflow", "inflow"}:
+        raise HTTPException(status_code=409, detail="La transferencia está incompleta")
+    if _money(rows[0].amount) != _money(rows[1].amount) or rows[0].account_id == rows[1].account_id:
+        raise HTTPException(status_code=409, detail="La transferencia es inválida")
+    return rows
+
+
+def _same_transfer_payload(rows: list[Transaction], payload: TransactionCreate) -> bool:
+    source = next(row for row in rows if row.transfer_direction == "outflow")
+    destination = next(row for row in rows if row.transfer_direction == "inflow")
+    return (
+        _money(source.amount) == _money(payload.amount)
+        and source.account_id == payload.source_account_id
+        and destination.account_id == payload.destination_account_id
+        and source.date == payload.date
+        and source.note == payload.note
+    )
+
+
+def _assert_transfer_access(rows: list[Transaction], household_id: str, user_id: str, db) -> None:
+    for row in rows:
+        _assert_replay_access(row, household_id, user_id, db)
+
+
 @router.get("")
 def list_transactions(
     db: DbDep,
@@ -104,7 +165,8 @@ def list_transactions(
     category_id: Annotated[str | None, Query(alias="categoryId")] = None,
     account_id: Annotated[str | None, Query(alias="accountId")] = None,
     member_id: Annotated[str | None, Query(alias="memberId")] = None,
-    transaction_type: Annotated[Literal["expense", "income"] | None, Query(alias="type")] = None,
+    transaction_type: Annotated[Literal["expense", "income", "transfer"] | None, Query(alias="type")] = None,
+    include_transfers: Annotated[bool, Query(alias="includeTransfers")] = False,
     from_date: Annotated[date | None, Query(alias="from")] = None,
     to_date: Annotated[date | None, Query(alias="to")] = None,
 ) -> list[TransactionOut]:
@@ -140,10 +202,12 @@ def list_transactions(
         stmt = stmt.where(Transaction.member_id == member_id)
     if transaction_type is not None:
         stmt = stmt.where(Transaction.type == transaction_type)
+    elif not include_transfers:
+        stmt = stmt.where(Transaction.type != "transfer")
     stmt = stmt.order_by(Transaction.date.desc(), Transaction.created_at.desc())
     stmt = stmt.limit(limit).offset(offset)
     transactions = db.scalars(stmt.execution_options(populate_existing=True)).all()
-    return [_tx_out(tx) for tx in transactions]
+    return [_tx_out(tx, db, user.id) for tx in transactions]
 
 
 @router.post("", status_code=201)
@@ -152,7 +216,68 @@ def create_transaction(
 ) -> TransactionOut:
     household_id = _household_id(user)
     client_id = str(payload.client_id) if payload.client_id is not None else None
+    if payload.type == "transfer":
+        assert payload.source_account_id is not None and payload.destination_account_id is not None
+        if client_id is not None:
+            existing_transaction = db.scalar(select(Transaction).where(
+                Transaction.household_id == household_id,
+                Transaction.client_id == client_id,
+            ))
+            if existing_transaction is not None:
+                _assert_replay_access(existing_transaction, household_id, user.id, db)
+                raise HTTPException(status_code=409, detail="El clientId ya se usó con un movimiento distinto")
+            existing_group = db.scalar(select(TransferGroup).where(
+                TransferGroup.household_id == household_id,
+                TransferGroup.client_id == client_id,
+            ))
+            if existing_group is not None:
+                rows = _transfer_rows(db, existing_group.id)
+                _assert_transfer_access(rows, household_id, user.id, db)
+                if not _same_transfer_payload(rows, payload):
+                    raise HTTPException(status_code=409, detail="El clientId ya se usó con un movimiento distinto")
+                return _tx_out(next(row for row in rows if row.transfer_direction == "outflow"), db, user.id)
+        _validate_transfer_accounts(db, household_id, user.id, payload.source_account_id, payload.destination_account_id)
+        group = TransferGroup(household_id=household_id, client_id=client_id, created_by_id=user.id)
+        db.add(group)
+        db.flush()
+        outgoing = Transaction(
+            household_id=household_id, type="transfer", amount=payload.amount,
+            account_id=payload.source_account_id, member_id=user.id, date=payload.date,
+            note=payload.note, transfer_group_id=group.id, transfer_direction="outflow",
+        )
+        incoming = Transaction(
+            household_id=household_id, type="transfer", amount=payload.amount,
+            account_id=payload.destination_account_id, member_id=user.id, date=payload.date,
+            note=payload.note, transfer_group_id=group.id, transfer_direction="inflow",
+        )
+        db.add_all([outgoing, incoming])
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            if client_id is None:
+                raise
+            existing_group = db.scalar(select(TransferGroup).where(
+                TransferGroup.household_id == household_id, TransferGroup.client_id == client_id,
+            ))
+            if existing_group is None:
+                raise
+            rows = _transfer_rows(db, existing_group.id)
+            _assert_transfer_access(rows, household_id, user.id, db)
+            if not _same_transfer_payload(rows, payload):
+                raise HTTPException(status_code=409, detail="El clientId ya se usó con un movimiento distinto") from None
+            return _tx_out(next(row for row in rows if row.transfer_direction == "outflow"), db, user.id)
+        db.refresh(outgoing)
+        return _tx_out(outgoing, db, user.id)
     if client_id is not None:
+        existing_group = db.scalar(select(TransferGroup).where(
+            TransferGroup.household_id == household_id,
+            TransferGroup.client_id == client_id,
+        ))
+        if existing_group is not None:
+            rows = _transfer_rows(db, existing_group.id)
+            _assert_transfer_access(rows, household_id, user.id, db)
+            raise HTTPException(status_code=409, detail="El clientId ya se usó con un movimiento distinto")
         existing = db.scalar(
             select(Transaction).where(
                 Transaction.household_id == household_id,
@@ -167,6 +292,7 @@ def create_transaction(
                     detail="El clientId ya se usó con un movimiento distinto",
                 )
             return _tx_out(existing)
+    assert payload.category_id is not None and payload.account_id is not None
     _validate_refs(db, household_id, user.id, payload.category_id, payload.account_id)
     tx = Transaction(
         household_id=household_id,
@@ -243,7 +369,33 @@ def update_transaction(
 ) -> TransactionOut:
     household_id = _household_id(user)
     tx = _get_transaction(db, household_id, user.id, transaction_id)
+    if tx.type == "transfer":
+        if tx.transfer_group_id is None:
+            raise HTTPException(status_code=409, detail="La transferencia está incompleta")
+        rows = _transfer_rows(db, tx.transfer_group_id)
+        _assert_transfer_access(rows, household_id, user.id, db)
+        data = payload.model_dump(exclude_unset=True)
+        source = next(row for row in rows if row.transfer_direction == "outflow")
+        destination = next(row for row in rows if row.transfer_direction == "inflow")
+        source_id = data.pop("source_account_id", source.account_id)
+        destination_id = data.pop("destination_account_id", destination.account_id)
+        if "account_id" in data:
+            raise HTTPException(status_code=422, detail="Usa cuenta origen y destino para editar una transferencia")
+        if "category_id" in data or data.get("type") not in (None, "transfer"):
+            raise HTTPException(status_code=422, detail="Una transferencia no usa categoría ni tipo de movimiento")
+        _validate_transfer_accounts(db, household_id, user.id, source_id, destination_id)
+        for row in rows:
+            row.amount = data.get("amount", row.amount)
+            row.date = data.get("date", row.date)
+            row.note = data.get("note", row.note)
+        source.account_id = source_id
+        destination.account_id = destination_id
+        db.commit()
+        db.refresh(tx)
+        return _tx_out(tx, db, user.id)
     data = payload.model_dump(exclude_unset=True)
+    if data.get("type") == "transfer" or "source_account_id" in data or "destination_account_id" in data:
+        raise HTTPException(status_code=422, detail="Una transacción existente no se puede convertir en transferencia")
     category_id = data.get("category_id", tx.category_id)
     account_id = data.get("account_id", tx.account_id)
     if "category_id" in data or "account_id" in data:
@@ -259,5 +411,17 @@ def update_transaction(
 def delete_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) -> None:
     household_id = _household_id(user)
     tx = _get_transaction(db, household_id, user.id, transaction_id)
+    if tx.type == "transfer":
+        if tx.transfer_group_id is None:
+            raise HTTPException(status_code=409, detail="La transferencia está incompleta")
+        rows = _transfer_rows(db, tx.transfer_group_id)
+        _assert_transfer_access(rows, household_id, user.id, db)
+        group = db.get(TransferGroup, tx.transfer_group_id)
+        db.delete(rows[0])
+        db.delete(rows[1])
+        if group is not None:
+            db.delete(group)
+        db.commit()
+        return
     db.delete(tx)
     db.commit()

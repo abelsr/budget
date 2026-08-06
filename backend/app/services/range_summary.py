@@ -49,6 +49,7 @@ def build_range_report(
         .where(
             Transaction.household_id == household_id,
             shared_accounts(),
+            Transaction.type.in_(["income", "expense"]),
             Transaction.date >= from_date,
             Transaction.date <= to_date,
         )
