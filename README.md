@@ -1,12 +1,19 @@
-# budget
-
 <p>
-  <img src="docs/brand/isotipo.png" alt="budget isotipo" width="48" height="40">
+  <center>
+    <img src="docs/brand/isologo-isotipo-no-bg.png" alt="budget isotipo" height="100">
+  </center>
 </p>
 
-[![CI](https://github.com/abelsr/budget/actions/workflows/ci.yml/badge.svg)](https://github.com/abelsr/budget/actions/workflows/ci.yml)
+# budget
 
-> **El dinero de tu hogar, en un solo lugar.**
+[![CI](https://github.com/abelsr/budget/actions/workflows/ci.yml/badge.svg)](https://github.com/abelsr/budget/actions/workflows/ci.yml)
+[![Python 3.14](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+
+> **Your household's money, in one place.**
 
 Self-hosted web app (PWA) for a family to track and understand their expenses
 and income. Individual accounts per person that join a **household** via an
