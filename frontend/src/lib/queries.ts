@@ -7,6 +7,7 @@ import type {
   Budget,
   BudgetStatus,
   Category,
+  Household,
   Member,
   NewTransaction,
   RecurringRule,
@@ -27,6 +28,7 @@ export const keys = {
   summary: ["summary", "month"] as const,
   rangeSummary: ["summary", "range"] as const,
   household: ["household", "me"] as const,
+  invitations: ["household", "invitations"] as const,
   recurringRules: ["recurring-rules"] as const,
   budgets: ["budgets"] as const,
   budgetsStatus: ["budgets", "status"] as const,
@@ -53,16 +55,16 @@ export interface TransactionFilters {
   to?: string
 }
 
-export interface Household {
-  id: string
-  name: string
-  currencyCode: string
-}
-
 export interface Invitation {
   token: string
   /** Ruta relativa (`/login?invite=TOKEN`); el link absoluto se arma en la UI. */
   inviteUrl: string
+  expiresAt: string
+}
+
+export interface ActiveInvitation {
+  id: string
+  createdAt: string
   expiresAt: string
 }
 
@@ -71,6 +73,7 @@ interface MemberDto {
   id: string
   name: string
   email: string
+  isOwner: boolean
 }
 
 /** Primera letra de las dos primeras palabras, en mayúsculas. */
@@ -104,6 +107,8 @@ export function useMembers() {
       return dtos.map((m) => ({
         id: m.id,
         name: m.name,
+        email: m.email,
+        isOwner: m.isOwner,
         initials: computeInitials(m.name),
       }))
     },
@@ -145,9 +150,41 @@ export function useHousehold() {
 
 /** Crea un link de invitación al hogar (válido 7 días, un solo uso). */
 export function useCreateInvitation() {
+  const invalidate = useInvalidator(keys.invitations)
   return useMutation({
     mutationFn: () =>
       apiFetch<Invitation>("/households/me/invitations", { method: "POST" }),
+    onSuccess: invalidate,
+  })
+}
+
+/** Las invitaciones activas solo son visibles para la persona propietaria. */
+export function useActiveInvitations(isOwner: boolean, open: boolean) {
+  const enabled = isOwner && open
+  return useQuery({
+    queryKey: keys.invitations,
+    queryFn: () => apiFetch<ActiveInvitation[]>("/households/me/invitations"),
+    enabled,
+    refetchInterval: enabled ? 60_000 : false,
+    refetchIntervalInBackground: true,
+  })
+}
+
+export function useRevokeInvitation() {
+  const invalidate = useInvalidator(keys.invitations)
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/households/me/invitations/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useRemoveMember() {
+  const invalidate = useInvalidator(keys.members, keys.household, keys.invitations)
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/households/me/members/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
   })
 }
 

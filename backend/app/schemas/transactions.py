@@ -43,7 +43,10 @@ class TransactionOut(_CamelModel):
     amount: float
     category_id: str
     account_id: str
+    #: Autor inmutable autenticado; conserva el nombre memberId por compatibilidad.
     member_id: str
+    #: Nombre del autor histórico, incluso si ya no pertenece al hogar.
+    author_name: str
     date: date_t
     note: str | None
     #: Regla que la generó, o NULL si se capturó a mano.

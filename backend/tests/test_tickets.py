@@ -10,16 +10,17 @@ FAKE_PNG = b"\x89PNG\r\n\x1a\n....fake"
 
 def _create_user_with_category(session):
     """Crea hogar + usuario + categoría expense activa y devuelve headers JWT."""
-    household = Household(name="Familia Test")
-    session.add(household)
-    session.flush()
     user = User(
         email="tester@example.com",
         hashed_password="not-a-real-hash",
         name="Tester",
-        household_id=household.id,
     )
     session.add(user)
+    session.flush()
+    household = Household(name="Familia Test", owner_id=user.id)
+    session.add(household)
+    session.flush()
+    user.household_id = household.id
     category = Category(
         household_id=household.id,
         name="Supermercado",

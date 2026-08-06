@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 7 of 17 done (01, 02, 04, 05, 06, 07, 16) · last updated 2026-07-26
+> **Progress:** 9 of 16 done (01, 02, 04, 05, 06, 07, 09, 10, 16) · last updated 2026-08-04
 
 ## Immediate — robustness
 
@@ -23,8 +23,8 @@ criteria. When tackling one: read it in full, update its **Status** to
 | 06 | [Recurring transactions](06-transacciones-recurrentes.md) | ✅ 2026-07-25 | High | M |
 | 07 | [Monthly budgets](07-presupuestos-mensuales.md) | ✅ 2026-07-25 | High | M |
 | 08 | [CSV import](08-importacion-csv.md) | ⬜ | Medium | L |
-| 09 | [Filters and search](09-filtros-busqueda.md) | ⬜ | Medium | S |
-| 10 | [Profile and password change](10-perfil-y-password.md) | ⬜ | Medium | S |
+| 09 | [Filters and search](09-filtros-busqueda.md) | ✅ 2026-08-04 | Medium | S |
+| 10 | [Profile and password change](10-perfil-y-password.md) | ✅ 2026-08-04 | Medium | S |
 
 ## Phase 3 — growth
 
@@ -39,42 +39,37 @@ criteria. When tackling one: read it in full, update its **Status** to
 
 | # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
-| 15 | [HTTPS with Caddy](15-https-caddy.md) | ⬜ | High | S |
 | 16 | [CI with GitHub Actions](16-ci-github-actions.md) | ✅ 2026-07-24 | Medium | M |
 | 17 | [Monitoring](17-monitoreo.md) | ⬜ | Low | S |
 
 ## Suggested attack order
 
-`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 04 ✅ → 15`
+`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 04 ✅ → 09 ✅ → 10 ✅ → 03 → 08`
 
-Invitations and onboarding completed the family experience; Alembic and HTTPS
-harden it for production; recurring transactions and budgets are the features with the most
-daily impact.
+Invitations and onboarding completed the family experience; Alembic, CI, and
+backups harden it for production; recurring transactions, budgets, and filters
+are the features with the most daily impact.
 
-**16 (CI) was done before 15** because HTTPS is waiting on an infrastructure
-decision (custom domain vs. Tailscale) and CI didn't depend on anything.
-**06 and 07 were also moved ahead of 15** for the same reason: the decision is
-still pending and neither feature depended on anything.
-
-**04 was done before 15**, for the third time for the same reason: 15 is still
-waiting on an infrastructure step and 04 had no pending decision. It was also
-overdue — 06 and 07 were both deployed after taking manual backups by hand,
-precisely because the automated one did not exist yet.
-
-**Next: 15 — HTTPS with Caddy**, once Tailscale is installed on the host (see
-below). If that step stays pending, the unblocked items are **09 — Filters and
-search** and **10 — Profile and password change** (both effort S), or
-**03 — Installable PWA**.
-
-**15 (HTTPS with Caddy) is still blocked on a decision, with the path already
-chosen: Tailscale** (`tailscale cert` over the tailnet, nothing exposed to the internet,
-works behind CGNAT). It still needs to be installed on the host and on the
-family's devices — today there's no `tailscale`, `caddy`, or `mkcert` on the host. Besides
-closing out the deployment, it enables `navigator.clipboard` on mobile: the
-invitation link relies on the `document.execCommand('copy')` fallback because plain HTTP
-over IP is not a secure context (see `frontend/src/lib/clipboard.ts`).
+**Next: 03 — Installable PWA.** Then tackle **08 — CSV import**.
 
 ## Log
+
+**2026-08-04 — 10 (profile and password change) completed.**
+
+- Profile editing now includes optional sex and birth date (with client-side age calculation), plus authenticated avatar upload, replacement, and removal.
+- Avatar blobs stay private in MinIO: uploads are normalized to WebP, use immutable object keys, and avatar writes are serialized to avoid concurrent replacement races.
+- An incorrect current password returns `401` without closing the session; existing stateless JWTs intentionally remain valid after a password change.
+
+**2026-08-04 — 09 (filters and search) completed.**
+
+- The feature was already present in the application; the roadmap had not been
+  updated after its implementation.
+- `GET /transactions` combines note search, category, account, member, type,
+  and date-range filters. The UI debounces note search by 300 ms, synchronizes
+  every filter with the URL, and exposes removable active-filter chips.
+- `month` and `from`/`to` are now explicitly incompatible (`422`), rather than
+  silently giving `month` precedence. A composite
+  `transactions(household_id, date)` index was added for the filtered ledger.
 
 **2026-07-26 — 04 (backups) implemented, and the restore verified end to end.**
 
@@ -204,7 +199,7 @@ media query couldn't be emulated; it's worth confirming manually on the system.
   a root `.env.example` (and `plan.md` claimed there was). Both were created.
 - `backend/.env` has a 20-character `JWT_SECRET`: that's the source of the
   `InsecureKeyLengthWarning` in the tests. It only affects local dev (Docker uses
-  the root one, which is 41 characters), and hardening it falls within the scope of **15**.
+  the root one, which is 41 characters); harden it before any public deployment.
 - A **migrations-against-real-Postgres job** (8 tests) was added to CI that
   wasn't in doc 16's scope: the docker job built the image but
   no one ran a migration, and that's exactly the risk of breaking the database when

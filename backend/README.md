@@ -50,7 +50,7 @@ uv run pytest               # 78 tests, in-memory SQLite
 ## Docker (full stack from the repo root)
 
 ```bash
-docker compose up --build   # frontend :8081, backend :8000, minio :9000/:9001
+docker compose up --build   # frontend :8081, backend :8000, MinIO console localhost :9001; S3 API internal
 ```
 
 ## Structure
@@ -117,11 +117,14 @@ Why this approach:
 | PATCH | `/auth/me/onboarding` | Marks/reopens the initial wizard (idempotent) |
 | POST | `/auth/join` | Registration with invitation token (no wizard) |
 | GET | `/households/me` | Current household |
-| GET | `/households/me/members` | Household members |
-| POST | `/households/me/invitations` | Creates an invitation (7 days) |
+| GET | `/households/me/members` | Active member directory (all household members) |
+| POST | `/households/me/invitations` | Owner creates an invitation (7 days) |
+| GET | `/households/me/invitations` | Owner lists active invitations (without tokens) |
+| DELETE | `/households/me/invitations/{id}` | Owner revokes an active invitation |
+| DELETE | `/households/me/members/{id}` | Owner detaches another active member |
 | GET/POST/PATCH/DELETE | `/accounts` | Account CRUD (computed balance) |
 | GET/POST/PATCH/DELETE | `/categories` | Category CRUD |
-| GET/POST/PATCH/DELETE | `/transactions` | Transaction CRUD (`?month=YYYY-MM`). `POST` accepts `repeat: weekly\|monthly` and creates the linked rule |
+| GET/POST/PATCH/DELETE | `/transactions` | Transaction CRUD (`?month=YYYY-MM`). `memberId` is the immutable authenticated author; `POST` accepts `repeat: weekly\|monthly` and creates the linked rule |
 | GET/POST/PATCH/DELETE | `/recurring-rules` | Recurring rule CRUD. `PATCH` only `amount`, `note`, and `active`; `DELETE` keeps the transactions already generated |
 | GET | `/summary/month` | Monthly income/expenses/donut chart |
 | GET/POST/PATCH/DELETE | `/budgets` | Budget CRUD (one per expense category, global — not per month) |

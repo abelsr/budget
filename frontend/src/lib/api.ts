@@ -37,20 +37,26 @@ async function parseError(res: Response): Promise<ApiError> {
   }
 }
 
+export interface ApiFetchOptions extends RequestInit {
+  /** Conserva el token cuando un 401 es un error esperado de la operación. */
+  clearTokenOnUnauthorized?: boolean
+}
+
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {},
+  options: ApiFetchOptions = {},
 ): Promise<T> {
+  const { clearTokenOnUnauthorized = true, ...fetchOptions } = options
   const token = getToken()
-  const headers = new Headers(options.headers)
+  const headers = new Headers(fetchOptions.headers)
   if (token) headers.set("Authorization", `Bearer ${token}`)
   // FormData (multipart) define su propio Content-Type con boundary
-  if (options.body && !(options.body instanceof FormData)) {
+  if (fetchOptions.body && !(fetchOptions.body instanceof FormData)) {
     headers.set("Content-Type", "application/json")
   }
 
-  const res = await fetch(`/api${path}`, { ...options, headers })
-  if (res.status === 401) setToken(null) // sesión expirada
+  const res = await fetch(`/api${path}`, { ...fetchOptions, headers })
+  if (res.status === 401 && clearTokenOnUnauthorized) setToken(null) // sesión expirada
   if (!res.ok) throw await parseError(res)
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>

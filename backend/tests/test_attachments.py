@@ -39,23 +39,24 @@ def world_fixture(session, monkeypatch):
     monkeypatch.setattr(storage, "get_attachment", fake_get)
     monkeypatch.setattr(storage, "delete_attachment", fake_delete)
 
-    h1 = Household(name="Hogar Uno")
-    h2 = Household(name="Hogar Dos")
-    session.add_all([h1, h2])
-    session.commit()
     u1 = User(
         email="uno@example.com",
         hashed_password="x",
         name="Uno",
-        household_id=h1.id,
     )
     u2 = User(
         email="dos@example.com",
         hashed_password="x",
         name="Dos",
-        household_id=h2.id,
     )
     session.add_all([u1, u2])
+    session.flush()
+    h1 = Household(name="Hogar Uno", owner_id=u1.id)
+    h2 = Household(name="Hogar Dos", owner_id=u2.id)
+    session.add_all([h1, h2])
+    session.flush()
+    u1.household_id = h1.id
+    u2.household_id = h2.id
     session.commit()
 
     txs = {}

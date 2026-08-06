@@ -39,6 +39,7 @@ export function TransactionItem({
   const isIncome = transaction.type === "income"
   const hasAttachments = transaction.attachments.length > 0
   const isRecurring = Boolean(transaction.recurringRuleId)
+  const authorName = transaction.authorName ?? member?.name
 
   // Comercio reconocido por la nota → medallón de marca (fallback: categoría).
   const brand = matchBrand(transaction.note)
@@ -49,7 +50,7 @@ export function TransactionItem({
   const meta = [
     transaction.note ? category?.name : undefined,
     ledger ? undefined : account?.name,
-    member?.name,
+    authorName,
     showDate ? formatShortDate(transaction.date) : undefined,
   ]
     .filter(Boolean)

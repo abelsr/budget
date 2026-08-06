@@ -1,6 +1,6 @@
 # 🔍 Filters and search in Transactions
 
-**Status:** ⬜ Pending · **Priority:** Medium · **Effort:** S (<1 day) · **Dependencies:** None
+**Status:** ✅ 2026-08-04 · **Priority:** Medium · **Effort:** S (<1 day) · **Dependencies:** None
 
 ## Why
 The Transactions list grows every day and today there's no way to find anything: no searching by note, no filtering by category or account. It's the most visible gap on the page.
@@ -22,8 +22,8 @@ The Transactions list grows every day and today there's no way to find anything:
   - `q`: searches `note` with `ILIKE '%q%'`.
   - `categoryId`, `accountId`, `memberId`, `type` (`expense|income`).
   - `from`, `to`: date range (ISO).
-- Maintain full compatibility with the current params (`month`, `limit`, `offset`); if `from`/`to` are provided along with `month`, `month` takes precedence, or the combination is documented (decide and document).
-- Index on `transactions(household_id, date)` if it doesn't already exist, to support filters with pagination.
+- Maintain full compatibility with the current params (`month`, `limit`, `offset`); `month` cannot be combined with `from` or `to` and returns `422` to avoid an ambiguous range.
+- Index on `transactions(household_id, date)` to support filters with pagination.
 ### Frontend
 - Search bar in Transactions: input with `Search` icon, 300ms debounce, bound to the `q` param.
 - Filter chip row below: category, account, type (expense/income). If they grow, move to a filter sheet.
@@ -34,13 +34,13 @@ The Transactions list grows every day and today there's no way to find anything:
 - No changes (index via migration if applicable).
 
 ## Acceptance criteria
-- [ ] Typing "sams" filters the list to transactions whose note contains "sams" (case-insensitive).
-- [ ] Combining category + account works (intersection).
-- [ ] Clearing filters restores the full list.
-- [ ] Copying the URL with filters and opening it in another tab preserves the applied filters.
-- [ ] The existing params (`month`, `limit`, `offset`) keep working the same way.
-- [ ] Tests: each individual param, combinations, case-insensitive `ILIKE` search.
+- [x] Typing "sams" filters the list to transactions whose note contains "sams" (case-insensitive).
+- [x] Combining category + account works (intersection).
+- [x] Clearing filters restores the full list.
+- [x] Copying the URL with filters and opening it in another tab preserves the applied filters.
+- [x] The existing params (`month`, `limit`, `offset`) keep working the same way.
+- [x] Tests cover combinations, case-insensitive `ILIKE` search, and the `month`/range conflict.
 
 ## Notes
-- Low risk; the main one is the `month` vs `from`/`to` interaction — resolve it with an explicit, documented rule.
+- `month` and `from`/`to` are mutually exclusive. The API rejects their combination with `422` instead of silently discarding a filter.
 - Debounce and the correct query key prevent unnecessary refetches while typing.

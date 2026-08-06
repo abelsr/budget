@@ -1,4 +1,7 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from datetime import date, datetime
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -47,8 +50,41 @@ class UserResponse(_CamelModel):
     email: str
     name: str
     household_id: str | None
+    sex: Literal["female", "male", "non_binary", "prefer_not_to_say"] | None
+    birth_date: date | None
+    has_avatar: bool
+    avatar_updated_at: datetime | None
     #: False → el frontend manda al wizard de `/onboarding`.
     onboarding_completed: bool
+
+
+class ProfileUpdateRequest(_CamelModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    sex: Literal["female", "male", "non_binary", "prefer_not_to_say"] | None = None
+    birth_date: date | None = None
+
+    @model_validator(mode="after")
+    def validate_update(self):
+        if not self.model_fields_set.intersection({"name", "sex", "birth_date"}):
+            raise ValueError("Debes enviar al menos un campo para actualizar")
+        if "name" in self.model_fields_set and self.name is None:
+            raise ValueError("El nombre no puede ser nulo")
+        if self.birth_date is not None:
+            today = date.today()
+            if self.birth_date > today:
+                raise ValueError("La fecha de nacimiento no puede estar en el futuro")
+            try:
+                oldest_allowed = today.replace(year=today.year - 120)
+            except ValueError:
+                oldest_allowed = today.replace(year=today.year - 120, day=28)
+            if self.birth_date < oldest_allowed:
+                raise ValueError("La fecha de nacimiento no puede ser mayor a 120 años")
+        return self
+
+
+class ChangePasswordRequest(_CamelModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
 
 
 class OnboardingRequest(_CamelModel):

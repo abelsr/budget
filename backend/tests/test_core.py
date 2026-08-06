@@ -22,23 +22,24 @@ def make_headers(user: User) -> dict[str, str]:
 @pytest.fixture(name="world")
 def world_fixture(session):
     """Dos hogares, cada uno con un usuario y una categoría."""
-    h1 = Household(name="Hogar Uno")
-    h2 = Household(name="Hogar Dos")
-    session.add_all([h1, h2])
-    session.commit()
     u1 = User(
         email="uno@example.com",
         hashed_password="x",
         name="Uno",
-        household_id=h1.id,
     )
     u2 = User(
         email="dos@example.com",
         hashed_password="x",
         name="Dos",
-        household_id=h2.id,
     )
     session.add_all([u1, u2])
+    session.flush()
+    h1 = Household(name="Hogar Uno", owner_id=u1.id)
+    h2 = Household(name="Hogar Dos", owner_id=u2.id)
+    session.add_all([h1, h2])
+    session.flush()
+    u1.household_id = h1.id
+    u2.household_id = h2.id
     session.commit()
     c2 = Category(
         household_id=h2.id,
@@ -303,7 +304,28 @@ def test_transaction_validation(client, world):
     assert resp.status_code == 404
 
 
-def test_transaction_filters_and_month_precedence(client, world):
+def test_transaction_author_is_authenticated_user_not_member_id(client, world):
+    account = create_account(client, world["headers1"])
+    category = create_category(client, world["headers1"])
+    transaction = create_transaction(
+        client,
+        world["headers1"],
+        category["id"],
+        account["id"],
+        memberId=world["u2"].id,
+    )
+    assert transaction["memberId"] == world["u1"].id
+
+    response = client.patch(
+        f"/transactions/{transaction['id']}",
+        json={"note": "actualizado", "memberId": world["u2"].id},
+        headers=world["headers1"],
+    )
+    assert response.status_code == 200
+    assert response.json()["memberId"] == world["u1"].id
+
+
+def test_transaction_filters_and_month_range_conflict(client, world):
     headers = world["headers1"]
     account = create_account(client, headers, name="Efectivo")
     other_account = create_account(client, headers, name="Débito")
@@ -330,7 +352,8 @@ def test_transaction_filters_and_month_precedence(client, world):
         params={"month": "2026-07", "from": "2026-01-01", "to": "2026-01-02"},
         headers=headers,
     )
-    assert {tx["id"] for tx in response.json()} == {grocery["id"], salary["id"]}
+    assert response.status_code == 422
+    assert response.json()["detail"] == "month no se puede combinar con from ni to"
 
 
 # ---------- Aislamiento entre hogares ----------

@@ -15,7 +15,9 @@ import {
 } from "lucide-react"
 import { motion } from "motion/react"
 
-import { InviteSheet } from "@/components/InviteSheet"
+import { HouseholdMembersSheet } from "@/components/HouseholdMembersSheet"
+import { ProfileAvatar } from "@/components/ProfileAvatar"
+import { ProfileSettingsSheet } from "@/components/ProfileSettingsSheet"
 import { useAuth } from "@/lib/auth"
 import { useHousehold, useMembers } from "@/lib/queries"
 import { useTheme, type Theme } from "@/lib/theme"
@@ -42,7 +44,8 @@ export function SettingsPage() {
   const { data: members = [] } = useMembers()
   const { data: household } = useHousehold()
   const navigate = useNavigate()
-  const [inviteOpen, setInviteOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   function onLogout() {
     logout()
@@ -62,20 +65,18 @@ export function SettingsPage() {
 
       <Section>
         <div className="flex items-center gap-3 px-4 py-3.5">
-          <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-[15px] font-semibold text-primary">
-            {session?.name.charAt(0).toUpperCase() ?? "?"}
-          </span>
+          <ProfileAvatar name={session?.name ?? "Mi perfil"} hasAvatar={session?.hasAvatar ?? false} avatarUpdatedAt={session?.avatarUpdatedAt ?? null} className="size-11 rounded-full bg-primary/10 text-[15px] font-semibold text-primary" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[15px] font-semibold">{session?.name}</p>
             <p className="truncate text-[12px] text-muted-foreground">{session?.email}</p>
           </div>
         </div>
-        <Row icon={<UserRound size={16} />} label="Mi cuenta" value="Próximamente" disabled />
+        <Row icon={<UserRound size={16} />} label="Mi cuenta" onClick={() => setProfileOpen(true)} />
         <Row
           icon={<Users size={16} />}
           label="Miembros del hogar"
           value={members.length ? `${members.length}` : undefined}
-          onClick={() => setInviteOpen(true)}
+          onClick={() => setMembersOpen(true)}
         />
         <Row icon={<Tags size={16} />} label="Categorías" to="/app/ajustes/categorias" />
         <Row icon={<Repeat size={16} />} label="Recurrentes" to="/app/ajustes/recurrentes" />
@@ -103,7 +104,8 @@ export function SettingsPage() {
         budget · v0.1.0 · autohospedado
       </p>
 
-      <InviteSheet open={inviteOpen} onOpenChange={setInviteOpen} />
+      <HouseholdMembersSheet open={membersOpen} onOpenChange={setMembersOpen} />
+      <ProfileSettingsSheet open={profileOpen} onOpenChange={setProfileOpen} />
     </motion.div>
   )
 }

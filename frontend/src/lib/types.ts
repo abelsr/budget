@@ -16,7 +16,16 @@ export type Frequency = "weekly" | "monthly"
 export interface Member {
   id: string
   name: string
+  email: string
+  isOwner: boolean
   initials: string
+}
+
+export interface Household {
+  id: string
+  name: string
+  currencyCode: string
+  isOwner: boolean
 }
 
 export interface Account {
@@ -65,6 +74,8 @@ export interface Transaction {
   categoryId: string
   accountId: string
   memberId: string
+  /** Immutable historical author name; available even after household removal. */
+  authorName?: string
   /** ISO date: YYYY-MM-DD */
   date: string
   note?: string

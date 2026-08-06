@@ -49,6 +49,7 @@ def _tx_out(tx: Transaction) -> TransactionOut:
         category_id=tx.category_id,
         account_id=tx.account_id,
         member_id=tx.member_id,
+        author_name=tx.author.name,
         date=tx.date,
         note=tx.note,
         recurring_rule_id=tx.recurring_rule_id,
@@ -74,6 +75,11 @@ def list_transactions(
     household_id = _household_id(user)
     materialize_due(db, household_id)
     stmt = select(Transaction).where(Transaction.household_id == household_id)
+    if month is not None and (from_date is not None or to_date is not None):
+        raise HTTPException(
+            status_code=422,
+            detail="month no se puede combinar con from ni to",
+        )
     if month is not None:
         year, mon = int(month[:4]), int(month[5:7])
         if not 1 <= mon <= 12:
@@ -116,7 +122,7 @@ def create_transaction(
         amount=payload.amount,
         category_id=payload.category_id,
         account_id=payload.account_id,
-        member_id=user.id,
+        member_id=user.id,  # El autor siempre es el usuario autenticado.
         date=payload.date,
         note=payload.note,
     )

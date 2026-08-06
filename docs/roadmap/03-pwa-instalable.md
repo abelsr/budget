@@ -42,6 +42,6 @@ The product decision is "installable PWA with an offline shell", and the primary
 - [ ] The Lighthouse PWA check passes
 
 ## Notes
-- HTTPS: SWs require a secure context; on self-hosted by IP+HTTP, installation may not be available. Document that HTTPS is recommended (reverse proxy / Tailscale / etc.).
+- Service workers require a secure context; on self-hosted IP+HTTP, installation may not be available. Validate on a deployment that provides TLS before declaring the PWA ready.
 - Risk: a poorly configured SW can leave clients "stuck" on an old version of the frontend. Test the update flow before considering this closed.
 - Reference: https://vite-pwa-org.netlify.app/

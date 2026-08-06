@@ -1,6 +1,6 @@
 # 🌐 Opening up to multiple families
 
-**Status:** ⬜ Pending · **Priority:** Low · **Effort:** L (3+ days) · **Dependencies:** 01-alembic ✅ (done), 15-https-caddy (HTTPS mandatory before exposing auth to the internet)
+**Status:** ⬜ Pending · **Priority:** Low · **Effort:** L (3+ days) · **Dependencies:** 01-alembic ✅ (done); TLS is mandatory before exposing auth to the internet
 
 ## Why
 Today the app serves a single family per deployment, accessed via local IP. Opening up public signup turns the project into a product that any family can use without the dev's involvement. This means hardening the surface exposed to the internet: rate limiting, anti-abuse measures, legal minimums. It's a security posture change, not just a new endpoint.
@@ -36,7 +36,7 @@ Today the app serves a single family per deployment, accessed via local IP. Open
 - Readable error messages for 429 ("too many attempts, wait a few minutes")
 
 ### Infra
-- HTTPS active (15) before opening up registration: auth without TLS on the internet is unacceptable
+- TLS active before opening up registration: auth without TLS on the internet is unacceptable
 - New variables in the backend `.env`: limits, and email provider credentials if verification is activated
 - Backups of the `pgdata` volume become critical (no longer just your own data): document at least one scheduled `pg_dump`
 - Hosting decision: the public instance can live on the same host or on a cheap VPS; document minimum requirements
