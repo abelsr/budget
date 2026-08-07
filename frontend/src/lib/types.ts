@@ -88,9 +88,37 @@ export interface Transaction {
   counterpartyAccountId?: string | null
   counterpartyAccountName?: string | null
   attachments: Attachment[]
+  reconciliationStatus: "pending" | "reconciled"
   /** Local-only state for an outbox record; it is never sent to the API. */
   syncStatus?: "pending" | "failed"
   syncError?: string
+}
+
+export interface ReconciliationTransaction {
+  id: string
+  type: TransactionType
+  amount: number
+  date: string
+  note: string | null
+  reconciliationStatus: "pending" | "reconciled"
+}
+
+export interface ReconciliationSession {
+  id: string
+  accountId: string
+  statementDate: string
+  statementBalance: number
+  status: "open" | "completed" | "stale"
+  completedAt: string | null
+  createdAt: string
+}
+
+export interface ReconciliationDetail extends ReconciliationSession {
+  pendingTotal: number
+  reconciledTotal: number
+  reconciledBalance: number
+  difference: number
+  transactions: ReconciliationTransaction[]
 }
 
 export interface NewTransaction {

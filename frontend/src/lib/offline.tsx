@@ -55,6 +55,7 @@ function pendingAsTransaction(entry: PendingTransaction): Transaction {
     note: entry.payload.note,
     transferDirection: entry.payload.type === "transfer" ? "outflow" : null,
     counterpartyAccountId: entry.payload.type === "transfer" ? entry.payload.destinationAccountId : null,
+    reconciliationStatus: "pending",
     attachments: [],
     syncStatus: entry.lastError ? "failed" : "pending",
     syncError: entry.lastError,

@@ -200,11 +200,34 @@ class Transaction(Base):
     import_batch_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     delete_reason: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # A movement can be selected only once, in the reconciliation that cleared it.
+    reconciliation_status: Mapped[str] = mapped_column(String(12), default="pending", server_default="pending")
+    reconciliation_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("reconciliation_sessions.id"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     attachments: Mapped[list["Attachment"]] = relationship(lazy="selectin")
     # La autoría no depende de que la persona siga perteneciendo al hogar.
     author: Mapped[User] = relationship(foreign_keys=[member_id], lazy="selectin")
+
+
+class ReconciliationSession(Base):
+    __tablename__ = "reconciliation_sessions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    statement_date: Mapped[date] = mapped_column(Date)
+    statement_balance: Mapped[float] = mapped_column(Numeric(19, 4))
+    # open | completed | stale
+    status: Mapped[str] = mapped_column(String(12), default="open", server_default="open")
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_by_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
 
 class TransferGroup(Base):

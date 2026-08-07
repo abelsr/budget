@@ -19,6 +19,8 @@ import type {
   NewTransaction,
   NewTransfer,
   RecurringRule,
+  ReconciliationDetail,
+  ReconciliationSession,
   SavingsGoal,
   Transaction,
 } from "@/lib/types"
@@ -44,6 +46,7 @@ export const keys = {
   goals: ["goals"] as const,
   importBatches: ["import", "batches"] as const,
   importBatch: (id: string) => ["import", "batches", id] as const,
+  reconciliation: (accountId: string, id: string) => ["accounts", accountId, "reconciliations", id] as const,
 }
 
 export interface MonthSummary {
@@ -452,6 +455,44 @@ export function useDeleteTransaction() {
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/transactions/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
+  })
+}
+
+export function useCreateReconciliation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ accountId, statementDate, statementBalance }: { accountId: string; statementDate: string; statementBalance: number }) =>
+      apiFetch<ReconciliationSession>(`/accounts/${accountId}/reconciliations`, {
+        method: "POST", body: JSON.stringify({ statementDate, statementBalance }),
+      }),
+    onSuccess: (session) => queryClient.invalidateQueries({ queryKey: keys.reconciliation(session.accountId, session.id) }),
+  })
+}
+
+export function useReconciliation(accountId: string | null, id: string | null) {
+  return useQuery({
+    queryKey: keys.reconciliation(accountId ?? "pending", id ?? "pending"),
+    queryFn: () => apiFetch<ReconciliationDetail>(`/accounts/${accountId}/reconciliations/${id}`),
+    enabled: Boolean(accountId && id),
+  })
+}
+
+export function useToggleReconciliation() {
+  return useMutation({
+    mutationFn: ({ transactionId, reconciled }: { transactionId: string; reconciled: boolean }) =>
+      apiFetch(`/transactions/${transactionId}/reconciliation`, { method: "POST", body: JSON.stringify({ reconciled }) }),
+  })
+}
+
+export function useCompleteReconciliation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ accountId, id }: { accountId: string; id: string }) =>
+      apiFetch<ReconciliationSession>(`/accounts/${accountId}/reconciliations/${id}/complete`, { method: "POST" }),
+    onSuccess: (session) => {
+      queryClient.invalidateQueries({ queryKey: keys.reconciliation(session.accountId, session.id) })
+      queryClient.invalidateQueries({ queryKey: keys.transactions })
+    },
   })
 }
 
