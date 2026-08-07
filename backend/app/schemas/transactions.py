@@ -77,4 +77,5 @@ class TransactionOut(_CamelModel):
     transfer_direction: Literal["outflow", "inflow"] | None = None
     counterparty_account_id: str | None = None
     counterparty_account_name: str | None = None
+    reconciliation_status: Literal["pending", "reconciled"] = "pending"
     attachments: list[AttachmentResponse] = []

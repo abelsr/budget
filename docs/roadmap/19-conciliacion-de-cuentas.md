@@ -1,6 +1,6 @@
 # Account reconciliation
 
-**Status:** ⬜ Pending · **Priority:** High · **Effort:** M · **Dependencies:**
+**Status:** ✅ 2026-08-06 · **Priority:** High · **Effort:** M · **Dependencies:**
 [08 — CSV import](08-importacion-csv.md)
 
 ## Why

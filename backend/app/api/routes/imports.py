@@ -25,6 +25,7 @@ from app.models import (
     TransactionEditEvent,
     User,
 )
+from app.services.reconciliation import invalidate_completed_reconciliation
 from app.schemas.imports import (
     DateFormat,
     ImportBatchDetailOut,
@@ -522,6 +523,7 @@ def revert_batch(batch_id: str, db: DbDep, user: CurrentUserDep) -> ImportBatchO
                 status_code=409,
                 detail=ImportRevertConflictOut(conflicts=[conflict]).model_dump(by_alias=True),
             )
+        invalidate_completed_reconciliation(db, transactions[row.transaction_id])
     db.commit()
     return _batch_out(batch)
 
@@ -536,6 +538,7 @@ def restore_batch(batch_id: str, db: DbDep, user: CurrentUserDep) -> ImportBatch
         transactions = db.scalars(select(Transaction).where(Transaction.id.in_(transaction_ids)).with_for_update()).all()
         for transaction in transactions:
             if transaction.delete_reason == "import_revert":
+                invalidate_completed_reconciliation(db, transaction)
                 transaction.deleted_at = None
                 transaction.delete_reason = None
     db.commit()

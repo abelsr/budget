@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 14 of 16 done (01–07, 09–14, 16) · last updated 2026-08-05
+> **Progress:** 15 of 17 done (01–14, 16, 19) · last updated 2026-08-06
 
 ## Immediate — robustness
 
@@ -41,7 +41,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 |---|---|---|---|---|
 | 16 | [CI with GitHub Actions](16-ci-github-actions.md) | ✅ 2026-07-24 | Medium | M |
 | 17 | [Monitoring](17-monitoreo.md) | ⬜ | Low | S |
-| 19 | [Account reconciliation](19-conciliacion-de-cuentas.md) | ⬜ | High | M |
+| 19 | [Account reconciliation](19-conciliacion-de-cuentas.md) | ✅ 2026-08-06 | High | M |
 
 ## Suggested attack order
 
@@ -110,6 +110,13 @@ may be implemented in parallel.
   and possible restoration.
 
 ## Log
+
+**2026-08-06 — 19 (account reconciliation) completed.**
+
+- Accounts support one open reconciliation at a time. A session compares its statement date and closing balance against the account opening balance plus every selected ledger entry, and cannot complete until the four-decimal difference is exactly zero.
+- Ledger entries can be marked or unmarked while the session is open. Transfer rows remain independent, so each account side is reconciled against its own statement.
+- Completed sessions become explicitly stale when an included transaction is edited, deleted, soft-deleted by an import revert, or restored. The history remains visible for review instead of silently claiming that the account is still reconciled.
+- Account access uses the existing shared/personal visibility rules. Backend tests passed (173; 12 PostgreSQL-dependent migration tests skipped without a configured test database); frontend lint and production build passed.
 
 **2026-08-06 — 08 (CSV statement import) completed.**
 

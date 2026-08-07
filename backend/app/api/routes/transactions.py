@@ -23,6 +23,7 @@ from app.schemas.transactions import (
 )
 from app.services.recurring import advance, materialize_due
 from app.services.account_access import can_operate, visible_accounts
+from app.services.reconciliation import invalidate_completed_reconciliation
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -95,6 +96,7 @@ def _tx_out(tx: Transaction, db=None, user_id: str | None = None) -> Transaction
         transfer_direction=tx.transfer_direction,
         counterparty_account_id=counterparty.account_id if counterparty else None,
         counterparty_account_name=(db.get(Account, counterparty.account_id).name if counterparty else None),
+        reconciliation_status=tx.reconciliation_status,
     )
 
 
@@ -460,6 +462,8 @@ def update_transaction(
                     transaction_id=row.id, edited_by_id=user.id,
                     before_snapshot=before, after_snapshot=after,
                 ))
+            if before != after:
+                invalidate_completed_reconciliation(db, row)
         db.commit()
         db.refresh(tx)
         return _tx_out(tx, db, user.id)
@@ -479,6 +483,8 @@ def update_transaction(
             transaction_id=tx.id, edited_by_id=user.id,
             before_snapshot=before, after_snapshot=after,
         ))
+    if before != after:
+        invalidate_completed_reconciliation(db, tx)
     db.commit()
     db.refresh(tx)
     return _tx_out(tx)
@@ -496,6 +502,8 @@ def delete_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) -> 
         rows = _transfer_rows(db, tx.transfer_group_id)
         _assert_transfer_access(rows, household_id, user.id, db)
         group = db.get(TransferGroup, tx.transfer_group_id)
+        for row in rows:
+            invalidate_completed_reconciliation(db, row)
         db.delete(rows[0])
         db.delete(rows[1])
         # The group is the FK parent; remove both transfer rows first.
@@ -504,5 +512,6 @@ def delete_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) -> 
             db.delete(group)
         db.commit()
         return
+    invalidate_completed_reconciliation(db, tx)
     db.delete(tx)
     db.commit()

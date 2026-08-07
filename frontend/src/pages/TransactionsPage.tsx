@@ -1,5 +1,5 @@
 import { motion } from "motion/react"
-import { CalendarDays, Receipt, Search, SlidersHorizontal, X } from "lucide-react"
+import { CalendarDays, Landmark, Receipt, Search, SlidersHorizontal, X } from "lucide-react"
 import { useSearchParams } from "react-router-dom"
 import { useEffect, useState } from "react"
 
@@ -13,6 +13,7 @@ import {
 import type { TransactionFilters } from "@/lib/queries"
 import { springAppear } from "@/lib/springs"
 import { TransactionItem } from "@/components/TransactionItem"
+import { ReconciliationSheet } from "@/components/ReconciliationSheet"
 import { Card, EmptyState, PageHeader } from "@/components/ui/surface"
 
 /**
@@ -34,6 +35,7 @@ export function TransactionsPage() {
         searchParams.get("to"),
     ),
   )
+  const [reconciliationOpen, setReconciliationOpen] = useState(false)
   const { data: accounts = [] } = useAccounts()
   const { data: categories = [] } = useCategories()
   const { data: members = [] } = useMembers()
@@ -177,6 +179,7 @@ export function TransactionsPage() {
             <DateFilter label="Hasta" value={filters.to ?? ""} onChange={(value) => setFilter("to", value)} />
           </div>
         )}
+        {filters.accountId && accounts.find((account) => account.id === filters.accountId) && <button type="button" onClick={() => setReconciliationOpen(true)} className="pressable mt-3 flex h-8 items-center gap-1.5 rounded-lg bg-primary-soft px-3 text-[11px] font-semibold text-primary"><Landmark size={14} />Conciliar esta cuenta</button>}
       </section>
 
       {days.length === 0 ? (
@@ -243,6 +246,7 @@ export function TransactionsPage() {
           })}
         </Card>
       )}
+      {filters.accountId && accounts.find((account) => account.id === filters.accountId) && <ReconciliationSheet account={accounts.find((account) => account.id === filters.accountId)!} open={reconciliationOpen} onOpenChange={setReconciliationOpen} />}
     </motion.div>
   )
 }
