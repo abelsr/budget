@@ -60,14 +60,16 @@ screen, semantic green/red reserved for money flow). Interaction follows the
 
 1. **MVP:** auth + households + accounts + categories + transactions + dashboard. ✅ **DONE** (+ AI scanner, attachments, dark mode)
 2. **Robustness:** migrations, invitations from the UI, onboarding, PWA, backups. ✅ **DONE**
-3. **Phase 2:** recurrence, CSV import, monthly budgets. 🚧 **In progress** — recurrence, budgets, filters, reports, exports, and profile done; CSV pending
+3. **Phase 2:** recurrence, CSV import, monthly budgets. ✅ **DONE**
 4. **Phase 3:** savings goals, personal accounts (privacy between members), offline-first with sync, multi-family opening. ✅ **DONE**
-5. **Next cycle:** financial integrity and household planning. Transfers → CSV
-   import → reconciliation → merchant rules → split transactions → monthly
-   rollover budgets → alerts and cash-flow planning. See
+5. **Next cycle:** financial integrity and household planning. Transfers, CSV
+   import, and reconciliation are complete; the next product initiative is
+   merchant rules and categorization, followed by split transactions, monthly
+   rollover budgets, alerts, and cash-flow planning. See
    [docs/roadmap/README.md](roadmap/README.md).
 
-**Concrete next step:** [CSV import](roadmap/08-importacion-csv.md).
+**Concrete next step:** merchants and categorization rules (proposed in the
+[roadmap index](roadmap/README.md)).
 Details and log in [docs/roadmap/](roadmap/README.md).
 
 ## Repo structure
@@ -83,7 +85,7 @@ budget/
 └── frontend/           ← React + Vite PWA (nginx in prod)
 ```
 
-## Current status (2026-07-24)
+## Current status (2026-08-06)
 
 **Repo published on GitHub.** Full stack running on Docker Compose
 (frontend nginx :8081, backend :8000, Postgres 17, MinIO S3 API internal on
@@ -159,9 +161,10 @@ verified end-to-end, including access from a phone over the local IP.
 
 > Full details in **[docs/roadmap/](roadmap/README.md)** — one file per
 > pending item with why, scope, design, and acceptance criteria, plus the
-> log of what's already done. Closed: 01 (Alembic), 02 (invitations),
-> 04 (backups), 05 (onboarding), 06 (recurring), 07 (budgets), 09 (filters),
-> 10 (profile and password), 16 (CI).
+> log of what's already done. Closed: 01 (Alembic), 02 (invitations), 03
+> (PWA), 04 (backups), 05 (onboarding), 06 (recurring), 07 (budgets), 08
+> (CSV import), 09 (filters), 10 (profile and password), 11–14 (growth), 16
+> (CI), and 19 (account reconciliation).
 
 **Immediate (robustness):**
 
@@ -169,7 +172,7 @@ verified end-to-end, including access from a phone over the local IP.
 
 **Phase 2 (features):**
 
-- ⬜ [CSV import](roadmap/08-importacion-csv.md) of account statements.
+- ✅ [CSV import](roadmap/08-importacion-csv.md) of account statements (2026-08-06).
 - ✅ [Filters and search](roadmap/09-filtros-busqueda.md) in Transactions (2026-08-04).
 - ✅ [Profile and password change](roadmap/10-perfil-y-password.md) (2026-08-04).
 
@@ -184,3 +187,4 @@ verified end-to-end, including access from a phone over the local IP.
 
 - ✅ [CI with GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build + **migrations against a real Postgres** on every push and PR, passing (2026-07-24). Strict branch protection on `main` since 2026-07-25: the 4 checks are required (including for the owner), so changes now go through branch + PR.
 - ⬜ [Monitoring](roadmap/17-monitoreo.md): JSON logs, downtime and disk alerts.
+- ✅ [Account reconciliation](roadmap/19-conciliacion-de-cuentas.md): statement-balance sessions, movement states, and stale-session review after edits or import reversals (2026-08-06).
