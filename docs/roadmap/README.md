@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 15 of 17 done (01–14, 16, 19) · last updated 2026-08-06
+> **Progress:** 16 of 17 done (01–14, 16, 19) · last updated 2026-08-06
 
 ## Immediate — robustness
 
@@ -45,7 +45,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 
 ## Suggested attack order
 
-`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 04 ✅ → 09 ✅ → 10 ✅ → 03 ✅ → 11 ✅ → 12 ✅ → 13 ✅ → 14 ✅ → 08`
+`02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 04 ✅ → 09 ✅ → 10 ✅ → 03 ✅ → 11 ✅ → 12 ✅ → 13 ✅ → 14 ✅ → 08 ✅ → 19 ✅`
 
 Invitations and onboarding completed the family experience; Alembic, CI, and
 backups harden it for production; recurring transactions, budgets, and filters
@@ -61,8 +61,8 @@ before adding more visual polish, bank aggregation, or generative AI.
 | Order | Initiative | Why now | Dependency | Status |
 |---|---|---|---|---|
 | 1 | **Transfers between accounts** | Moving money must not distort income, expenses, budgets, or reports. | None | ✅ 2026-08-05 |
-| 2 | **CSV statement import** | Removes the main adoption and migration barrier without requiring a banking-data provider. | Transfers: imported transfers must be representable correctly. | 08 pending |
-| 3 | **Account reconciliation** | Lets a household verify that its ledger agrees with the bank after manual entry or import. | CSV import | 19 pending |
+| 2 | **CSV statement import** | Removes the main adoption and migration barrier without requiring a banking-data provider. | Transfers: imported transfers must be representable correctly. | ✅ 2026-08-06 |
+| 3 | **Account reconciliation** | Lets a household verify that its ledger agrees with the bank after manual entry or import. | CSV import | ✅ 2026-08-06 |
 | 4 | **Merchants and categorization rules** | Prevents repetitive categorization and improves the quality of reports and budgets. | CSV import | Proposed |
 | 5 | **Split transactions** | A single purchase can belong to several categories; forcing one category makes budgets inaccurate. | Transfers and report invariants | Proposed |
 | 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | Proposal A2 |
