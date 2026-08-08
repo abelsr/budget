@@ -5,4 +5,5 @@ set -e
 
 /app/.venv/bin/python -m app.db_bootstrap
 
-exec /app/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 "$@"
+log_level=$(printf '%s' "${LOG_LEVEL:-info}" | tr '[:upper:]' '[:lower:]')
+exec /app/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level "$log_level" "$@"

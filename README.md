@@ -208,6 +208,52 @@ docker compose start minio backend
 Then log in and confirm the dashboard shows the expected balances, the
 transaction list is populated, and a receipt attachment opens.
 
+## Monitoring
+
+The backend emits JSON logs to stdout. Every completed request includes a UUID
+in both the log's `request_id` field and the response's `X-Request-ID` header;
+use it to correlate a reported failure without logging request bodies. Keep
+`LOG_LEVEL=INFO` in production. Set `LOG_LEVEL=DEBUG` only while diagnosing an
+issue.
+
+`/health` checks both the API and its PostgreSQL connection. Start the optional
+local Uptime Kuma dashboard with:
+
+```bash
+docker compose --profile monitoring up -d uptime-kuma
+```
+
+Open `http://localhost:3001`, complete Kuma's initial setup, then create an
+HTTP(s) monitor for `http://backend:8000/health` with a 60-second interval and
+configure a notification provider (Telegram, Discord, or email). The port is
+bound to localhost deliberately; access it through the host LAN, a reverse
+proxy with authentication, or Tailscale. Verify it alerts after:
+
+```bash
+docker compose stop backend
+```
+
+Kuma cannot detect a full host or disk failure. Run the disk check from host
+cron, pointing `DISK_PATH` at the mount that holds the Docker volumes when it
+is not `/`. `DISK_ALERT_WEBHOOK` must accept a JSON POST, such as a Discord
+webhook:
+
+```bash
+crontab -e
+# every 15 minutes; alert when the filesystem is at least 85% full
+*/15 * * * * DISK_ALERT_WEBHOOK=https://example.invalid/webhook /path/to/budget/scripts/check-disk.sh >> /path/to/budget/backups/disk-check.log 2>&1
+```
+
+Test the notification safely by lowering the threshold temporarily:
+
+```bash
+DISK_THRESHOLD_PERCENT=1 DISK_ALERT_WEBHOOK=https://example.invalid/webhook \
+  ./scripts/check-disk.sh
+```
+
+For alerts when the entire host is unavailable, also configure an external
+monitor such as Better Stack against the public HTTPS `/health` endpoint.
+
 ## Documentation
 
 - **[docs/plan.md](docs/plan.md)** — product and architecture decisions, current status.

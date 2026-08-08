@@ -51,6 +51,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: attachments
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       db:
         condition: service_healthy
@@ -65,6 +66,15 @@ services:
       - backend
     ports:
       - "8081:80"
+
+  uptime-kuma:
+    profiles: [monitoring]
+    image: louislam/uptime-kuma:2
+    restart: unless-stopped
+    volumes:
+      - uptime_kuma_data:/app/data
+    ports:
+      - "127.0.0.1:3001:3001"
 
   # Optional scheduler for scripts/backup.sh. Never starts on its own:
   #   docker compose --profile backup up -d backup
@@ -105,3 +115,4 @@ services:
 volumes:
   pgdata:
   minio_data:
+  uptime_kuma_data:

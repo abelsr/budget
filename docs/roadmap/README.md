@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 16 of 17 done (01–14, 16, 19) · last updated 2026-08-06
+> **Progress:** 17 of 17 done (01–14, 16, 17, 19) · last updated 2026-08-08
 
 ## Immediate — robustness
 
@@ -40,7 +40,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 | # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
 | 16 | [CI with GitHub Actions](16-ci-github-actions.md) | ✅ 2026-07-24 | Medium | M |
-| 17 | [Monitoring](17-monitoreo.md) | ⬜ | Low | S |
+| 17 | [Monitoring](17-monitoreo.md) | ✅ 2026-08-08 | Low | S |
 | 19 | [Account reconciliation](19-conciliacion-de-cuentas.md) | ✅ 2026-08-06 | High | M |
 
 ## Suggested attack order
@@ -117,6 +117,12 @@ may be implemented in parallel.
 - CSV imports apply the most specific matching active-category rule before creating each transaction. The chosen category is captured in the immutable import baseline, so import review, audit events, revert, and restore keep their existing guarantees.
 - Rules are household-isolated and are removed with a deleted category because they are configuration rather than financial history. The merchant-logo registry remains a separate offline visual enhancement.
 - Backend tests passed (176; 12 PostgreSQL-dependent migration tests skipped without a configured test database). Frontend production build passed.
+
+**2026-08-08 — 17 (monitoring) completed.**
+
+- Backend request logs are structured JSON with a UUID `request_id`, method, path, status, and elapsed duration. Every response exposes the same ID in `X-Request-ID`; request bodies are never logged.
+- `/health` performs a lightweight `SELECT 1` database check, so an HTTP monitor detects an API that is up but disconnected from PostgreSQL.
+- An optional, localhost-only Uptime Kuma compose profile and a host cron disk-check script are documented in the root README. The alert destination is deployment-specific and must be configured by the operator.
 
 **2026-08-06 — 19 (account reconciliation) completed.**
 
