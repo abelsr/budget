@@ -57,6 +57,16 @@ export interface Category {
   active: boolean
 }
 
+/** A normalized merchant description automatically assigned on CSV import. */
+export interface MerchantRule {
+  id: string
+  householdId: string
+  pattern: string
+  categoryId: string
+  categoryName: string
+  categoryType: "expense" | "income"
+}
+
 /** Comprobante adjunto a una transacción (foto, PDF, doc). */
 export interface Attachment {
   id: string

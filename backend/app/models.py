@@ -149,6 +149,22 @@ class Category(Base):
     household: Mapped[Household] = relationship(back_populates="categories")
 
 
+class MerchantRule(Base):
+    """Household-owned normalized merchant pattern assigned to one category."""
+
+    __tablename__ = "merchant_rules"
+    __table_args__ = (UniqueConstraint("household_id", "match_text", name="uq_merchant_rules_household_match_text"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    pattern: Mapped[str] = mapped_column(String(120))
+    match_text: Mapped[str] = mapped_column(String(120))
+    category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    category: Mapped[Category] = relationship(lazy="joined")
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (
