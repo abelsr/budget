@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import delete, func, select, update
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Account, Budget, Category, RecurringRule, Transaction, User
+from app.models import Account, Budget, Category, MerchantRule, RecurringRule, Transaction, User
 from app.schemas.categories import CategoryCreate, CategoryOut, CategoryUpdate
 from app.services.account_access import visible_accounts
 
@@ -116,6 +116,8 @@ def delete_category(category_id: str, db: DbDep, user: CurrentUserDep) -> None:
     # This must happen for tombstones too; otherwise a peer could distinguish a
     # private transaction from an unused category through /budgets.
     db.execute(delete(Budget).where(Budget.category_id == category.id))
+    # Categorization rules are configuration, not ledger history.
+    db.execute(delete(MerchantRule).where(MerchantRule.category_id == category.id))
     has_hidden_movements = db.scalar(
         select(func.count())
         .select_from(Transaction)

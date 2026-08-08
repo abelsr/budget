@@ -63,7 +63,7 @@ before adding more visual polish, bank aggregation, or generative AI.
 | 1 | **Transfers between accounts** | Moving money must not distort income, expenses, budgets, or reports. | None | ✅ 2026-08-05 |
 | 2 | **CSV statement import** | Removes the main adoption and migration barrier without requiring a banking-data provider. | Transfers: imported transfers must be representable correctly. | ✅ 2026-08-06 |
 | 3 | **Account reconciliation** | Lets a household verify that its ledger agrees with the bank after manual entry or import. | CSV import | ✅ 2026-08-06 |
-| 4 | **Merchants and categorization rules** | Prevents repetitive categorization and improves the quality of reports and budgets. | CSV import | Proposed |
+| 4 | **Merchants and categorization rules** | Prevents repetitive categorization and improves the quality of reports and budgets. | CSV import | ✅ 2026-08-08 |
 | 5 | **Split transactions** | A single purchase can belong to several categories; forcing one category makes budgets inaccurate. | Transfers and report invariants | Proposed |
 | 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | Proposal A2 |
 | 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Proposal A5 + proposed forecast |
@@ -110,6 +110,13 @@ may be implemented in parallel.
   and possible restoration.
 
 ## Log
+
+**2026-08-08 — merchants and categorization rules completed.**
+
+- Households can create and remove normalized merchant patterns from Settings. Matching is case-insensitive, accent-insensitive, and ignores punctuation, so variants such as `Sam's`, `Sams`, `S.A.` and `SA` remain useful without duplicating rules.
+- CSV imports apply the most specific matching active-category rule before creating each transaction. The chosen category is captured in the immutable import baseline, so import review, audit events, revert, and restore keep their existing guarantees.
+- Rules are household-isolated and are removed with a deleted category because they are configuration rather than financial history. The merchant-logo registry remains a separate offline visual enhancement.
+- Backend tests passed (176; 12 PostgreSQL-dependent migration tests skipped without a configured test database). Frontend production build passed.
 
 **2026-08-06 — 19 (account reconciliation) completed.**
 

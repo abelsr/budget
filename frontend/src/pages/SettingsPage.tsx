@@ -80,6 +80,7 @@ export function SettingsPage() {
           onClick={() => setMembersOpen(true)}
         />
         <Row icon={<Tags size={16} />} label="Categorías" to="/app/ajustes/categorias" />
+        <Row icon={<Tags size={16} />} label="Reglas de comercios" to="/app/ajustes/reglas-de-comercios" />
         <Row icon={<Repeat size={16} />} label="Recurrentes" to="/app/ajustes/recurrentes" />
         <Row icon={<FileUp size={16} />} label="Importar movimientos" to="/app/importar" />
         <ThemeRow theme={theme} setTheme={setTheme} />

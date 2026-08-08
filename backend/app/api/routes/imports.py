@@ -21,6 +21,7 @@ from app.models import (
     ImportBatch,
     ImportFingerprint,
     ImportRow,
+    MerchantRule,
     Transaction,
     TransactionEditEvent,
     User,
@@ -42,6 +43,7 @@ from app.schemas.imports import (
     TransactionEditEventOut,
 )
 from app.services.account_access import can_operate, visible_accounts
+from app.services.categorization import matching_category_id
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -348,6 +350,13 @@ async def commit_import(
                 db.add(category)
                 db.flush()
             categories[tx_type] = category
+        merchant_rules = db.scalars(
+            select(MerchantRule).join(Category).where(
+                MerchantRule.household_id == household_id,
+                Category.active.is_(True),
+                Category.deleted.is_(False),
+            )
+        ).all()
         batch = ImportBatch(
             household_id=household_id, account_id=account_id, created_by_id=user.id,
             source_filename=filename, mapping=parsed_mapping.model_dump(by_alias=True),
@@ -359,8 +368,9 @@ async def commit_import(
         for row in chosen:
             tx_type = "income" if row["amount"] > 0 else "expense"
             amount = abs(row["amount"])
+            category_id = matching_category_id(merchant_rules, row["description"], tx_type) or categories[tx_type].id
             baseline = {
-                "type": tx_type, "amount": _canonical_amount(amount), "category_id": categories[tx_type].id,
+                "type": tx_type, "amount": _canonical_amount(amount), "category_id": category_id,
                 "account_id": account_id, "date": row["date"].isoformat(), "note": row["description"],
             }
             advisory_reasons = _advisory_reasons(
@@ -385,7 +395,7 @@ async def commit_import(
                 with db.begin_nested():
                     transaction = Transaction(
                         household_id=household_id, type=tx_type, amount=amount,
-                        category_id=categories[tx_type].id, account_id=account_id, member_id=user.id,
+                        category_id=category_id, account_id=account_id, member_id=user.id,
                         date=row["date"], note=row["description"], import_batch_id=batch.id,
                     )
                     db.add(transaction)

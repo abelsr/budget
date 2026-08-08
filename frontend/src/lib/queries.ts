@@ -16,6 +16,7 @@ import type {
   ImportMapping,
   ImportPreview,
   Member,
+  MerchantRule,
   NewTransaction,
   NewTransfer,
   RecurringRule,
@@ -46,6 +47,7 @@ export const keys = {
   goals: ["goals"] as const,
   importBatches: ["import", "batches"] as const,
   importBatch: (id: string) => ["import", "batches", id] as const,
+  merchantRules: ["merchant-rules"] as const,
   reconciliation: (accountId: string, id: string) => ["accounts", accountId, "reconciliations", id] as const,
 }
 
@@ -112,6 +114,33 @@ export function useCategories() {
   return useQuery({
     queryKey: keys.categories,
     queryFn: () => apiFetch<Category[]>("/categories"),
+  })
+}
+
+export function useMerchantRules() {
+  return useQuery({
+    queryKey: keys.merchantRules,
+    queryFn: () => apiFetch<MerchantRule[]>("/merchant-rules"),
+  })
+}
+
+export function useCreateMerchantRule() {
+  const invalidate = useInvalidator(keys.merchantRules)
+  return useMutation({
+    mutationFn: ({ pattern, categoryId }: { pattern: string; categoryId: string }) =>
+      apiFetch<MerchantRule>("/merchant-rules", {
+        method: "POST",
+        body: JSON.stringify({ pattern, categoryId }),
+      }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteMerchantRule() {
+  const invalidate = useInvalidator(keys.merchantRules)
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/merchant-rules/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
   })
 }
 

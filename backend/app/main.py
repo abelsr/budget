@@ -10,6 +10,7 @@ from app.api.routes import (
     goals,
     households,
     imports,
+    merchant_rules,
     reconciliations,
     recurring,
     reports,
@@ -47,6 +48,7 @@ for module in (
     goals,
     tickets,
     imports,
+    merchant_rules,
     reconciliations,
 ):
     app.include_router(module.router)

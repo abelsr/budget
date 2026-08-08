@@ -16,6 +16,7 @@ import { LandingPage } from "@/pages/LandingPage"
 import { ReportsPage } from "@/pages/ReportsPage"
 import { PrivacyPage } from "@/pages/PrivacyPage"
 import { ImportPage } from "@/pages/ImportPage"
+import { MerchantRulesPage } from "@/pages/MerchantRulesPage"
 
 const ONBOARDING_PATH = "/onboarding"
 /** La app vive bajo /app; / es la landing pública. */
@@ -93,6 +94,7 @@ function App() {
               <Route path="ajustes" element={<SettingsPage />} />
               <Route path="ajustes/categorias" element={<CategoriesPage />} />
               <Route path="ajustes/recurrentes" element={<RecurringPage />} />
+              <Route path="ajustes/reglas-de-comercios" element={<MerchantRulesPage />} />
               <Route path="importar" element={<ImportPage />} />
             </Route>
           </Route>
