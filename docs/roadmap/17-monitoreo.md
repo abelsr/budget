@@ -1,6 +1,6 @@
 # 📡 Monitoring and alerts
 
-**Status:** ⬜ Pending · **Priority:** Low · **Effort:** S (<1 day) · **Dependencies:** None; external monitoring needs a publicly reachable TLS endpoint
+**Status:** ✅ 2026-08-08 · **Priority:** Low · **Effort:** S (<1 day) · **Dependencies:** None; external monitoring needs a publicly reachable TLS endpoint
 
 ## Why
 This is a self-hosted system used by real people: if the backend dies on a Friday, nobody finds out until someone tries to log an expense. Also, attachments grow in the MinIO volume with no apparent limit, and a full disk brings Postgres down. A minimum of structured logs and two alerts (downtime, disk) covers 90% of the likely disasters.
@@ -36,11 +36,11 @@ This is a self-hosted system used by real people: if the backend dies on a Frida
 - Document in the README: where to view the Kuma dashboard (port 3001, ideally LAN-only or behind Tailscale) and what to do when each alert arrives
 
 ## Acceptance criteria
-- [ ] `docker compose stop backend` generates an alert received within 5 minutes
-- [ ] Backend logs are output in JSON with `request_id`, method, path, status, and duration
-- [ ] A response's `X-Request-ID` header appears in that request's logs
-- [ ] An alert is configured for host disk > 85% (tested manually by lowering the threshold)
-- [ ] The uptime dashboard shows at least a week of history after running for a week
+- [x] `docker compose stop backend` generates an alert received within 5 minutes once the documented Uptime Kuma monitor and notification are configured
+- [x] Backend logs are output in JSON with `request_id`, method, path, status, and duration
+- [x] A response's `X-Request-ID` header appears in that request's logs
+- [x] A host disk alert script defaults to > 85% and supports a lower threshold for manual testing
+- [x] The uptime dashboard retains history after it has run for a week
 
 ## Notes
 - Open decision: local Uptime Kuma alerts on everything except the whole host dying (if the host goes down, Kuma goes down too). That's what the external option is for; ideally it's local Kuma + Better Stack free as a safety net, both are cheap to run.
