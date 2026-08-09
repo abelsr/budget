@@ -75,6 +75,8 @@ class ImportTransactionStateOut(_CamelModel):
     note: str | None
     deleted_at: datetime | None
     delete_reason: str | None
+    is_split: bool = False
+    splits: list[dict] = []
 
 
 class TransactionEditEventOut(_CamelModel):

@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import extract, func, select
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Account, Transaction
+from app.models import Account, Transaction, TransactionSplit
 from app.schemas.summary import (
     CategoryTotal,
     MonthSummaryResponse,
@@ -60,11 +60,25 @@ def get_month_summary(
     income = _sum("income")
     expense = _sum("expense")
 
+    # A parent movement contributes to account totals once, while its split
+    # allocations contribute to their individual category totals.
     by_category_stmt = (
-        select(Transaction.category_id, func.sum(Transaction.amount)).join(Account)
-        .where(*base_filter, Transaction.type == "expense")
-        .group_by(Transaction.category_id)
-        .order_by(func.sum(Transaction.amount).desc())
+        select(TransactionSplit.category_id, func.sum(TransactionSplit.amount).label("total"))
+        .join(Transaction, Transaction.id == TransactionSplit.transaction_id)
+        .join(Account, Account.id == Transaction.account_id)
+        .where(*base_filter, Transaction.type == "expense", Transaction.is_split.is_(True))
+        .group_by(TransactionSplit.category_id)
+        .union_all(
+            select(Transaction.category_id, func.sum(Transaction.amount).label("total")).join(Account)
+            .where(*base_filter, Transaction.type == "expense", Transaction.is_split.is_(False))
+            .group_by(Transaction.category_id)
+        )
+        .subquery()
+    )
+    by_category_stmt = (
+        select(by_category_stmt.c.category_id, func.sum(by_category_stmt.c.total))
+        .group_by(by_category_stmt.c.category_id)
+        .order_by(func.sum(by_category_stmt.c.total).desc())
     )
     by_category = [
         CategoryTotal(category_id=category_id, total=round(float(total), 2))

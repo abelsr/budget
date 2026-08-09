@@ -15,6 +15,15 @@ class _CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+class TransactionSplitInput(_CamelModel):
+    category_id: str
+    amount: float = Field(gt=0)
+
+
+class TransactionSplitOut(TransactionSplitInput):
+    pass
+
+
 class TransactionCreate(_CamelModel):
     client_id: UUID | None = None
     type: TransactionType
@@ -25,6 +34,7 @@ class TransactionCreate(_CamelModel):
     destination_account_id: str | None = None
     date: date_t
     note: str | None = None
+    splits: list[TransactionSplitInput] = Field(default_factory=list)
     #: Si viene, crea además la regla recurrente y liga esta transacción como su
     #: primera ocurrencia. En la misma operación: partirlo en dos llamadas
     #: dejaría transacciones huérfanas o reglas sin primera ocurrencia.
@@ -41,7 +51,16 @@ class TransactionCreate(_CamelModel):
                 raise ValueError("La cuenta origen y destino deben ser distintas")
             if self.repeat is not None:
                 raise ValueError("Las transferencias no pueden ser recurrentes")
-        elif not self.category_id or not self.account_id:
+            if self.splits:
+                raise ValueError("Las transferencias no se pueden dividir")
+        elif not self.account_id:
+            raise ValueError("El movimiento requiere categoría y cuenta")
+        elif self.splits:
+            if self.category_id is not None:
+                raise ValueError("Un movimiento dividido no usa categoría única")
+            if self.repeat is not None:
+                raise ValueError("Los movimientos divididos no pueden ser recurrentes")
+        elif not self.category_id:
             raise ValueError("El movimiento requiere categoría y cuenta")
         return self
 
@@ -55,6 +74,9 @@ class TransactionUpdate(_CamelModel):
     note: str | None = None
     source_account_id: str | None = None
     destination_account_id: str | None = None
+    # When present, replaces the entire allocation set. [] converts a split
+    # back to a regular transaction and therefore requires categoryId.
+    splits: list[TransactionSplitInput] | None = None
 
 
 class TransactionOut(_CamelModel):
@@ -78,4 +100,6 @@ class TransactionOut(_CamelModel):
     counterparty_account_id: str | None = None
     counterparty_account_name: str | None = None
     reconciliation_status: Literal["pending", "reconciled"] = "pending"
+    is_split: bool = False
+    splits: list[TransactionSplitOut] = []
     attachments: list[AttachmentResponse] = []

@@ -99,9 +99,16 @@ export interface Transaction {
   counterpartyAccountName?: string | null
   attachments: Attachment[]
   reconciliationStatus: "pending" | "reconciled"
+  isSplit: boolean
+  splits: TransactionSplit[]
   /** Local-only state for an outbox record; it is never sent to the API. */
   syncStatus?: "pending" | "failed"
   syncError?: string
+}
+
+export interface TransactionSplit {
+  categoryId: string
+  amount: number
 }
 
 export interface ReconciliationTransaction {
@@ -152,6 +159,15 @@ export interface NewTransfer {
   destinationAccountId: string
   date: string
   note?: string
+}
+
+export interface NewSplitTransaction {
+  type: "expense" | "income"
+  amount: number
+  accountId: string
+  date: string
+  note?: string
+  splits: TransactionSplit[]
 }
 
 /**
@@ -263,6 +279,8 @@ export interface ImportTransactionState {
   note: string | null
   deletedAt: string | null
   deleteReason: string | null
+  isSplit: boolean
+  splits: TransactionSplit[]
 }
 
 export interface TransactionEditEvent {

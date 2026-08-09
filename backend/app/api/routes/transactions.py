@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, DbDep
@@ -13,12 +13,15 @@ from app.models import (
     RecurringRule,
     Transaction,
     TransactionEditEvent,
+    TransactionSplit,
     TransferGroup,
     User,
 )
 from app.schemas.transactions import (
     TransactionCreate,
     TransactionOut,
+    TransactionSplitInput,
+    TransactionSplitOut,
     TransactionUpdate,
 )
 from app.services.recurring import advance, materialize_due
@@ -97,6 +100,8 @@ def _tx_out(tx: Transaction, db=None, user_id: str | None = None) -> Transaction
         counterparty_account_id=counterparty.account_id if counterparty else None,
         counterparty_account_name=(db.get(Account, counterparty.account_id).name if counterparty else None),
         reconciliation_status=tx.reconciliation_status,
+        is_split=tx.is_split,
+        splits=[TransactionSplitOut(category_id=split.category_id, amount=float(split.amount)) for split in tx.splits],
     )
 
 
@@ -109,7 +114,10 @@ def _same_create_payload(tx: Transaction, payload: TransactionCreate, db) -> boo
         or tx.account_id != payload.account_id
         or tx.date != payload.date
         or tx.note != payload.note
+        or tx.is_split != bool(payload.splits)
     ):
+        return False
+    if tx.is_split and not _same_splits(tx.splits, payload.splits):
         return False
     if payload.repeat is None:
         return tx.recurring_rule_id is None
@@ -120,6 +128,38 @@ def _same_create_payload(tx: Transaction, payload: TransactionCreate, db) -> boo
 def _money(value: Decimal | float) -> Decimal:
     """Compare amounts at the database's fixed four-decimal money scale."""
     return Decimal(str(value)).quantize(Decimal("0.0001"))
+
+
+def _same_splits(rows: list[TransactionSplit], splits: list[TransactionSplitInput]) -> bool:
+    return sorted((row.category_id, _money(row.amount)) for row in rows) == sorted(
+        (split.category_id, _money(split.amount)) for split in splits
+    )
+
+
+def _split_snapshot(tx: Transaction) -> list[dict[str, object]]:
+    return [
+        {"category_id": split.category_id, "amount": float(split.amount)}
+        for split in sorted(tx.splits, key=lambda row: row.category_id)
+    ]
+
+
+def _validate_splits(
+    db, household_id: str, user_id: str, tx_type: str, amount: Decimal | float,
+    splits: list[TransactionSplitInput],
+) -> None:
+    if len(splits) < 2:
+        raise HTTPException(status_code=422, detail="Un movimiento dividido requiere al menos dos categorías")
+    if len({split.category_id for split in splits}) != len(splits):
+        raise HTTPException(status_code=422, detail="Una categoría no se puede repetir en un movimiento dividido")
+    if sum((_money(split.amount) for split in splits), Decimal()) != _money(amount):
+        raise HTTPException(status_code=422, detail="Las asignaciones deben sumar exactamente el monto")
+    for split in splits:
+        category = db.get(Category, split.category_id)
+        if (
+            category is None or category.household_id != household_id or category.deleted
+            or not category.active or category.type != tx_type
+        ):
+            raise HTTPException(status_code=422, detail="La categoría de una asignación no es válida")
 
 
 def _snapshot(tx: Transaction, fields: tuple[str, ...]) -> dict[str, object]:
@@ -236,7 +276,10 @@ def list_transactions(
     if q:
         stmt = stmt.where(Transaction.note.ilike(f"%{q}%"))
     if category_id is not None:
-        stmt = stmt.where(Transaction.category_id == category_id)
+        stmt = stmt.where(or_(
+            Transaction.category_id == category_id,
+            Transaction.splits.any(TransactionSplit.category_id == category_id),
+        ))
     if account_id is not None:
         stmt = stmt.where(Transaction.account_id == account_id)
     if member_id is not None:
@@ -345,14 +388,19 @@ def create_transaction(
                     detail="El clientId ya se usó con un movimiento distinto",
                 )
             return _tx_out(existing)
-    assert payload.category_id is not None and payload.account_id is not None
-    _validate_refs(db, household_id, user.id, payload.category_id, payload.account_id)
+    assert payload.account_id is not None
+    if payload.splits:
+        _validate_splits(db, household_id, user.id, payload.type, payload.amount, payload.splits)
+    else:
+        assert payload.category_id is not None
+        _validate_refs(db, household_id, user.id, payload.category_id, payload.account_id)
     tx = Transaction(
         household_id=household_id,
         client_id=client_id,
         type=payload.type,
         amount=payload.amount,
-        category_id=payload.category_id,
+        category_id=None if payload.splits else payload.category_id,
+        is_split=bool(payload.splits),
         account_id=payload.account_id,
         member_id=user.id,  # El autor siempre es el usuario autenticado.
         date=payload.date,
@@ -364,6 +412,11 @@ def create_transaction(
         with db.begin_nested():
             db.add(tx)
             db.flush()
+            if payload.splits:
+                db.add_all([
+                    TransactionSplit(transaction_id=tx.id, category_id=split.category_id, amount=split.amount)
+                    for split in payload.splits
+                ])
     except IntegrityError:
         if client_id is None:
             raise
@@ -437,6 +490,8 @@ def update_transaction(
         rows = _transfer_rows(db, tx.transfer_group_id, for_update=True)
         _assert_transfer_access(rows, household_id, user.id, db)
         data = payload.model_dump(exclude_unset=True)
+        if "splits" in data:
+            raise HTTPException(status_code=422, detail="Las transferencias no se pueden dividir")
         source = next(row for row in rows if row.transfer_direction == "outflow")
         destination = next(row for row in rows if row.transfer_direction == "inflow")
         source_id = data.pop("source_account_id", source.account_id)
@@ -470,14 +525,48 @@ def update_transaction(
     data = payload.model_dump(exclude_unset=True)
     if data.get("type") == "transfer" or "source_account_id" in data or "destination_account_id" in data:
         raise HTTPException(status_code=422, detail="Una transacción existente no se puede convertir en transferencia")
+    splits = data.pop("splits", None)
+    if splits is not None:
+        splits = [TransactionSplitInput.model_validate(split) for split in splits]
+    if splits is not None and data.get("type") == "transfer":
+        raise HTTPException(status_code=422, detail="Una transacción existente no se puede convertir en transferencia")
     category_id = data.get("category_id", tx.category_id)
     account_id = data.get("account_id", tx.account_id)
-    if "category_id" in data or "account_id" in data:
+    if splits is not None:
+        if splits:
+            _validate_splits(
+                db, household_id, user.id, data.get("type", tx.type),
+                data.get("amount", tx.amount), splits,
+            )
+            data["category_id"] = None
+            data["is_split"] = True
+        else:
+            if not category_id:
+                raise HTTPException(status_code=422, detail="El movimiento requiere categoría y cuenta")
+            data["is_split"] = False
+    elif tx.is_split and "amount" in data:
+        raise HTTPException(status_code=422, detail="Actualiza las asignaciones al cambiar el monto")
+    if ("category_id" in data or "account_id" in data) and not data.get("is_split", tx.is_split):
         _validate_refs(db, household_id, user.id, category_id, account_id)
     before = _snapshot(tx, tuple(data))
+    if splits is not None:
+        before["splits"] = _split_snapshot(tx)
     for field, value in data.items():
         setattr(tx, field, value)
+    if splits is not None:
+        # Flush removals before replacements: the same category may remain in
+        # the new allocation set and is protected by a parent/category unique key.
+        db.execute(delete(TransactionSplit).where(TransactionSplit.transaction_id == tx.id))
+        db.flush()
+        db.expire(tx, ["splits"])
+        if splits:
+            tx.splits.extend(
+                TransactionSplit(category_id=split.category_id, amount=split.amount) for split in splits
+            )
+        db.flush()
     after = _snapshot(tx, tuple(data))
+    if splits is not None:
+        after["splits"] = _split_snapshot(tx)
     if tx.import_batch_id is not None and before != after:
         db.add(TransactionEditEvent(
             transaction_id=tx.id, edited_by_id=user.id,

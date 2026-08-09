@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Account, Budget, Category, MerchantRule, RecurringRule, Transaction, User
+from app.models import Account, Budget, Category, MerchantRule, RecurringRule, Transaction, TransactionSplit, User
 from app.schemas.categories import CategoryCreate, CategoryOut, CategoryUpdate
 from app.services.account_access import visible_accounts
 
@@ -100,7 +100,8 @@ def delete_category(category_id: str, db: DbDep, user: CurrentUserDep) -> None:
         select(func.count())
         .select_from(Transaction)
         .join(Account, Account.id == Transaction.account_id)
-        .where(Transaction.category_id == category.id, visible_accounts(user.id))
+        .outerjoin(TransactionSplit, TransactionSplit.transaction_id == Transaction.id)
+        .where(or_(Transaction.category_id == category.id, TransactionSplit.category_id == category.id), visible_accounts(user.id))
     )
     if has_movements:
         raise HTTPException(status_code=409, detail="La categoría tiene movimientos")
@@ -121,7 +122,8 @@ def delete_category(category_id: str, db: DbDep, user: CurrentUserDep) -> None:
     has_hidden_movements = db.scalar(
         select(func.count())
         .select_from(Transaction)
-        .where(Transaction.category_id == category.id)
+        .outerjoin(TransactionSplit, TransactionSplit.transaction_id == Transaction.id)
+        .where(or_(Transaction.category_id == category.id, TransactionSplit.category_id == category.id))
     )
     has_hidden_rules = db.scalar(
         select(func.count())

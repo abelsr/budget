@@ -18,6 +18,7 @@ import type {
   Member,
   MerchantRule,
   NewTransaction,
+  NewSplitTransaction,
   NewTransfer,
   RecurringRule,
   ReconciliationDetail,
@@ -334,17 +335,17 @@ export function useAddTransaction() {
   const queryClient = useQueryClient()
   const { queue } = useOffline()
   return useMutation({
-    mutationFn: async (input: (NewTransaction | NewTransfer) & { offlineEligible?: boolean }) => {
+    mutationFn: async (input: (NewTransaction | NewTransfer | NewSplitTransaction) & { offlineEligible?: boolean }) => {
       const { offlineEligible = true, ...payload } = input
       const offlinePayload = { ...payload, clientId: crypto.randomUUID() }
-      if (!("repeat" in payload && payload.repeat) && offlineEligible && !navigator.onLine) return queue(offlinePayload)
+      if (!("repeat" in payload && payload.repeat) && offlineEligible && !navigator.onLine) return queue(offlinePayload as Parameters<typeof queue>[0])
       try {
         return await apiFetch<Transaction>("/transactions", {
           method: "POST",
           body: JSON.stringify(offlinePayload),
         })
       } catch (error) {
-        if (!("repeat" in payload && payload.repeat) && offlineEligible && !(error instanceof ApiError)) return queue(offlinePayload)
+        if (!("repeat" in payload && payload.repeat) && offlineEligible && !(error instanceof ApiError)) return queue(offlinePayload as Parameters<typeof queue>[0])
         throw error
       }
     },
@@ -353,6 +354,7 @@ export function useAddTransaction() {
       queryClient.invalidateQueries({ queryKey: keys.accounts })
       queryClient.invalidateQueries({ queryKey: keys.summary })
       queryClient.invalidateQueries({ queryKey: keys.budgetsStatus })
+      queryClient.invalidateQueries({ queryKey: keys.rangeSummary })
       // Con `repeat` el backend crea también la regla
       queryClient.invalidateQueries({ queryKey: keys.recurringRules })
     },
@@ -466,6 +468,7 @@ export function useUpdateTransaction() {
     keys.accounts,
     keys.summary,
     keys.budgetsStatus,
+    keys.rangeSummary,
   )
   return useMutation({
     mutationFn: ({ id, ...input }: { id: string } & Record<string, unknown>) =>
@@ -480,6 +483,7 @@ export function useDeleteTransaction() {
     keys.accounts,
     keys.summary,
     keys.budgetsStatus,
+    keys.rangeSummary,
   )
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/transactions/${id}`, { method: "DELETE" }),

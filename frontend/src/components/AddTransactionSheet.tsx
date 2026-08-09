@@ -20,7 +20,7 @@ import {
 } from "@/lib/queries"
 import { springIndicator } from "@/lib/springs"
 import { toISODate } from "@/lib/format"
-import type { Frequency, TransactionType } from "@/lib/types"
+import type { Frequency, TransactionSplit, TransactionType } from "@/lib/types"
 
 /** Opciones del selector "Repetir". `null` = movimiento de una sola vez. */
 const repeatOptions: { value: Frequency | null; label: string }[] = [
@@ -75,6 +75,8 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   const [type, setType] = useState<TransactionType>("expense")
   const [amountText, setAmountText] = useState("")
   const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [splitMode, setSplitMode] = useState(false)
+  const [splits, setSplits] = useState<Array<{ categoryId: string; amountText: string }>>([])
   const [accountId, setAccountId] = useState<string | null>(null)
   const [destinationAccountId, setDestinationAccountId] = useState<string | null>(null)
   const [date, setDate] = useState(() => toISODate(new Date()))
@@ -92,16 +94,25 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   const selectedCategory = visibleCategories.find((c) => c.id === categoryId)
   const selectedAccount = accounts.find((a) => a.id === effectiveAccountId)
   const effectiveDestinationAccountId = destinationAccountId ?? accounts.find((a) => a.id !== effectiveAccountId)?.id
+  const splitValues: TransactionSplit[] = splits
+    .filter((split) => split.categoryId && Number(split.amountText.replace(",", ".")) > 0)
+    .map((split) => ({ categoryId: split.categoryId, amount: Number(split.amountText.replace(",", ".")) }))
+  const assigned = splitValues.reduce((total, split) => total + split.amount, 0)
+  const remaining = Math.round((amount - assigned) * 10_000) / 10_000
   const canSave = amount > 0 && effectiveAccountId && date && (type === "transfer"
     ? Boolean(effectiveDestinationAccountId && effectiveDestinationAccountId !== effectiveAccountId)
-    : categoryId !== null)
+    : splitMode
+      ? splitValues.length === 2 && splitValues.length === splits.length && remaining === 0
+      : categoryId !== null)
   const isSaving = addTransaction.isPending || uploadAttachment.isPending
 
   function save() {
     if (!canSave || !effectiveAccountId) return
     const payload = type === "transfer"
       ? { type, amount, sourceAccountId: effectiveAccountId, destinationAccountId: effectiveDestinationAccountId!, date, note: note.trim() || undefined, offlineEligible: true }
-      : { type, amount, categoryId: categoryId!, accountId: effectiveAccountId, date, note: note.trim() || undefined, repeat: repeat ?? undefined, offlineEligible: !file }
+      : splitMode
+        ? { type, amount, accountId: effectiveAccountId, date, note: note.trim() || undefined, splits: splitValues, offlineEligible: false }
+        : { type, amount, categoryId: categoryId!, accountId: effectiveAccountId, date, note: note.trim() || undefined, repeat: repeat ?? undefined, offlineEligible: !file }
     addTransaction.mutate(
       payload,
       {
@@ -202,7 +213,33 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
             <label htmlFor="transaction-category" className="block text-[12px] font-semibold text-muted-foreground">
               Categoría
             </label>
-            <div className="relative flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3">
+            <button
+              type="button"
+              onClick={() => {
+                setSplitMode((value) => !value)
+                setCategoryId(null)
+                if (!splitMode) setSplits([{ categoryId: "", amountText: "" }, { categoryId: "", amountText: "" }])
+              }}
+              className={`pressable rounded-full px-3 py-1.5 text-[12px] font-semibold ${splitMode ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}
+            >
+              Dividir por categorías
+            </button>
+            {splitMode ? <div className="space-y-2 rounded-xl border border-border bg-secondary/40 p-3">
+              {splits.map((split, index) => (
+                <div key={index} className="flex gap-2">
+                  <select value={split.categoryId} onChange={(event) => setSplits((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, categoryId: event.target.value } : row))} className="min-w-0 flex-1 rounded-lg bg-card px-2 text-[13px] outline-none">
+                    <option value="">Categoría</option>
+                    {visibleCategories.filter((category) => category.id === split.categoryId || !splits.some((row, rowIndex) => rowIndex !== index && row.categoryId === category.id)).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  </select>
+                  <input inputMode="decimal" value={split.amountText} onChange={(event) => setSplits((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, amountText: event.target.value.replace(/[^0-9.,]/g, "") } : row))} placeholder="$0.00" className="tnum w-24 rounded-lg bg-card px-2 text-[13px] outline-none" aria-label={`Monto de asignación ${index + 1}`} />
+                  {splits.length > 2 && <button type="button" onClick={() => setSplits((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="text-muted-foreground" aria-label="Quitar asignación">×</button>}
+                </div>
+              ))}
+              <div className="flex items-center justify-between text-[12px]">
+                <button type="button" onClick={() => setSplits((current) => [...current, { categoryId: "", amountText: "" }])} className="font-semibold text-primary">+ Añadir categoría</button>
+                <span className={remaining === 0 ? "text-income" : "text-muted-foreground"}>Restante: {remaining.toFixed(2)}</span>
+              </div>
+            </div> : <div className="relative flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3">
               {selectedCategory ? (
                 <CategoryIcon
                   icon={selectedCategory.icon}
@@ -229,7 +266,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
                 aria-hidden="true"
                 className="pointer-events-none absolute right-3 text-muted-foreground"
               />
-            </div>
+            </div>}
           </div>}
 
           <div className="space-y-2">
@@ -297,7 +334,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          {type !== "transfer" && <details className="rounded-xl border border-border bg-secondary/40 px-3">
+          {type !== "transfer" && !splitMode && <details className="rounded-xl border border-border bg-secondary/40 px-3">
             <summary className="flex h-11 cursor-pointer list-none items-center gap-2 text-[13px] font-medium text-muted-foreground">
               <Repeat size={15} aria-hidden="true" />
               Opciones adicionales

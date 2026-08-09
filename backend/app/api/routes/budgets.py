@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import extract, func, select
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Account, Budget, Category, Transaction, User
+from app.models import Account, Budget, Category, Transaction, TransactionSplit, User
 from app.schemas.budgets import BudgetCreate, BudgetOut, BudgetStatus, BudgetUpdate
 from app.services.recurring import materialize_due
 from app.services.account_access import shared_accounts
@@ -92,14 +92,33 @@ def get_budgets_status(
         extract("year", Transaction.date) == year,
         extract("month", Transaction.date) == month_num,
         Transaction.type == "expense",
-        Transaction.category_id.in_(category_ids),
+        Transaction.is_split.is_(True),
     ]
     spent_stmt = (
-        select(Transaction.category_id, func.sum(Transaction.amount)).join(Account)
+        select(TransactionSplit.category_id, func.sum(TransactionSplit.amount))
+        .join(Transaction, Transaction.id == TransactionSplit.transaction_id)
+        .join(Account, Account.id == Transaction.account_id)
         .where(*base_filter)
+        .where(TransactionSplit.category_id.in_(category_ids))
+        .group_by(TransactionSplit.category_id)
+    )
+    simple_stmt = (
+        select(Transaction.category_id, func.sum(Transaction.amount)).join(Account)
+        .where(
+            Transaction.household_id == household_id,
+            Transaction.deleted_at.is_(None),
+            shared_accounts(),
+            extract("year", Transaction.date) == year,
+            extract("month", Transaction.date) == month_num,
+            Transaction.type == "expense",
+            Transaction.is_split.is_(False),
+            Transaction.category_id.in_(category_ids),
+        )
         .group_by(Transaction.category_id)
     )
-    spent_by_category = dict(db.execute(spent_stmt).all())
+    spent_by_category: dict[str, object] = {}
+    for category_id, amount in [*db.execute(spent_stmt).all(), *db.execute(simple_stmt).all()]:
+        spent_by_category[category_id] = spent_by_category.get(category_id, 0) + amount
 
     return [
         BudgetStatus(

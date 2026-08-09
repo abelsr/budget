@@ -28,6 +28,7 @@ import type {
   Category,
   Member,
   Transaction,
+  TransactionSplit,
   TransactionType,
 } from "@/lib/types"
 
@@ -137,6 +138,7 @@ function ViewMode({
   const isIncome = transaction.type === "income"
   const isTransfer = transaction.type === "transfer"
   const isInflow = transaction.transferDirection === "inflow"
+  const { data: categories = [] } = useCategories()
   const authorName = transaction.authorName ?? member?.name
 
   function remove() {
@@ -193,6 +195,10 @@ function ViewMode({
       <div className="divide-y divide-border/50 overflow-hidden rounded-2xl bg-secondary">
         {isTransfer ? <>
           <DetailRow label={isInflow ? "Desde cuenta" : "A cuenta"} value={transaction.counterpartyAccountName ?? "—"} />
+          <DetailRow label="Cuenta" value={account?.name ?? "—"} />
+        </> : transaction.isSplit ? <>
+          <DetailRow label="Asignaciones" value={`${transaction.splits.length} categorías`} />
+          {transaction.splits.map((split) => <DetailRow key={split.categoryId} label={categories.find((item) => item.id === split.categoryId)?.name ?? "Categoría"} value={formatMoney(split.amount)} />)}
           <DetailRow label="Cuenta" value={account?.name ?? "—"} />
         </> : <>
           <DetailRow label="Categoría" value={category?.name ?? "—"} />
@@ -344,6 +350,10 @@ function EditForm({
   const [categoryId, setCategoryId] = useState<string | null>(
     transaction.categoryId,
   )
+  const [splitMode, setSplitMode] = useState(transaction.isSplit)
+  const [splits, setSplits] = useState<Array<{ categoryId: string; amountText: string }>>(
+    transaction.splits.map((split) => ({ categoryId: split.categoryId, amountText: String(split.amount) })),
+  )
   const [accountId, setAccountId] = useState<string | null>(
     transaction.accountId,
   )
@@ -360,7 +370,11 @@ function EditForm({
   )
   const effectiveAccountId =
     accountId ?? accounts.find((a) => a.kind === "debit")?.id ?? accounts[0]?.id
-  const canSave = amount > 0 && categoryId !== null && effectiveAccountId && date
+  const splitValues: TransactionSplit[] = splits
+    .filter((split) => split.categoryId && Number(split.amountText.replace(",", ".")) > 0)
+    .map((split) => ({ categoryId: split.categoryId, amount: Number(split.amountText.replace(",", ".")) }))
+  const remaining = Math.round((amount - splitValues.reduce((total, split) => total + split.amount, 0)) * 10_000) / 10_000
+  const canSave = amount > 0 && effectiveAccountId && date && (splitMode ? splitValues.length >= 2 && splitValues.length === splits.length && remaining === 0 : categoryId !== null)
 
   function save() {
     if (!canSave || !categoryId || !effectiveAccountId) return
@@ -369,10 +383,11 @@ function EditForm({
         id: transaction.id,
         type,
         amount,
-        categoryId,
+        categoryId: splitMode ? null : categoryId,
         accountId: effectiveAccountId,
         date,
         note: note.trim() || undefined,
+        splits: splitMode ? splitValues : transaction.isSplit ? [] : undefined,
       },
       {
         onSuccess: () => {
@@ -453,6 +468,23 @@ function EditForm({
         <p className="mb-2 text-[13px] font-medium text-muted-foreground">
           Categoría
         </p>
+        <button type="button" onClick={() => {
+          setSplitMode((value) => !value)
+          if (!splitMode) setSplits([{ categoryId: "", amountText: "" }, { categoryId: "", amountText: "" }])
+        }} className={`mb-3 rounded-full px-3 py-1.5 text-[12px] font-semibold ${splitMode ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+          Dividir por categorías
+        </button>
+        {splitMode ? <div className="space-y-2 rounded-xl bg-secondary p-3">
+          {splits.map((split, index) => <div key={index} className="flex gap-2">
+            <select value={split.categoryId} onChange={(event) => setSplits((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, categoryId: event.target.value } : row))} className="min-w-0 flex-1 rounded-lg bg-card px-2 text-[13px]">
+              <option value="">Categoría</option>
+              {visibleCategories.filter((item) => item.id === split.categoryId || !splits.some((row, rowIndex) => rowIndex !== index && row.categoryId === item.id)).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <input inputMode="decimal" value={split.amountText} onChange={(event) => setSplits((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, amountText: event.target.value.replace(/[^0-9.,]/g, "") } : row))} className="tnum w-24 rounded-lg bg-card px-2 text-[13px]" aria-label={`Monto de asignación ${index + 1}`} />
+            {splits.length > 2 && <button type="button" onClick={() => setSplits((current) => current.filter((_, rowIndex) => rowIndex !== index))} aria-label="Quitar asignación">×</button>}
+          </div>)}
+          <div className="flex justify-between text-[12px]"><button type="button" onClick={() => setSplits((current) => [...current, { categoryId: "", amountText: "" }])} className="font-semibold text-primary">+ Añadir categoría</button><span className={remaining === 0 ? "text-income" : "text-muted-foreground"}>Restante: {remaining.toFixed(2)}</span></div>
+        </div> : <>
         <div className="grid grid-cols-4 gap-2">
           {visibleCategories.map((c) => {
             const selected = categoryId === c.id
@@ -478,6 +510,7 @@ function EditForm({
             )
           })}
         </div>
+        </>}
       </div>
 
       {/* Cuenta */}
