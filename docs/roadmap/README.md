@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 19 of 19 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover) · last updated 2026-08-08
+> **Progress:** 20 of 20 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts) · last updated 2026-08-08
 
 ## Immediate — robustness
 
@@ -42,6 +42,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 | 16 | [CI with GitHub Actions](16-ci-github-actions.md) | ✅ 2026-07-24 | Medium | M |
 | 17 | [Monitoring](17-monitoreo.md) | ✅ 2026-08-08 | Low | S |
 | 19 | [Account reconciliation](19-conciliacion-de-cuentas.md) | ✅ 2026-08-06 | High | M |
+| 20 | [In-app alerts](20-alertas-en-app.md) | ✅ 2026-08-08 | Medium | M |
 
 ## Suggested attack order
 
@@ -66,7 +67,7 @@ before adding more visual polish, bank aggregation, or generative AI.
 | 4 | **Merchants and categorization rules** | Prevents repetitive categorization and improves the quality of reports and budgets. | CSV import | ✅ 2026-08-08 |
 | 5 | **Split transactions** | A single purchase can belong to several categories; forcing one category makes budgets inaccurate. | Transfers and report invariants | ✅ 2026-08-08 |
 | 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | ✅ 2026-08-08 |
-| 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Proposal A5 + proposed forecast |
+| 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Alerts ✅ 2026-08-08; forecast proposed |
 | 8 | **Goal plans** | Adds due dates, required periodic contributions, and pause/resume to the shipped manual goals. | Alerts | Proposed |
 | 9 | **Mexican card and instalment support** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and cash-flow forecast | Proposed |
 
@@ -110,6 +111,12 @@ may be implemented in parallel.
   and possible restoration.
 
 ## Log
+
+**2026-08-08 — 20 (in-app alerts) completed.**
+
+- A lazy, idempotent `/alerts` pass persists budget threshold, overdue recurring-rule, reached-goal, and negative-balance notifications without adding a scheduler to self-hosted deployments.
+- The unique household dedupe key prevents duplicate records during concurrent reads. Household notifications are shared, while personal-account notifications remain visible only to their owner.
+- The desktop notification bell now reports the real unread count and opens a responsive sheet that marks alerts read, links to the relevant area, and can materialize an overdue recurring rule immediately.
 
 **2026-08-08 — monthly budgets with optional rollover completed.**
 

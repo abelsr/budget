@@ -4,6 +4,7 @@ import { ApiError, apiFetch } from "@/lib/api"
 import { useOffline, useOfflineTransactions } from "@/lib/offline"
 import type {
   Account,
+  Alert,
   Attachment,
   Budget,
   BudgetStatus,
@@ -35,6 +36,7 @@ import type {
 
 export const keys = {
   accounts: ["accounts"] as const,
+  alerts: ["alerts"] as const,
   categories: ["categories"] as const,
   members: ["members"] as const,
   transactions: ["transactions"] as const,
@@ -590,6 +592,44 @@ export function useDeleteAttachment() {
   const invalidate = useInvalidator(keys.transactions)
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/attachments/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Alertas
+// ---------------------------------------------------------------------------
+
+export function useAlerts() {
+  return useQuery({
+    queryKey: keys.alerts,
+    queryFn: () => apiFetch<Alert[]>("/alerts"),
+    refetchInterval: 60_000,
+  })
+}
+
+export function useReadAlerts() {
+  const invalidate = useInvalidator(keys.alerts)
+  return useMutation({
+    mutationFn: (alertId?: string) => apiFetch<void>("/alerts/read", {
+      method: "POST",
+      body: JSON.stringify(alertId ? { alertId } : {}),
+    }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useGenerateAlertRecurring() {
+  const invalidate = useInvalidator(
+    keys.alerts,
+    keys.recurringRules,
+    keys.transactions,
+    keys.accounts,
+    keys.summary,
+    keys.budgetsStatus,
+  )
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ generated: number }>(`/alerts/${id}/generate`, { method: "POST" }),
     onSuccess: invalidate,
   })
 }

@@ -1,7 +1,6 @@
 import { Link, NavLink, Outlet } from "react-router-dom"
 import {
   ArrowLeftRight,
-  Bell,
   ChevronsUpDown,
   FolderCog,
   LayoutDashboard,
@@ -19,6 +18,7 @@ import { useAuth } from "@/lib/auth"
 import { AddTransactionButton } from "@/components/AddTransactionSheet"
 import { BrandMark } from "@/components/BrandMark"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
+import { AlertsButton } from "@/components/AlertsSheet"
 import { useOffline } from "@/lib/offline"
 
 type NavigationItem = {
@@ -136,14 +136,7 @@ export function AppShell() {
       <main className="pb-28 md:pb-10 md:pl-52">
         {(!online || pending.length > 0) && <OfflineBanner online={online} pending={pending.length} cacheUpdatedAt={cacheUpdatedAt} />}
         <header className="hidden h-15 items-center justify-end border-b bg-card/80 px-8 backdrop-blur-sm md:flex">
-          <span
-            role="status"
-            aria-label="Notificaciones pendientes"
-            className="pressable relative mr-28 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <Bell size={18} />
-            <span className="absolute right-1 top-1 size-1.5 rounded-full bg-destructive" aria-hidden="true" />
-          </span>
+          <span className="mr-28"><AlertsButton /></span>
         </header>
         <div className="mx-auto w-full max-w-2xl px-4 pt-6 md:max-w-3xl md:pt-7 lg:max-w-6xl lg:px-8 2xl:max-w-7xl">
           <Outlet />
@@ -182,8 +175,12 @@ export function AppShell() {
                   {label}
                 </>
               )}
-            </NavLink>
+              </NavLink>
           ))}
+          <div className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-muted-foreground">
+            <AlertsButton />
+            Alertas
+          </div>
         </div>
       </nav>
     </div>

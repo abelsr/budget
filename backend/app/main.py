@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.routes import (
     accounts,
+    alerts,
     attachments,
     auth,
     budgets,
@@ -49,6 +50,7 @@ for module in (
     auth,
     households,
     accounts,
+    alerts,
     categories,
     transactions,
     recurring,

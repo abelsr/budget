@@ -229,6 +229,17 @@ export interface SavingsGoal {
   isCompleted: boolean
 }
 
+export type AlertKind = "budget_warning" | "budget_exceeded" | "recurring_overdue" | "goal_reached" | "negative_balance"
+
+export interface Alert {
+  id: string
+  kind: AlertKind
+  message: string
+  payload: Record<string, unknown>
+  readAt: string | null
+  createdAt: string
+}
+
 export type ImportDateFormat = "DD/MM/YYYY" | "MM/DD/YYYY"
 export type ImportDuplicateReason = "household" | "fingerprint" | "file"
 
