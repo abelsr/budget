@@ -466,7 +466,8 @@ def get_batch(batch_id: str, db: DbDep, user: CurrentUserDep) -> ImportBatchDeta
                 id=transaction.id, type=transaction.type, amount=float(transaction.amount),
                 category_id=transaction.category_id, account_id=transaction.account_id,
                 date=transaction.date, note=transaction.note, deleted_at=transaction.deleted_at,
-                delete_reason=transaction.delete_reason,
+                delete_reason=transaction.delete_reason, is_split=transaction.is_split,
+                splits=[{"category_id": split.category_id, "amount": float(split.amount)} for split in transaction.splits],
             ) if (transaction := transactions.get(row.transaction_id)) is not None else None),
             edit_events=[TransactionEditEventOut(
                 id=event.id, transaction_id=event.transaction_id, edited_by_id=event.edited_by_id,
@@ -485,6 +486,7 @@ def get_batch(batch_id: str, db: DbDep, user: CurrentUserDep) -> ImportBatchDeta
 def _matches_baseline(transaction: Transaction, baseline: dict) -> bool:
     return (
         transaction.type == baseline["type"]
+        and not transaction.is_split
         and _canonical_amount(transaction.amount) == baseline["amount"]
         and transaction.category_id == baseline["category_id"]
         and transaction.account_id == baseline["account_id"]
@@ -516,6 +518,7 @@ def revert_batch(batch_id: str, db: DbDep, user: CurrentUserDep) -> ImportBatchO
             Transaction.type == baseline["type"],
             Transaction.amount == Decimal(baseline["amount"]),
             Transaction.category_id == baseline["category_id"],
+            Transaction.is_split.is_(False),
             Transaction.account_id == baseline["account_id"],
             Transaction.date == date.fromisoformat(baseline["date"]),
         ]

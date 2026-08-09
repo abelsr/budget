@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AlertCircle, ArrowLeftRight, CloudUpload, Paperclip, Repeat } from "lucide-react"
+import { AlertCircle, ArrowLeftRight, CloudUpload, Paperclip, Repeat, Split } from "lucide-react"
 
 import { formatMoney, formatShortDate } from "@/lib/format"
 import type { Account, Category, Member, Transaction } from "@/lib/types"
@@ -46,12 +46,13 @@ export function TransactionItem({
 
   // Comercio reconocido por la nota → medallón de marca (fallback: categoría).
   const brand = matchBrand(transaction.note)
+  const splitSummary = transaction.isSplit ? `${transaction.splits.length} categorías` : undefined
 
   // La cuenta es una columna propia en el ledger de escritorio; fuera de él va
   // en la línea de metadatos. En móvil (donde la columna está oculta) vuelve a
   // los metadatos. Nunca en ambas, §9.
   const meta = [
-    isTransfer ? transaction.counterpartyAccountName && `→ ${transaction.counterpartyAccountName}` : transaction.note ? category?.name : undefined,
+    isTransfer ? transaction.counterpartyAccountName && `→ ${transaction.counterpartyAccountName}` : splitSummary ?? (transaction.note ? category?.name : undefined),
     ledger ? undefined : account?.name,
     authorName,
     showDate ? formatShortDate(transaction.date) : undefined,
@@ -71,11 +72,11 @@ export function TransactionItem({
         {brand ? (
           <BrandMedallion brand={brand} className="size-10 shrink-0" />
         ) : (
-          isTransfer ? <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary"><ArrowLeftRight size={19} /></span> : <CategoryIcon icon={category?.icon ?? "wallet"} color={category?.color ?? CHART_OTHER.light} className="size-10 shrink-0" />
+          isTransfer ? <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary"><ArrowLeftRight size={19} /></span> : transaction.isSplit ? <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"><Split size={18} /></span> : <CategoryIcon icon={category?.icon ?? "wallet"} color={category?.color ?? CHART_OTHER.light} className="size-10 shrink-0" />
         )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-medium">
-            {transaction.note || (isTransfer ? "Transferencia" : category?.name) || "Movimiento"}
+            {transaction.note || (isTransfer ? "Transferencia" : transaction.isSplit ? "Movimiento dividido" : category?.name) || "Movimiento"}
           </p>
           <p className="flex items-center gap-1 truncate text-[13px] text-muted-foreground">
             <span className="truncate">

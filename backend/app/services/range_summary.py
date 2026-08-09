@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Category, Transaction, User
+from app.models import Account, Category, Transaction, TransactionSplit, User
 from app.schemas.summary import CategoryTotal, RangeMonthTotal
 from app.services.account_access import shared_accounts
 
@@ -43,7 +43,7 @@ def build_range_report(
             User.name,
             Transaction.note,
         )
-        .join(Category, Category.id == Transaction.category_id)
+        .outerjoin(Category, Category.id == Transaction.category_id)
         .join(Account, Account.id == Transaction.account_id)
         .join(User, User.id == Transaction.member_id)
         .where(
@@ -66,12 +66,31 @@ def build_range_report(
         month = tx_date.strftime("%Y-%m")
         totals = monthly_totals.setdefault(month, {"income": 0.0, "expense": 0.0})
         totals[tx_type] += amount_float
-        if tx_type == "expense":
+        if tx_type == "expense" and category_id:
             category_totals[category_id] = category_totals.get(category_id, 0.0) + amount_float
             category_names[category_id] = category
         transactions.append(
-            LedgerTransaction(tx_date, tx_type, amount_float, category, account, member, note)
+            LedgerTransaction(tx_date, tx_type, amount_float, category or "Dividido", account, member, note)
         )
+
+    split_rows = db.execute(
+        select(TransactionSplit.category_id, TransactionSplit.amount, Category.name)
+        .join(Transaction, Transaction.id == TransactionSplit.transaction_id)
+        .join(Category, Category.id == TransactionSplit.category_id)
+        .join(Account, Account.id == Transaction.account_id)
+        .where(
+            Transaction.household_id == household_id,
+            Transaction.deleted_at.is_(None),
+            Transaction.is_split.is_(True),
+            Transaction.type == "expense",
+            shared_accounts(),
+            Transaction.date >= from_date,
+            Transaction.date <= to_date,
+        )
+    ).all()
+    for category_id, amount, category_name in split_rows:
+        category_totals[category_id] = category_totals.get(category_id, 0.0) + float(amount)
+        category_names[category_id] = category_name
 
     return RangeReport(
         monthly=[

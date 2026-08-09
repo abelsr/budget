@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 17 of 17 done (01–14, 16, 17, 19) · last updated 2026-08-08
+> **Progress:** 18 of 18 done (01–14, 16, 17, 19, split transactions) · last updated 2026-08-08
 
 ## Immediate — robustness
 
@@ -64,7 +64,7 @@ before adding more visual polish, bank aggregation, or generative AI.
 | 2 | **CSV statement import** | Removes the main adoption and migration barrier without requiring a banking-data provider. | Transfers: imported transfers must be representable correctly. | ✅ 2026-08-06 |
 | 3 | **Account reconciliation** | Lets a household verify that its ledger agrees with the bank after manual entry or import. | CSV import | ✅ 2026-08-06 |
 | 4 | **Merchants and categorization rules** | Prevents repetitive categorization and improves the quality of reports and budgets. | CSV import | ✅ 2026-08-08 |
-| 5 | **Split transactions** | A single purchase can belong to several categories; forcing one category makes budgets inaccurate. | Transfers and report invariants | Proposed |
+| 5 | **Split transactions** | A single purchase can belong to several categories; forcing one category makes budgets inaccurate. | Transfers and report invariants | ✅ 2026-08-08 |
 | 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | Proposal A2 |
 | 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Proposal A5 + proposed forecast |
 | 8 | **Goal plans** | Adds due dates, required periodic contributions, and pause/resume to the shipped manual goals. | Alerts | Proposed |
@@ -110,6 +110,14 @@ may be implemented in parallel.
   and possible restoration.
 
 ## Log
+
+**2026-08-08 — split transactions completed.**
+
+- A divided expense or income remains one account movement, reconciliation item, attachment owner, and CSV-provenance record; its exact four-decimal category allocations live in `transaction_splits`.
+- Creation and editing require two distinct, active categories of the matching type whose allocations total the parent exactly. Simple and split movements can be converted atomically; recurring and transfer movements deliberately remain unsplittable.
+- Budgets, dashboard/category summaries, filters, reports, category deletion safeguards, and import audit state are allocation-aware. Account balances and income/expense totals continue to count the parent once, preventing double counting.
+- The quick-entry and detail sheets support adding, editing, and reviewing allocations with an assigned/remaining indicator. Split entry is intentionally online-only; the existing offline outbox continues to handle only simple entries and transfers.
+- Backend tests passed (185 SQLite tests; 12 PostgreSQL migration tests passed against a disposable PostgreSQL 17 instance). Frontend lint and production build passed; existing Fast Refresh and bundle-size warnings remain.
 
 **2026-08-08 — merchants and categorization rules completed.**
 

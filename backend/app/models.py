@@ -182,9 +182,10 @@ class Transaction(Base):
         ),
         CheckConstraint(
             "(type = 'transfer' AND category_id IS NULL AND transfer_group_id IS NOT NULL "
-            "AND transfer_direction IN ('outflow', 'inflow')) OR "
-            "(type IN ('expense', 'income') AND category_id IS NOT NULL "
-            "AND transfer_group_id IS NULL AND transfer_direction IS NULL)",
+            "AND transfer_direction IN ('outflow', 'inflow') AND is_split = false) OR "
+            "(type IN ('expense', 'income') AND transfer_group_id IS NULL "
+            "AND transfer_direction IS NULL AND ((is_split = false AND category_id IS NOT NULL) "
+            "OR (is_split = true AND category_id IS NULL)))",
             name="ck_transactions_transfer_shape",
         ),
     )
@@ -196,6 +197,9 @@ class Transaction(Base):
     type: Mapped[str] = mapped_column(String(10))  # expense | income | transfer
     amount: Mapped[float] = mapped_column(Numeric(19, 4))
     category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
+    # A split retains one ledger/reconciliation row and allocates its total to
+    # child categories. Its category lives exclusively in TransactionSplit.
+    is_split: Mapped[bool] = mapped_column(default=False, server_default="false")
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
     transfer_group_id: Mapped[str | None] = mapped_column(
         ForeignKey("transfer_groups.id"), nullable=True, index=True
@@ -224,8 +228,31 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     attachments: Mapped[list["Attachment"]] = relationship(lazy="selectin")
+    splits: Mapped[list["TransactionSplit"]] = relationship(
+        back_populates="transaction", lazy="selectin", cascade="all, delete-orphan"
+    )
     # La autoría no depende de que la persona siga perteneciendo al hogar.
     author: Mapped[User] = relationship(foreign_keys=[member_id], lazy="selectin")
+
+
+class TransactionSplit(Base):
+    """One category allocation of a single ledger transaction."""
+
+    __tablename__ = "transaction_splits"
+    __table_args__ = (
+        UniqueConstraint("transaction_id", "category_id", name="uq_transaction_splits_transaction_category"),
+        CheckConstraint("amount > 0", name="ck_transaction_splits_positive_amount"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    transaction_id: Mapped[str] = mapped_column(
+        ForeignKey("transactions.id", ondelete="CASCADE"), index=True
+    )
+    category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"), index=True)
+    amount: Mapped[float] = mapped_column(Numeric(19, 4))
+
+    transaction: Mapped[Transaction] = relationship(back_populates="splits")
+    category: Mapped[Category] = relationship(lazy="joined")
 
 
 class ReconciliationSession(Base):

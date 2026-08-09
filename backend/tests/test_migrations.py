@@ -61,6 +61,8 @@ APP_TABLES = {
     "import_rows",
     "import_fingerprints",
     "transaction_edit_events",
+    "reconciliation_sessions",
+    "transaction_splits",
 }
 
 
