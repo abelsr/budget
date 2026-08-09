@@ -26,6 +26,8 @@ import {
 } from "lucide-react"
 
 import { TicketScannerButton } from "@/components/TicketScanner"
+import { BudgetBar } from "@/components/BudgetBar"
+import { BudgetFormSheet } from "@/components/BudgetFormSheet"
 import { TransactionItem } from "@/components/TransactionItem"
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { SavingsGoalContributionSheet, SavingsGoalFormSheet } from "@/components/SavingsGoalSheets"
@@ -34,6 +36,8 @@ import { CHART_OTHER, seriesColor } from "@/lib/chart-colors"
 import { formatMoney, formatMoneyCompact, monthLabel } from "@/lib/format"
 import {
   useAccounts,
+  useBudgets,
+  useBudgetsStatus,
   useCategories,
   useMembers,
   useMonthSummary,
@@ -42,7 +46,7 @@ import {
   useUpdateGoal,
 } from "@/lib/queries"
 import { useTheme } from "@/lib/theme"
-import type { Account, Category, Member, SavingsGoal, Transaction } from "@/lib/types"
+import type { Account, Budget, BudgetStatus, Category, Member, SavingsGoal, Transaction } from "@/lib/types"
 
 const kindIcon = { cash: Wallet, debit: Landmark, credit: CreditCard, savings: PiggyBank }
 const MAX_SLICES = 6
@@ -66,6 +70,7 @@ export function DashboardPage() {
   const { data: transactions = [] } = useTransactions()
   const { data: summary } = useMonthSummary()
   const { data: goals = [] } = useGoals()
+  const { data: budgets = [] } = useBudgets()
   const slices = useSlices(summary?.byCategory, categories)
 
   return (
@@ -84,11 +89,35 @@ export function DashboardPage() {
         <div className="min-w-0 lg:col-span-5"><CategoryCard slices={slices} total={summary?.expense ?? 0} concealed={!balancesVisible} /></div>
         <div className="min-w-0 lg:col-span-4"><RecentCard transactions={transactions} categories={categories} accounts={accounts} members={members} concealed={!balancesVisible} /></div>
         <motion.div variants={item} className="min-w-0 lg:col-span-3"><TicketScannerButton /></motion.div>
+        <div className="min-w-0 lg:col-span-12"><BudgetsCard budgets={budgets} categories={categories} concealed={!balancesVisible} /></div>
         <div className="min-w-0 lg:col-span-12"><GoalsCard goals={goals} accounts={accounts} concealed={!balancesVisible} /></div>
       </div>
     </motion.div>
   )
 }
+
+function BudgetsCard({ budgets, categories, concealed }: { budgets: Budget[]; categories: Category[]; concealed: boolean }) {
+  const [month, setMonth] = useState(currentMonth())
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<Budget | undefined>()
+  const { data: statuses = [] } = useBudgetsStatus(month)
+  const monthName = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(new Date(`${month}-01T12:00:00`))
+  function edit(budget?: Budget) { setEditing(budget); setFormOpen(true) }
+  function effectiveBudget(categoryId: string) { return budgets.find((budget) => budget.categoryId === categoryId && budget.month?.slice(0, 7) === month) ?? budgets.find((budget) => budget.categoryId === categoryId && budget.month === null) }
+  return <motion.section variants={item} className="dashboard-card p-3.5 lg:p-4">
+    <div className="flex items-start justify-between gap-3"><div><h2 className="text-[13px] font-semibold">Presupuestos</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Límites y disponibilidad por categoría.</p></div><button onClick={() => edit()} className="pressable flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground" aria-label="Crear presupuesto"><Plus size={17} /></button></div>
+    <div className="mt-3 flex items-center justify-between gap-3"><p className="capitalize text-[12px] font-medium">{monthName}</p><input type="month" value={month} onChange={(event) => setMonth(event.target.value)} className="rounded-lg bg-secondary px-2 py-1 text-[11px] outline-none" aria-label="Mes de presupuestos" /></div>
+    {statuses.length === 0 ? <button onClick={() => edit()} className="mt-4 w-full rounded-2xl border border-dashed border-border px-4 py-5 text-left text-[13px] text-muted-foreground">Crea un presupuesto para saber cuánto llevas gastado.</button> : <ul className="mt-4 space-y-3">{statuses.map((status) => <BudgetRow key={status.categoryId} status={status} category={categories.find((category) => category.id === status.categoryId)} budget={effectiveBudget(status.categoryId)} concealed={concealed} onEdit={edit} />)}</ul>}
+    <BudgetFormSheet open={formOpen} onOpenChange={setFormOpen} budget={editing} defaultMonth={month} />
+  </motion.section>
+}
+
+function BudgetRow({ status, category, budget, concealed, onEdit }: { status: BudgetStatus; category?: Category; budget?: Budget; concealed: boolean; onEdit: (budget?: Budget) => void }) {
+  const carries = status.available > status.budget
+  return <li><button type="button" onClick={() => onEdit(budget)} className="w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-primary"><div className="mb-1.5 flex items-center justify-between gap-3"><span className="flex min-w-0 items-center gap-2"><CategoryIcon icon={category?.icon ?? "tag"} color={category?.color ?? "#64748b"} size={14} className="size-6" /><span className="truncate text-[12px] font-medium">{category?.name ?? "Categoría"}</span></span><span className="tnum shrink-0 text-[11px] text-muted-foreground">{concealed ? "••••" : `${formatMoney(status.spent)} de ${formatMoney(status.available)}`}</span></div><BudgetBar percentage={status.percentage} />{carries && <p className="mt-1 text-[10px] text-muted-foreground">Incluye {concealed ? "••••" : formatMoney(status.available - status.budget)} acumulados.</p>}</button></li>
+}
+
+function currentMonth() { const today = new Date(); return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}` }
 
 function firstName(name?: string) {
   return name?.trim().split(/\s+/)[0] || ""

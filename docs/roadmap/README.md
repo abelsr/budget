@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 18 of 18 done (01–14, 16, 17, 19, split transactions) · last updated 2026-08-08
+> **Progress:** 19 of 19 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover) · last updated 2026-08-08
 
 ## Immediate — robustness
 
@@ -65,7 +65,7 @@ before adding more visual polish, bank aggregation, or generative AI.
 | 3 | **Account reconciliation** | Lets a household verify that its ledger agrees with the bank after manual entry or import. | CSV import | ✅ 2026-08-06 |
 | 4 | **Merchants and categorization rules** | Prevents repetitive categorization and improves the quality of reports and budgets. | CSV import | ✅ 2026-08-08 |
 | 5 | **Split transactions** | A single purchase can belong to several categories; forcing one category makes budgets inaccurate. | Transfers and report invariants | ✅ 2026-08-08 |
-| 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | Proposal A2 |
+| 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | ✅ 2026-08-08 |
 | 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Proposal A5 + proposed forecast |
 | 8 | **Goal plans** | Adds due dates, required periodic contributions, and pause/resume to the shipped manual goals. | Alerts | Proposed |
 | 9 | **Mexican card and instalment support** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and cash-flow forecast | Proposed |
@@ -110,6 +110,12 @@ may be implemented in parallel.
   and possible restoration.
 
 ## Log
+
+**2026-08-08 — monthly budgets with optional rollover completed.**
+
+- Existing global category limits now remain backwards-compatible defaults, while households can create an explicit budget for any month and edit past entries without overwriting history.
+- The budget status resolves the explicit month before the global default. A rollover-enabled prior effective budget contributes only its positive surplus to the next month's available amount; overspending never produces a negative carry.
+- The dashboard includes a month selector, category progress bars, an available-versus-spent display, and a form to choose a monthly or default limit and opt into rollover.
 
 **2026-08-08 — split transactions completed.**
 

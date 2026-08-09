@@ -107,7 +107,7 @@ transactional tests.
 
 ---
 
-### A2. Monthly budgets with optional rollover
+### A2. Monthly budgets with optional rollover — ✅ 2026-08-08
 
 **Why.** Today `budgets` is a single global limit per category (a fixed
 amount, spend recalculated each month). Real families budget per month, and
