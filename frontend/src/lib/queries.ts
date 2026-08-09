@@ -601,6 +601,8 @@ export function useDeleteAttachment() {
 export interface BudgetInput {
   categoryId: string
   amount: number
+  month?: string | null
+  rollover?: boolean
 }
 
 export function useBudgets() {
@@ -610,10 +612,11 @@ export function useBudgets() {
   })
 }
 
-export function useBudgetsStatus() {
+export function useBudgetsStatus(month?: string) {
   return useQuery({
-    queryKey: keys.budgetsStatus,
-    queryFn: () => apiFetch<BudgetStatus[]>("/budgets/status"),
+    queryKey: [...keys.budgetsStatus, month],
+    queryFn: () =>
+      apiFetch<BudgetStatus[]>(`/budgets/status${month ? `?month=${month}` : ""}`),
   })
 }
 
@@ -629,10 +632,10 @@ export function useCreateBudget() {
 export function useUpdateBudget() {
   const invalidate = useInvalidator(keys.budgets, keys.budgetsStatus)
   return useMutation({
-    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
+    mutationFn: ({ id, amount, rollover }: { id: string; amount: number; rollover: boolean }) =>
       apiFetch<Budget>(`/budgets/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount, rollover }),
       }),
     onSuccess: invalidate,
   })

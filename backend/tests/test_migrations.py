@@ -200,6 +200,54 @@ def test_esquema_migrado_coincide_con_los_modelos(database_url: str) -> None:
         )
 
 
+def test_monthly_budget_migration_keeps_existing_global_defaults(database_url: str) -> None:
+    config = alembic_config(database_url)
+    command.upgrade(config, "e4f5a6b7c8d9")
+
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("INSERT INTO households (id, name, currency_code) VALUES ('h1', 'Uno', 'MXN')")
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO categories (id, household_id, name, icon, color, type, active, deleted) "
+                    "VALUES ('c1', 'h1', 'Comida', 'pizza', '#30b0c7', 'expense', true, false)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO budgets (id, household_id, category_id, amount) "
+                    "VALUES ('b1', 'h1', 'c1', 100.0000)"
+                )
+            )
+
+        command.upgrade(config, "head")
+
+        with engine.begin() as connection:
+            migrated = connection.execute(
+                text("SELECT month, rollover FROM budgets WHERE id = 'b1'")
+            ).one()
+            assert migrated.month is None
+            assert migrated.rollover is False
+            connection.execute(
+                text(
+                    "INSERT INTO budgets (id, household_id, category_id, amount, month, rollover) "
+                    "VALUES ('b2', 'h1', 'c1', 200.0000, '2026-08-01', true)"
+                )
+            )
+            with pytest.raises(IntegrityError), connection.begin_nested():
+                connection.execute(
+                    text(
+                        "INSERT INTO budgets (id, household_id, category_id, amount, month, rollover) "
+                        "VALUES ('b3', 'h1', 'c1', 300.0000, NULL, false)"
+                    )
+                )
+    finally:
+        engine.dispose()
+
+
 def test_import_batch_scope_fk_uses_the_batch_candidate_key(database_url: str) -> None:
     command.upgrade(alembic_config(database_url), "head")
 

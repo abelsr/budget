@@ -332,9 +332,7 @@ class RecurringRule(Base):
 
 
 class Budget(Base):
-    """Límite de gasto por categoría. Global (no por mes): se define una vez
-    y el gasto de cada mes se recalcula en /budgets/status contra las
-    transacciones de ese periodo, sin recrear el presupuesto."""
+    """Límite de gasto por categoría, global o para un mes concreto."""
 
     __tablename__ = "budgets"
 
@@ -342,9 +340,22 @@ class Budget(Base):
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
     category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"))
     amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    # NULL conserva los límites globales creados antes de los presupuestos mensuales.
+    month: Mapped[date | None] = mapped_column(Date, nullable=True)
+    rollover: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    __table_args__ = (UniqueConstraint("household_id", "category_id"),)
+    __table_args__ = (
+        UniqueConstraint("household_id", "category_id", "month"),
+        Index(
+            "uq_budgets_household_category_global",
+            "household_id",
+            "category_id",
+            unique=True,
+            postgresql_where=month.is_(None),
+            sqlite_where=month.is_(None),
+        ),
+    )
 
 
 class SavingsGoal(Base):

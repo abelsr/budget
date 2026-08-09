@@ -22,16 +22,19 @@ import type { Budget } from "@/lib/types"
 /**
  * Bottom sheet para crear o editar un límite de presupuesto.
  * En edición la categoría no se puede cambiar; en creación solo se listan
- * categorías de gasto que todavía no tienen un límite.
+ * categorías de gasto que todavía no tienen un límite en ese periodo.
  */
 export function BudgetFormSheet({
   open,
   onOpenChange,
   budget,
+  defaultMonth,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   budget?: Budget
+  /** YYYY-MM mostrado por la tarjeta desde la que se abre el formulario. */
+  defaultMonth?: string
 }) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange} showSwipeHandle>
@@ -40,6 +43,7 @@ export function BudgetFormSheet({
           <BudgetForm
             key={budget?.id ?? "new"}
             budget={budget}
+            defaultMonth={defaultMonth}
             onDone={() => onOpenChange(false)}
           />
         )}
@@ -50,9 +54,11 @@ export function BudgetFormSheet({
 
 function BudgetForm({
   budget,
+  defaultMonth,
   onDone,
 }: {
   budget?: Budget
+  defaultMonth?: string
   onDone: () => void
 }) {
   const isEditing = budget !== undefined
@@ -62,23 +68,32 @@ function BudgetForm({
   const updateBudget = useUpdateBudget()
   const deleteBudget = useDeleteBudget()
 
-  const budgetedCategoryIds = new Set(budgets.map((b) => b.categoryId))
+  const initialMonth = budget?.month?.slice(0, 7) ?? defaultMonth ?? currentMonth()
+  const [month, setMonth] = useState(initialMonth)
+  const [isDefault, setIsDefault] = useState(budget?.month === null && budget !== undefined)
+  const scopedBudgets = new Set(
+    budgets
+      .filter((item) => (isDefault ? item.month === null : item.month?.slice(0, 7) === month))
+      .map((item) => item.categoryId),
+  )
   const availableCategories = categories.filter(
-    (c) => c.type === "expense" && (isEditing || !budgetedCategoryIds.has(c.id)),
+    (c) => c.type === "expense" && (isEditing || !scopedBudgets.has(c.id)),
   )
 
   const [categoryId, setCategoryId] = useState(
     budget?.categoryId ?? availableCategories[0]?.id ?? "",
   )
   const [amount, setAmount] = useState(budget ? String(budget.amount) : "")
+  const [rollover, setRollover] = useState(budget?.rollover ?? false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const isPending =
     createBudget.isPending || updateBudget.isPending || deleteBudget.isPending
   const parsedAmount = Number(amount)
+  const selectedCategoryIsAvailable = isEditing || availableCategories.some((c) => c.id === categoryId)
   const canSave =
-    categoryId !== "" && parsedAmount > 0 && !isPending && !Number.isNaN(parsedAmount)
+    categoryId !== "" && selectedCategoryIsAvailable && parsedAmount > 0 && !isPending && !Number.isNaN(parsedAmount)
 
   function onError(err: unknown) {
     setError(
@@ -93,12 +108,12 @@ function BudgetForm({
     setError(null)
     if (isEditing) {
       updateBudget.mutate(
-        { id: budget.id, amount: parsedAmount },
+        { id: budget.id, amount: parsedAmount, rollover },
         { onSuccess: onDone, onError },
       )
     } else {
       createBudget.mutate(
-        { categoryId, amount: parsedAmount },
+        { categoryId, amount: parsedAmount, month: isDefault ? null : `${month}-01`, rollover },
         { onSuccess: onDone, onError },
       )
     }
@@ -169,6 +184,28 @@ function BudgetForm({
         )}
       </div>
 
+      {!isEditing && (
+        <div>
+          <p className="mb-2 text-[13px] font-medium text-muted-foreground">Periodo</p>
+          <input
+            type="month"
+            value={month}
+            disabled={isDefault}
+            onChange={(event) => setMonth(event.target.value)}
+            className="w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none disabled:opacity-50"
+            aria-label="Mes del presupuesto"
+          />
+          <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12px] text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={isDefault}
+              onChange={(event) => setIsDefault(event.target.checked)}
+            />
+            Usar como límite predeterminado para meses sin presupuesto
+          </label>
+        </div>
+      )}
+
       {/* Monto */}
       <div>
         <p className="mb-2 text-[13px] font-medium text-muted-foreground">
@@ -184,6 +221,19 @@ function BudgetForm({
           aria-label="Límite mensual"
         />
       </div>
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-secondary px-4 py-3 text-[13px]">
+        <input
+          type="checkbox"
+          checked={rollover}
+          onChange={(event) => setRollover(event.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          <span className="block font-medium">Arrastrar sobrante al mes siguiente</span>
+          <span className="mt-0.5 block text-[11px] text-muted-foreground">El saldo sin gastar de este mes se suma a la disponibilidad del siguiente.</span>
+        </span>
+      </label>
 
       {error && (
         <p className="rounded-xl bg-expense/10 px-3 py-2 text-[13px] text-expense">
@@ -218,4 +268,9 @@ function BudgetForm({
       )}
     </div>
   )
+}
+
+function currentMonth() {
+  const today = new Date()
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`
 }

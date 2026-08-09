@@ -90,6 +90,8 @@ def test_create_and_list_budget(client, world):
     assert body["categoryId"] == world["expense1"].id
     assert body["amount"] == 1500.0
     assert body["householdId"] == world["h1"].id
+    assert body["month"] is None
+    assert body["rollover"] is False
 
     listed = client.get("/budgets", headers=world["headers1"])
     assert listed.status_code == 200
@@ -111,6 +113,50 @@ def test_create_duplicate_budget_conflicts(client, world):
     assert first.status_code == 201
     second = client.post("/budgets", json=payload, headers=world["headers1"])
     assert second.status_code == 409
+
+
+def test_monthly_budget_coexists_with_global_default_and_takes_precedence(client, world):
+    global_budget = client.post(
+        "/budgets",
+        json={"categoryId": world["expense1"].id, "amount": 100.0},
+        headers=world["headers1"],
+    )
+    assert global_budget.status_code == 201
+    monthly = client.post(
+        "/budgets",
+        json={
+            "categoryId": world["expense1"].id,
+            "amount": 250.0,
+            "month": "2026-08-28",
+            "rollover": True,
+        },
+        headers=world["headers1"],
+    )
+    assert monthly.status_code == 201, monthly.text
+    assert monthly.json()["month"] == "2026-08-01"
+
+    status = client.get("/budgets/status?month=2026-08", headers=world["headers1"])
+    assert status.status_code == 200
+    assert status.json() == [
+        {
+            "categoryId": world["expense1"].id,
+            "budget": 250.0,
+            "available": 250.0,
+            "spent": 0.0,
+            "percentage": 0.0,
+        }
+    ]
+
+
+def test_duplicate_monthly_budget_conflicts_but_another_month_is_allowed(client, world):
+    payload = {"categoryId": world["expense1"].id, "amount": 100.0, "month": "2026-08-01"}
+    assert client.post("/budgets", json=payload, headers=world["headers1"]).status_code == 201
+    assert client.post("/budgets", json=payload, headers=world["headers1"]).status_code == 409
+    assert client.post(
+        "/budgets",
+        json={**payload, "month": "2026-09-01"},
+        headers=world["headers1"],
+    ).status_code == 201
 
 
 def test_update_budget_amount(client, world):
@@ -229,6 +275,52 @@ def test_status_different_month_resets_without_recreating_budget(client, session
 
     # El presupuesto sigue siendo el mismo registro, no uno nuevo por mes.
     assert client.get("/budgets", headers=world["headers1"]).json()[0]["id"] == budget["id"]
+
+
+@pytest.mark.parametrize(
+    ("rollover", "previous_spend", "expected_available"),
+    [(False, 40.0, 100.0), (True, 40.0, 160.0), (True, 120.0, 100.0)],
+)
+def test_status_rollover_uses_only_previous_month_surplus(
+    client, session, world, rollover, previous_spend, expected_available
+):
+    created = client.post(
+        "/budgets",
+        json={
+            "categoryId": world["expense1"].id,
+            "amount": 100.0,
+            "rollover": rollover,
+        },
+        headers=world["headers1"],
+    )
+    assert created.status_code == 201
+    _add_transaction(
+        session,
+        household=world["h1"],
+        account=world["account1"],
+        category=world["expense1"],
+        member=world["u1"],
+        tx_type="expense",
+        amount=previous_spend,
+        tx_date=date(2025, 12, 10),
+    )
+    _add_transaction(
+        session,
+        household=world["h1"],
+        account=world["account1"],
+        category=world["expense1"],
+        member=world["u1"],
+        tx_type="expense",
+        amount=80.0,
+        tx_date=date(2026, 1, 10),
+    )
+    session.commit()
+
+    status = client.get("/budgets/status?month=2026-01", headers=world["headers1"])
+    assert status.status_code == 200
+    assert status.json()[0]["available"] == expected_available
+    assert status.json()[0]["spent"] == 80.0
+    assert status.json()[0]["percentage"] == round(80 / expected_available * 100, 1)
 
 
 def test_status_is_empty_without_budgets(client, world):
