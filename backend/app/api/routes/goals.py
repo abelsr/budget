@@ -1,3 +1,6 @@
+from datetime import date
+from decimal import Decimal, ROUND_CEILING
+
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select, update
 
@@ -36,22 +39,40 @@ def _validate_account(db, household_id: str, account_id: str | None) -> None:
 
 
 def _goal_out(goal: SavingsGoal) -> SavingsGoalOut:
-    target = float(goal.target_amount)
-    current = float(goal.current_amount)
+    target = Decimal(goal.target_amount)
+    current = Decimal(goal.current_amount)
+    remaining = max(Decimal("0"), target - current)
+    completed = current >= target
+    status = "none"
+    required_monthly_contribution = None
+    if not goal.archived and not completed and goal.target_date is not None:
+        if goal.plan_paused:
+            status = "paused"
+        elif goal.target_date < date.today():
+            status = "overdue"
+        else:
+            status = "active"
+            months = (goal.target_date.year - date.today().year) * 12 + goal.target_date.month - date.today().month + 1
+            required_monthly_contribution = float(
+                (remaining / months).quantize(Decimal("0.0001"), rounding=ROUND_CEILING)
+            )
     return SavingsGoalOut(
         id=goal.id,
         household_id=goal.household_id,
         name=goal.name,
-        target_amount=target,
-        current_amount=current,
+        target_amount=float(target),
+        current_amount=float(current),
         target_date=goal.target_date,
         account_id=goal.account_id,
         icon=goal.icon,
         color=goal.color,
         archived=goal.archived,
-        progress_pct=min(100, round(current / target * 100, 1)),
-        remaining=max(0, round(target - current, 2)),
-        is_completed=current >= target,
+        progress_pct=min(100, round(float(current / target * 100), 1)),
+        remaining=round(float(remaining), 2),
+        is_completed=completed,
+        plan_paused=goal.plan_paused,
+        plan_status=status,
+        required_monthly_contribution=required_monthly_contribution,
     )
 
 
