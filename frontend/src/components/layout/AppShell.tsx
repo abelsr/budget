@@ -4,10 +4,12 @@ import {
   ChevronsUpDown,
   FolderCog,
   LayoutDashboard,
+  PiggyBank,
   Settings,
   Tags,
   UserRound,
   Wallet,
+  WalletCards,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { motion } from "motion/react"
@@ -37,6 +39,8 @@ const mobileTabs: Array<NavigationItem & { to: string }> = [
 
 const desktopTabs: NavigationItem[] = [
   ...mobileTabs.slice(0, 3),
+  { to: "/app/presupuestos", label: "Presupuestos", icon: WalletCards },
+  { to: "/app/metas", label: "Metas", icon: PiggyBank },
   { to: "/app/ajustes/categorias", label: "Categorías", icon: Tags },
   { to: "/app/reportes", label: "Reportes", icon: FolderCog },
   mobileTabs[3]!,

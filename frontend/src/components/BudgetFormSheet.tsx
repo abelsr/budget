@@ -9,6 +9,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import { CategoryIcon } from "@/components/CategoryIcon"
+import { MonthPicker } from "@/components/ui/month-picker"
 import { ApiError } from "@/lib/api"
 import {
   useBudgets,
@@ -166,7 +167,7 @@ function BudgetForm({
             Todas las categorías de gasto ya tienen un límite.
           </p>
         ) : (
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {availableCategories.map((c) => (
               <button
                 key={c.id}
@@ -187,14 +188,7 @@ function BudgetForm({
       {!isEditing && (
         <div>
           <p className="mb-2 text-[13px] font-medium text-muted-foreground">Periodo</p>
-          <input
-            type="month"
-            value={month}
-            disabled={isDefault}
-            onChange={(event) => setMonth(event.target.value)}
-            className="w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none disabled:opacity-50"
-            aria-label="Mes del presupuesto"
-          />
+          {isDefault ? <div className="rounded-xl bg-secondary px-4 py-2.5 text-[15px] text-muted-foreground">Todos los meses</div> : <MonthPicker value={month} onChange={setMonth} label="Mes del presupuesto" />}
           <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12px] text-muted-foreground">
             <input
               type="checkbox"

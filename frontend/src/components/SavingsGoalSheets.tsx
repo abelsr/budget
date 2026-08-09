@@ -4,8 +4,11 @@ import { Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
+import { DatePicker } from "@/components/ui/date-picker"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ApiError } from "@/lib/api"
 import { CHART_PALETTE_LIGHT } from "@/lib/chart-colors"
+import { formatMoney } from "@/lib/format"
 import { useAccounts, useContributeToGoal, useCreateGoal, useDeleteGoal, useUpdateGoal } from "@/lib/queries"
 import type { SavingsGoal } from "@/lib/types"
 
@@ -41,6 +44,7 @@ function GoalForm({ goal, onDone }: { goal?: SavingsGoal; onDone: () => void }) 
   const [accountId, setAccountId] = useState(goal?.accountId ?? "")
   const [icon, setIcon] = useState(goal?.icon ?? ICONS[0])
   const [color, setColor] = useState(goal?.color ?? COLORS[0])
+  const [planPaused, setPlanPaused] = useState(goal?.planPaused ?? false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pending = createGoal.isPending || updateGoal.isPending || deleteGoal.isPending
@@ -51,7 +55,7 @@ function GoalForm({ goal, onDone }: { goal?: SavingsGoal; onDone: () => void }) 
   function save() {
     if (!canSave) return
     setError(null)
-    const input = { name: name.trim(), targetAmount: target, targetDate: targetDate || null, accountId: accountId || null, icon, color }
+    const input = { name: name.trim(), targetAmount: target, targetDate: targetDate || null, accountId: accountId || null, icon, color, planPaused }
     if (editing) updateGoal.mutate({ id: goal.id, ...input }, { onSuccess: onDone, onError: (err) => setError(errorMessage(err)) })
     else createGoal.mutate({ ...input, currentAmount: current }, { onSuccess: onDone, onError: (err) => setError(errorMessage(err)) })
   }
@@ -67,8 +71,11 @@ function GoalForm({ goal, onDone }: { goal?: SavingsGoal; onDone: () => void }) 
     <div className="flex items-center justify-center gap-3"><CategoryIcon icon={icon} color={color} size={24} className="size-12" /><span className="text-[17px] font-semibold">{name.trim() || "Sin nombre"}</span></div>
     <Field label="Nombre"><input autoFocus={!editing} value={name} onChange={(event) => setName(event.target.value)} placeholder="Ej. Vacaciones" className="w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none" /></Field>
     <div className={`grid gap-3 ${editing ? "grid-cols-1" : "grid-cols-2"}`}><Field label="Meta"><input inputMode="decimal" value={targetAmount} onChange={(event) => setTargetAmount(cleanAmount(event.target.value))} placeholder="0.00" className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none" /></Field>{!editing && <Field label="Monto inicial"><input inputMode="decimal" value={currentAmount} onChange={(event) => setCurrentAmount(cleanAmount(event.target.value))} placeholder="0.00" className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none" /></Field>}</div>
-    <Field label="Fecha objetivo (opcional)"><input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} className="w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none" /></Field>
-    <Field label="Cuenta compartida (opcional)"><select value={accountId} onChange={(event) => setAccountId(event.target.value)} className="w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none"><option value="">Sin cuenta vinculada</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></Field>
+    <Field label="Fecha objetivo (opcional)"><DatePicker value={targetDate} onChange={setTargetDate} label="Fecha objetivo" /></Field>
+    {goal?.planStatus === "active" && goal.requiredMonthlyContribution !== null && <p className="rounded-xl bg-primary-soft px-3 py-2 text-[12px] text-primary">Para llegar a tiempo, aparta {formatMoney(goal.requiredMonthlyContribution)} al mes.</p>}
+    {goal?.planStatus === "overdue" && <p className="rounded-xl bg-expense/10 px-3 py-2 text-[12px] text-expense">La fecha objetivo ya pasó. Actualiza el plan para calcular una nueva cuota.</p>}
+    {targetDate && <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-secondary px-4 py-3 text-[13px]"><span><span className="block font-medium">Pausar plan de ahorro</span><span className="mt-0.5 block text-[11px] text-muted-foreground">Conserva la meta, pero deja de pedir una cuota mensual.</span></span><input type="checkbox" checked={planPaused} onChange={(event) => setPlanPaused(event.target.checked)} className="size-4 accent-primary" /></label>}
+    <Field label="Cuenta compartida (opcional)"><Select value={accountId || "none"} onValueChange={(value) => setAccountId(value && value !== "none" ? value : "")}><SelectTrigger className="h-11 w-full rounded-xl border-0 bg-secondary px-4 text-[15px]"><SelectValue /></SelectTrigger><SelectContent className="rounded-xl p-1"><SelectItem value="none">Sin cuenta vinculada</SelectItem>{accounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>)}</SelectContent></Select></Field>
     <Picker label="Icono">{ICONS.map((value) => <button key={value} type="button" aria-label={`Icono ${value}`} aria-pressed={icon === value} onClick={() => setIcon(value)} className="pressable rounded-2xl p-1"><CategoryIcon icon={value} color={color} size={20} className={`size-10 ${icon === value ? "ring-2 ring-offset-2 ring-offset-background" : ""}`} style={{ ["--tw-ring-color" as string]: color }} /></button>)}</Picker>
     <Picker label="Color">{COLORS.map((value) => <button key={value} type="button" aria-label={`Color ${value}`} aria-pressed={color === value} onClick={() => setColor(value)} className={`pressable size-8 rounded-full ${color === value ? "ring-2 ring-offset-2 ring-offset-background" : ""}`} style={{ backgroundColor: value, ["--tw-ring-color" as string]: value }} />)}</Picker>
     {error && <p className="rounded-xl bg-expense/10 px-3 py-2 text-[13px] text-expense">{error}</p>}

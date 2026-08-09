@@ -701,6 +701,7 @@ export interface SavingsGoalInput {
   accountId?: string | null
   icon: string
   color: string
+  planPaused?: boolean
 }
 
 export function useGoals() {
