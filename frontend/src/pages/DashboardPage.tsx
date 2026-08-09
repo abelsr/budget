@@ -36,12 +36,10 @@ import { CHART_OTHER, seriesColor } from "@/lib/chart-colors"
 import { formatMoney, formatMoneyCompact, monthLabel } from "@/lib/format"
 import {
   useAccounts,
-  useBudgets,
   useBudgetsStatus,
   useCategories,
   useMembers,
   useMonthSummary,
-  useGoals,
   useTransactions,
   useUpdateGoal,
 } from "@/lib/queries"
@@ -69,8 +67,6 @@ export function DashboardPage() {
   const { data: members = [] } = useMembers()
   const { data: transactions = [] } = useTransactions()
   const { data: summary } = useMonthSummary()
-  const { data: goals = [] } = useGoals()
-  const { data: budgets = [] } = useBudgets()
   const slices = useSlices(summary?.byCategory, categories)
 
   return (
@@ -89,14 +85,12 @@ export function DashboardPage() {
         <div className="min-w-0 lg:col-span-5"><CategoryCard slices={slices} total={summary?.expense ?? 0} concealed={!balancesVisible} /></div>
         <div className="min-w-0 lg:col-span-4"><RecentCard transactions={transactions} categories={categories} accounts={accounts} members={members} concealed={!balancesVisible} /></div>
         <motion.div variants={item} className="min-w-0 lg:col-span-3"><TicketScannerButton /></motion.div>
-        <div className="min-w-0 lg:col-span-12"><BudgetsCard budgets={budgets} categories={categories} concealed={!balancesVisible} /></div>
-        <div className="min-w-0 lg:col-span-12"><GoalsCard goals={goals} accounts={accounts} concealed={!balancesVisible} /></div>
       </div>
     </motion.div>
   )
 }
 
-function BudgetsCard({ budgets, categories, concealed }: { budgets: Budget[]; categories: Category[]; concealed: boolean }) {
+export function BudgetsCard({ budgets, categories, concealed }: { budgets: Budget[]; categories: Category[]; concealed: boolean }) {
   const [month, setMonth] = useState(currentMonth())
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Budget | undefined>()
@@ -212,7 +206,7 @@ function RecentCard({ transactions, categories, accounts, members, concealed }: 
   return <motion.section variants={item} className="dashboard-card overflow-hidden"><div className="px-3.5 pt-3.5"><CardHeading title="Movimientos recientes" href="/app/transacciones" label="Ver todos" /></div>{rows.length === 0 ? <p className="px-3.5 py-8 text-[13px] text-muted-foreground">Todavía no hay movimientos.</p> : <ul className="mt-1 divide-y divide-border">{rows.map((transaction) => <TransactionItem key={transaction.id} transaction={transaction} category={categories.find((category) => category.id === transaction.categoryId)} account={accounts.find((account) => account.id === transaction.accountId)} member={members.find((member) => member.id === transaction.memberId)} hideAmount={concealed} />)}</ul>}</motion.section>
 }
 
-function GoalsCard({ goals, accounts, concealed }: { goals: SavingsGoal[]; accounts: Account[]; concealed: boolean }) {
+export function GoalsCard({ goals, accounts, concealed }: { goals: SavingsGoal[]; accounts: Account[]; concealed: boolean }) {
   const [showArchived, setShowArchived] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [contributionOpen, setContributionOpen] = useState(false)

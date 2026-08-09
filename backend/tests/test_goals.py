@@ -189,3 +189,50 @@ def test_account_deletion_unlinks_goal(client, session, world):
     assert deleted.status_code == 204
     session.refresh(goal)
     assert goal.account_id is None
+
+
+def test_goal_plan_calculates_monthly_contribution_and_can_pause(client, world):
+    today = date.today()
+    target_month = today.month + 4
+    target_year = today.year + (target_month - 1) // 12
+    target_month = (target_month - 1) % 12 + 1
+    goal = create_goal(
+        client,
+        world,
+        currentAmount=200,
+        targetAmount=1200,
+        targetDate=date(target_year, target_month, 28).isoformat(),
+    ).json()
+
+    # The current month counts because this month's contribution can still be made.
+    assert goal["planStatus"] == "active"
+    assert goal["requiredMonthlyContribution"] == 200
+    assert goal["planPaused"] is False
+
+    paused = client.patch(
+        f"/goals/{goal['id']}", json={"planPaused": True}, headers=world["headers1"]
+    )
+    assert paused.status_code == 200
+    assert paused.json()["planStatus"] == "paused"
+    assert paused.json()["requiredMonthlyContribution"] is None
+
+    resumed = client.patch(
+        f"/goals/{goal['id']}", json={"planPaused": False}, headers=world["headers1"]
+    )
+    assert resumed.status_code == 200
+    assert resumed.json()["planStatus"] == "active"
+    assert resumed.json()["requiredMonthlyContribution"] == 200
+
+
+def test_goal_plan_is_none_when_completed_or_overdue(client, world):
+    completed = create_goal(client, world, targetAmount=100, currentAmount=100).json()
+    assert completed["planStatus"] == "none"
+    assert completed["requiredMonthlyContribution"] is None
+
+    overdue = create_goal(
+        client,
+        world,
+        targetDate=(date.today() - timedelta(days=1)).isoformat(),
+    ).json()
+    assert overdue["planStatus"] == "overdue"
+    assert overdue["requiredMonthlyContribution"] is None

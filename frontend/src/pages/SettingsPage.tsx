@@ -8,11 +8,13 @@ import {
   Monitor,
   Moon,
   Palette,
+  PiggyBank,
   Repeat,
   Sun,
   Tags,
   UserRound,
   Users,
+  WalletCards,
 } from "lucide-react"
 import { motion } from "motion/react"
 
@@ -82,6 +84,8 @@ export function SettingsPage() {
         <Row icon={<Tags size={16} />} label="Categorías" to="/app/ajustes/categorias" />
         <Row icon={<Tags size={16} />} label="Reglas de comercios" to="/app/ajustes/reglas-de-comercios" />
         <Row icon={<Repeat size={16} />} label="Recurrentes" to="/app/ajustes/recurrentes" />
+        <Row icon={<WalletCards size={16} />} label="Presupuestos" to="/app/presupuestos" />
+        <Row icon={<PiggyBank size={16} />} label="Metas de ahorro" to="/app/metas" />
         <Row icon={<FileUp size={16} />} label="Importar movimientos" to="/app/importar" />
         <ThemeRow theme={theme} setTheme={setTheme} />
         <Row

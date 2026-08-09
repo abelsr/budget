@@ -17,6 +17,8 @@ import { ReportsPage } from "@/pages/ReportsPage"
 import { PrivacyPage } from "@/pages/PrivacyPage"
 import { ImportPage } from "@/pages/ImportPage"
 import { MerchantRulesPage } from "@/pages/MerchantRulesPage"
+import { BudgetsPage } from "@/pages/BudgetsPage"
+import { GoalsPage } from "@/pages/GoalsPage"
 
 const ONBOARDING_PATH = "/onboarding"
 /** La app vive bajo /app; / es la landing pública. */
@@ -90,6 +92,8 @@ function App() {
               <Route index element={<DashboardPage />} />
               <Route path="transacciones" element={<TransactionsPage />} />
               <Route path="cuentas" element={<AccountsPage />} />
+              <Route path="presupuestos" element={<BudgetsPage />} />
+              <Route path="metas" element={<GoalsPage />} />
               <Route path="reportes" element={<ReportsPage />} />
               <Route path="ajustes" element={<SettingsPage />} />
               <Route path="ajustes/categorias" element={<CategoriesPage />} />

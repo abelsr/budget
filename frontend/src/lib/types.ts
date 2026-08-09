@@ -227,6 +227,9 @@ export interface SavingsGoal {
   progressPct: number
   remaining: number
   isCompleted: boolean
+  planPaused: boolean
+  planStatus: "active" | "paused" | "completed" | "overdue" | "none"
+  requiredMonthlyContribution: number | null
 }
 
 export type AlertKind = "budget_warning" | "budget_exceeded" | "recurring_overdue" | "goal_reached" | "negative_balance"

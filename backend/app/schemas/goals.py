@@ -44,6 +44,7 @@ class SavingsGoalCreate(_CamelModel):
     account_id: str | None = None
     icon: str = Field(default="piggy-bank", min_length=1, max_length=60)
     color: str = Field(default="#30b0c7", pattern=r"^#[0-9a-fA-F]{6}$")
+    plan_paused: bool = False
 
     _strip_name = field_validator("name")(_clean_name)
     _validate_money = field_validator("target_amount", "current_amount", mode="before")(_money)
@@ -57,10 +58,11 @@ class SavingsGoalUpdate(_CamelModel):
     icon: str | None = Field(default=None, min_length=1, max_length=60)
     color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
     archived: bool | None = None
+    plan_paused: bool | None = None
 
     _strip_name = field_validator("name")(_clean_name)
 
-    @field_validator("name", "target_amount", "icon", "color", "archived", mode="before")
+    @field_validator("name", "target_amount", "icon", "color", "archived", "plan_paused", mode="before")
     @classmethod
     def _reject_null_for_non_nullable_fields(cls, value: object) -> object:
         if value is None:
@@ -97,3 +99,6 @@ class SavingsGoalOut(_CamelModel):
     progress_pct: float
     remaining: float
     is_completed: bool
+    plan_paused: bool
+    plan_status: str
+    required_monthly_contribution: float | None
