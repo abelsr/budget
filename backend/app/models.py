@@ -381,6 +381,26 @@ class SavingsGoal(Base):
     )
 
 
+class Alert(Base):
+    """Household or member notification generated from financial state."""
+
+    __tablename__ = "alerts"
+    __table_args__ = (
+        UniqueConstraint("household_id", "dedupe_key", name="uq_alerts_household_dedupe_key"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    # NULL alerts belong to the household. Personal-account alerts stay private.
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    kind: Mapped[str] = mapped_column(String(40))
+    message: Mapped[str] = mapped_column(String(300))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    dedupe_key: Mapped[str] = mapped_column(String(180))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class ImportBatch(Base):
     __tablename__ = "import_batches"
     __table_args__ = (
