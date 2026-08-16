@@ -5,6 +5,7 @@ from app.api.deps import CurrentUserDep, DbDep
 from app.models import Account, Household, RecurringRule, SavingsGoal, Transaction, User
 from app.schemas.accounts import AccountCreate, AccountOut, AccountUpdate
 from app.services.account_access import can_operate, visible_accounts
+from app.services.account_balances import account_balance, balance_sums
 from app.services.recurring import materialize_due
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -50,29 +51,10 @@ def list_accounts(db: DbDep, user: CurrentUserDep) -> list[AccountOut]:
         .where(Account.household_id == household_id, visible_accounts(user.id))
         .order_by(Account.created_at, Account.id)
     ).all()
-    totals = db.execute(
-        select(Transaction.account_id, func.coalesce(Transaction.transfer_direction, Transaction.type), func.sum(Transaction.amount))
-        .join(Account, Account.id == Transaction.account_id)
-        .where(
-            Transaction.household_id == household_id,
-            Transaction.deleted_at.is_(None),
-            visible_accounts(user.id),
-        )
-        .group_by(Transaction.account_id, func.coalesce(Transaction.transfer_direction, Transaction.type))
-    ).all()
-    agg: dict[str, dict[str, float]] = {}
-    for account_id, tx_type, total in totals:
-        agg.setdefault(account_id, {})[tx_type] = float(total or 0)
+    account_sums = balance_sums(db, household_id, visible_accounts(user.id))
     result = []
     for account in accounts:
-        sums = agg.get(account.id, {})
-        balance = (
-            float(account.opening_balance)
-            + sums.get("income", 0.0)
-            + sums.get("inflow", 0.0)
-            - sums.get("expense", 0.0)
-            - sums.get("outflow", 0.0)
-        )
+        balance = account_balance(account.opening_balance, account_sums.get(account.id, {}))
         result.append(_account_out(account, balance))
     return result
 
@@ -133,20 +115,8 @@ def update_account(
         setattr(account, field, value)
     db.commit()
     db.refresh(account)
-    totals = db.execute(
-        select(func.coalesce(Transaction.transfer_direction, Transaction.type), func.sum(Transaction.amount))
-        .where(Transaction.account_id == account.id, Transaction.deleted_at.is_(None))
-        .group_by(func.coalesce(Transaction.transfer_direction, Transaction.type))
-    ).all()
-    sums = {tx_type: float(total or 0) for tx_type, total in totals}
-    balance = (
-        float(account.opening_balance)
-        + sums.get("income", 0.0)
-        + sums.get("inflow", 0.0)
-        - sums.get("expense", 0.0)
-        - sums.get("outflow", 0.0)
-    )
-    return _account_out(account, balance)
+    sums = balance_sums(db, household_id, Account.id == account.id).get(account.id, {})
+    return _account_out(account, account_balance(account.opening_balance, sums))
 
 
 @router.delete("/{account_id}", status_code=204)

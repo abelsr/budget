@@ -63,13 +63,11 @@ screen, semantic green/red reserved for money flow). Interaction follows the
 3. **Phase 2:** recurrence, CSV import, monthly budgets. ✅ **DONE**
 4. **Phase 3:** savings goals, personal accounts (privacy between members), offline-first with sync, multi-family opening. ✅ **DONE**
 5. **Next cycle:** financial integrity and household planning. Transfers, CSV
-   import, and reconciliation are complete; the next product initiative is
-    merchant rules and categorization are complete; split transactions, monthly
-    rollover budgets, and in-app alerts are complete; cash-flow planning remains
-    proposed. See
+   import, reconciliation, merchant rules, split transactions, monthly rollover
+   budgets, in-app alerts, and the cash-flow forecast are complete. See
    [docs/roadmap/README.md](roadmap/README.md).
 
-**Concrete next step:** cash-flow calendar and forecast (proposed in the
+**Concrete next step:** Mexican card and instalment support (item 9 in the
 [roadmap index](roadmap/README.md)).
 Details and log in [docs/roadmap/](roadmap/README.md).
 

@@ -2,11 +2,15 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { motion } from "motion/react"
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   Cell,
+  Legend,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -32,22 +36,24 @@ import { TransactionItem } from "@/components/TransactionItem"
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { SavingsGoalContributionSheet, SavingsGoalFormSheet } from "@/components/SavingsGoalSheets"
 import { useAuth } from "@/lib/auth"
-import { CHART_OTHER, seriesColor } from "@/lib/chart-colors"
-import { formatMoney, formatMoneyCompact, monthLabel } from "@/lib/format"
+import { CHART_OTHER, CHART_PALETTE_LIGHT, seriesColor } from "@/lib/chart-colors"
+import { formatMoney, formatMoneyCompact, formatShortDate, formatWeekdayShort, monthLabel } from "@/lib/format"
 import {
   useAccounts,
   useBudgetsStatus,
   useCategories,
+  useForecast,
   useMembers,
   useMonthSummary,
   useTransactions,
   useUpdateGoal,
 } from "@/lib/queries"
 import { useTheme } from "@/lib/theme"
-import type { Account, Budget, BudgetStatus, Category, Member, SavingsGoal, Transaction } from "@/lib/types"
+import type { Account, Budget, BudgetStatus, Category, Forecast, Member, SavingsGoal, Transaction } from "@/lib/types"
 
 const kindIcon = { cash: Wallet, debit: Landmark, credit: CreditCard, savings: PiggyBank }
 const MAX_SLICES = 6
+const MAX_UPCOMING_ROWS = 4
 const DISMISSED_GOAL_CELEBRATIONS_KEY = "ff-dismissed-goal-celebrations"
 
 const container = {
@@ -67,6 +73,7 @@ export function DashboardPage() {
   const { data: members = [] } = useMembers()
   const { data: transactions = [] } = useTransactions()
   const { data: summary } = useMonthSummary()
+  const { data: forecast } = useForecast()
   const slices = useSlices(summary?.byCategory, categories)
 
   return (
@@ -85,6 +92,8 @@ export function DashboardPage() {
         <div className="min-w-0 lg:col-span-5"><CategoryCard slices={slices} total={summary?.expense ?? 0} concealed={!balancesVisible} /></div>
         <div className="min-w-0 lg:col-span-4"><RecentCard transactions={transactions} categories={categories} accounts={accounts} members={members} concealed={!balancesVisible} /></div>
         <motion.div variants={item} className="min-w-0 lg:col-span-3"><TicketScannerButton /></motion.div>
+
+        <div className="min-w-0 lg:col-span-12"><ForecastCard forecast={forecast} concealed={!balancesVisible} /></div>
       </div>
     </motion.div>
   )
@@ -187,6 +196,76 @@ function dailyFlow(transactions: Transaction[]) {
 function FlowTooltip({ active, payload, concealed }: { active?: boolean; payload?: { name: string; value: number; payload: { label: string } }[]; concealed: boolean }) {
   if (!active || !payload?.length) return null
   return <div className="rounded-md border border-border bg-card px-2 py-1.5 text-[11px] shadow-sm"><p className="text-muted-foreground">Día {payload[0].payload.label}</p>{payload.map((row) => <p key={row.name} className="tnum font-medium">{row.name}: {maskedMoney(row.value, concealed)}</p>)}</div>
+}
+
+function ForecastCard({ forecast, concealed }: { forecast: Forecast | undefined; concealed: boolean }) {
+  const { isDark } = useTheme()
+  const lineColor = seriesColor(CHART_PALETTE_LIGHT[0], isDark)
+  const points = forecast?.balance ?? []
+  const chartData = points.map((point) => ({ ...point, label: formatShortDate(point.date) }))
+  const upcoming = forecast?.upcoming ?? []
+  const visible = upcoming.slice(0, MAX_UPCOMING_ROWS)
+  const chartLabel = concealed
+    ? "Proyección del saldo del hogar: montos ocultos"
+    : points.length > 0
+      ? `Proyección del saldo del hogar para los próximos ${forecast?.days ?? 90} días: de ${formatMoney(forecast!.openingBalance)} a ${formatMoney(points[points.length - 1]!.balance)}`
+      : "Proyección del saldo del hogar"
+  return (
+    <motion.section variants={item} className="dashboard-card min-w-0 p-3.5 lg:p-4">
+      <CardHeading title="Proyección de flujo de efectivo" href="/app/transacciones" label="Ver movimientos" />
+      {!forecast || points.length === 0 ? (
+        <div className="mt-3 grid gap-4 lg:grid-cols-2">
+          <div className="h-36 animate-pulse rounded-2xl bg-secondary" />
+          <div className="space-y-2">{[0, 1, 2].map((row) => <div key={row} className="h-7 animate-pulse rounded-xl bg-secondary" />)}</div>
+        </div>
+      ) : (
+        <div className="mt-3 grid items-center gap-4 lg:grid-cols-2">
+          <div className="h-36" role="img" aria-label={chartLabel}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="forecast-balance-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={lineColor} stopOpacity={0.25} />
+                    <stop offset="100%" stopColor={lineColor} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} interval="preserveStartEnd" />
+                <YAxis tickLine={false} axisLine={false} width={42} tick={{ fontSize: 9, fill: "var(--muted-foreground)" }} tickFormatter={(value: number) => formatMoneyCompact(value)} />
+                <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.5} strokeDasharray="4 4" />
+                <Tooltip cursor={{ stroke: "var(--border)" }} content={<ForecastTooltip concealed={concealed} />} />
+                <Legend iconType="plainline" wrapperStyle={{ fontSize: 10, paddingTop: 2 }} />
+                <Area type="monotone" dataKey="balance" name="Saldo proyectado" stroke={lineColor} strokeWidth={2} fill="url(#forecast-balance-fill)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-muted-foreground">Próximos movimientos</p>
+            {upcoming.length === 0 ? (
+              <p className="py-8 text-[13px] text-muted-foreground">Sin movimientos previstos para los próximos 90 días.</p>
+            ) : (
+              <>
+                <ul className="mt-1">
+                  {visible.map((event, index) => <UpcomingRow key={`${event.source}-${event.date}-${event.label}-${index}`} event={event} concealed={concealed} />)}
+                </ul>
+                {upcoming.length > visible.length && <p className="mt-1.5 text-[11px] text-muted-foreground">+ {upcoming.length - visible.length} más</p>}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </motion.section>
+  )
+}
+
+function UpcomingRow({ event, concealed }: { event: Forecast["upcoming"][number]; concealed: boolean }) {
+  const isIn = event.type === "income"
+  return <li className="flex min-w-0 items-center gap-2 border-b border-border py-1.5 last:border-b-0"><span className="w-8 shrink-0 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{formatWeekdayShort(event.date)}</span><span className="min-w-0 flex-1 truncate text-[12px] font-medium">{event.label}</span><span className={`tnum shrink-0 text-[12px] font-semibold ${concealed ? "" : isIn ? "text-income" : "text-expense"}`}>{concealed ? "••••" : `${isIn ? "+" : "−"}${formatMoney(event.amount)}`}</span></li>
+}
+
+function ForecastTooltip({ active, payload, concealed }: { active?: boolean; payload?: { payload: { date: string; balance: number } }[]; concealed: boolean }) {
+  if (!active || !payload?.length) return null
+  const row = payload[0].payload
+  return <div className="rounded-md border border-border bg-card px-2 py-1.5 text-[11px] shadow-sm"><p className="text-muted-foreground">{formatWeekdayShort(row.date)} {formatShortDate(row.date)}</p><p className="tnum font-medium">Saldo proyectado: {concealed ? "••••" : formatMoney(row.balance)}</p></div>
 }
 
 interface Slice { id: string; name: string; total: number; color: string; share: number }

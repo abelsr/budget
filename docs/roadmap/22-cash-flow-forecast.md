@@ -1,6 +1,6 @@
 # Calendario de flujo de efectivo y proyección de saldo
 
-**Status:** 🚧 In progress · **Priority:** High · **Effort:** M ·
+**Status:** ✅ 2026-08-15 · **Priority:** High · **Effort:** M ·
 **Dependencies:** transfers, transacciones recurrentes (ambas ✅)
 
 ## Why
@@ -19,12 +19,17 @@ declarado del item 9 (tarjetas MX e instalados).
   movimientos previstos (ventana fija de 30 días).
 - Entrada de la proyección, en este orden:
   1. Saldo actual del hogar (solo cuentas compartidas, misma fórmula que
-     `GET /accounts`), llamado *opening balance*.
-  2. Movimientos ya registrados con fecha futura (todas las cuentas
-     compartidas, incluido transfer, excluidos los soft-deleted).
-  3. Occurrencias futuras de reglas recurrentes activas en cuentas
+     `GET /accounts`), llamado *opening balance*. Esa fórmula **no filtra por
+     fecha**: un movimiento registrado con fecha futura ya está incluido aquí.
+  2. Ocurrencias futuras de reglas recurrentes activas en cuentas
      compartidas, proyectadas con `advance()` **sin materializar** (lectura
-     puramente derivada; el estado vive en `next_run_date`).
+     puramente derivada; el estado vive en `next_run_date`). Son lo único que
+     mueve la serie diaria, porque es lo único que **aún no** está en el
+     opening.
+- Consecuencia: los movimientos registrados con fecha futura no se repiten
+  como delta (los aplicaría dos veces); solo aparecen en la lista `upcoming`.
+  La serie parte del mismo número que la card "Saldo del hogar", sin
+  saltos.
 - La proyección llama a `materialize_due` al inicio (convención de todos los
   endpoints de lectura): garantiza que el opening balance sea actual y que no
   falte occurrencia vencida. Es idempotente.
@@ -46,10 +51,11 @@ declarado del item 9 (tarjetas MX e instalados).
   - `build_forecast(db, household_id, as_of, days) -> ForecastResult`
   - Saldo inicial: agregación idéntica a `list_accounts`
     (`opening_balance + income + inflow − expense − outflow` por cuenta
-    compartida, `deleted_at IS NULL`). Extraer la fórmula en un helper
-    compartido con `accounts.py` para que no se desincronicen.
-  - Delta diario por movimiento registrado: `+amount` para
-    `income`/transfer inflow, `−amount` para `expense`/transfer outflow.
+    compartida, `deleted_at IS NULL`, sin filtro de fecha). Extraer la
+    fórmula en un helper compartido con `accounts.py` para que no se
+    desincronicen.
+  - Los movimientos registrados quedan fuera del walk por la misma razón:
+    ya están en el opening. Repetirlos lo contaría dos veces.
   - Delta por regla recurrente: desde `next_run_date` (siempre `> as_of` tras
     `materialize_due`) aplicando `advance(next, rule.frequency, rule.anchor_day)`
     hasta pasar el horizonte. Prohibido reimplementar el calendario: el clamp
@@ -90,20 +96,23 @@ declarado del item 9 (tarjetas MX e instalados).
 
 ## Acceptance criteria
 
-- [ ] Opening balance coincide con la suma de saldos de las cuentas
+- [x] Opening balance coincide con la suma de saldos de las cuentas
       compartidas en `GET /accounts` en el mismo instante.
-- [ ] Movimiento registrado a futuro y regla recurrente aparecen en su fecha
-      exacta; `balance[-1] == opening + Σ delta` en toda serie.
-- [ ] Regla mensual con `anchor_day=31` cruza febrero en 28/29 y vuelve a 31
+- [x] Una regla recurrente cae en su fecha exacta; un movimiento registrado a
+      futuro NO repite su efecto en la serie (ya viene en el opening, que
+      coincide con `/accounts`) y aparece en `upcoming`; en toda serie
+      `balance[-1] == opening + Σ delta`.
+- [x] Regla mensual con `anchor_day=31` cruza febrero en 28/29 y vuelve a 31
       (usa `advance`, no matemática propia).
-- [ ] Regla pausada no proyecta; transfer compartido→compartido no mueve el
-      saldo neto; transfer compartido→personal sí lo reduce; transacciones de
-      cuenta personal y soft-deleted quedan fuera.
-- [ ] `days` fuera de 14–180 responde 422; default 90 devuelve 91 filas.
-- [ ] El endpoint no inserta: conteo de transacciones y `next_run_date` de las
+- [x] Regla pausada no proyecta; transfer compartido→compartido no mueve el
+      saldo neto; transfer compartido→personal ya reduce el opening (igual que
+      `/accounts`) sin doble dip; transacciones de cuenta personal y
+      soft-deleted quedan fuera.
+- [x] `days` fuera de 14–180 responde 422; default 90 devuelve 91 filas.
+- [x] El endpoint no inserta: conteo de transacciones y `next_run_date` de las
       reglas invariables después del `GET`.
-- [ ] Aislamiento por hogar: ningún dato de otro hogar en la respuesta.
-- [ ] Card del dashboard respeta paleta (§4), `concealed`, `prefers-reduced-motion`
+- [x] Aislamiento por hogar: ningún dato de otro hogar en la respuesta.
+- [x] Card del dashboard respeta paleta (§4), `concealed`, `prefers-reduced-motion`
       y vacía elegante; `npm run build` y `npm run lint` pasan.
 
 ## Effort y riesgo

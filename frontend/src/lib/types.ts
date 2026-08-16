@@ -212,6 +212,42 @@ export interface BudgetStatus {
   percentage: number
 }
 
+/** Punto diario de la proyección de flujo de efectivo. */
+export interface ForecastPoint {
+  /** ISO date: YYYY-MM-DD */
+  date: string
+  income: number
+  expense: number
+  /** Variación neta del saldo del hogar ese día (signo inclusivo). */
+  delta: number
+  /** Saldo proyectado al cerrar el día. */
+  balance: number
+}
+
+/** Movimiento previsto: registrado con fecha futura u ocurrencia proyectada. */
+export interface ForecastUpcoming {
+  /** ISO date: YYYY-MM-DD */
+  date: string
+  /** Efecto sobre la caja compartida del hogar. */
+  type: "income" | "expense"
+  amount: number
+  label: string
+  source: "transaction" | "recurring"
+}
+
+/**
+ * Proyección diaria del saldo del hogar (solo cuentas compartidas) y
+ * próximos movimientos de una ventana fija.
+ */
+export interface Forecast {
+  /** ISO date: YYYY-MM-DD */
+  asOf: string
+  days: number
+  openingBalance: number
+  balance: ForecastPoint[]
+  upcoming: ForecastUpcoming[]
+}
+
 /** Meta de ahorro manual. Sus contribuciones no crean movimientos financieros. */
 export interface SavingsGoal {
   id: string
