@@ -21,6 +21,7 @@ import type {
   NewTransaction,
   NewSplitTransaction,
   NewTransfer,
+  Forecast,
   RecurringRule,
   ReconciliationDetail,
   ReconciliationSession,
@@ -42,6 +43,7 @@ export const keys = {
   transactions: ["transactions"] as const,
   summary: ["summary", "month"] as const,
   rangeSummary: ["summary", "range"] as const,
+  forecast: ["forecast"] as const,
   household: ["household", "me"] as const,
   invitations: ["household", "invitations"] as const,
   recurringRules: ["recurring-rules"] as const,
@@ -191,6 +193,14 @@ export function useRangeSummary(from: string, to: string) {
   })
 }
 
+/** Cash-flow forecast (default horizon of 90 days). */
+export function useForecast() {
+  return useQuery({
+    queryKey: keys.forecast,
+    queryFn: () => apiFetch<Forecast>("/forecast"),
+  })
+}
+
 export interface ImportPreviewInput {
   file: File
   accountId: string
@@ -225,6 +235,7 @@ function useImportInvalidator() {
     queryClient.invalidateQueries({ queryKey: keys.accounts })
     queryClient.invalidateQueries({ queryKey: keys.summary })
     queryClient.invalidateQueries({ queryKey: keys.rangeSummary })
+    queryClient.invalidateQueries({ queryKey: keys.forecast })
     queryClient.invalidateQueries({ queryKey: keys.budgets })
     queryClient.invalidateQueries({ queryKey: keys.budgetsStatus })
     queryClient.invalidateQueries({ queryKey: keys.importBatches })
@@ -357,6 +368,7 @@ export function useAddTransaction() {
       queryClient.invalidateQueries({ queryKey: keys.summary })
       queryClient.invalidateQueries({ queryKey: keys.budgetsStatus })
       queryClient.invalidateQueries({ queryKey: keys.rangeSummary })
+      queryClient.invalidateQueries({ queryKey: keys.forecast })
       // Con `repeat` el backend crea también la regla
       queryClient.invalidateQueries({ queryKey: keys.recurringRules })
     },
@@ -413,7 +425,7 @@ function useInvalidator(...queryKeys: readonly (readonly string[])[]) {
 }
 
 export function useCreateAccount() {
-  const invalidate = useInvalidator(keys.accounts)
+  const invalidate = useInvalidator(keys.accounts, keys.forecast)
   return useMutation({
     mutationFn: (input: AccountInput) =>
       apiFetch<Account>("/accounts", { method: "POST", body: JSON.stringify(input) }),
@@ -422,7 +434,7 @@ export function useCreateAccount() {
 }
 
 export function useUpdateAccount() {
-  const invalidate = useInvalidator(keys.accounts)
+  const invalidate = useInvalidator(keys.accounts, keys.forecast)
   return useMutation({
     mutationFn: ({ id, ...input }: Partial<AccountInput> & { id: string }) =>
       apiFetch<Account>(`/accounts/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
@@ -431,7 +443,7 @@ export function useUpdateAccount() {
 }
 
 export function useDeleteAccount() {
-  const invalidate = useInvalidator(keys.accounts)
+  const invalidate = useInvalidator(keys.accounts, keys.forecast)
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/accounts/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
@@ -471,6 +483,7 @@ export function useUpdateTransaction() {
     keys.summary,
     keys.budgetsStatus,
     keys.rangeSummary,
+    keys.forecast,
   )
   return useMutation({
     mutationFn: ({ id, ...input }: { id: string } & Record<string, unknown>) =>
@@ -486,6 +499,7 @@ export function useDeleteTransaction() {
     keys.summary,
     keys.budgetsStatus,
     keys.rangeSummary,
+    keys.forecast,
   )
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/transactions/${id}`, { method: "DELETE" }),
@@ -557,6 +571,7 @@ export function useUpdateRecurringRule() {
     keys.transactions,
     keys.accounts,
     keys.summary,
+    keys.forecast,
   )
   return useMutation({
     mutationFn: ({
@@ -580,6 +595,7 @@ export function useDeleteRecurringRule() {
     keys.transactions,
     keys.accounts,
     keys.summary,
+    keys.forecast,
   )
   return useMutation({
     mutationFn: (id: string) =>

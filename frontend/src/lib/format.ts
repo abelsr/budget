@@ -51,6 +51,14 @@ const shortFmt = new Intl.DateTimeFormat("es-MX", {
   month: "short",
 })
 
+const weekdayShortFmt = new Intl.DateTimeFormat("es-MX", {
+  weekday: "short",
+})
+
+export function formatWeekdayShort(isoDate: string): string {
+  return weekdayShortFmt.format(new Date(isoDate + "T12:00:00"))
+}
+
 export function formatDayHeader(isoDate: string): string {
   const date = new Date(isoDate + "T12:00:00")
   const today = new Date()

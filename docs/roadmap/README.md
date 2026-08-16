@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 21 of 21 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans) · last updated 2026-08-08
+> **Progress:** 22 of 22 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans, cash-flow forecast) · last updated 2026-08-15
 
 ## Immediate — robustness
 
@@ -67,9 +67,9 @@ before adding more visual polish, bank aggregation, or generative AI.
 | 4 | **Merchants and categorization rules** | Prevents repetitive categorization and improves the quality of reports and budgets. | CSV import | ✅ 2026-08-08 |
 | 5 | **Split transactions** | A single purchase can belong to several categories; forcing one category makes budgets inaccurate. | Transfers and report invariants | ✅ 2026-08-08 |
 | 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | ✅ 2026-08-08 |
-| 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Alerts ✅ 2026-08-08; forecast proposed |
+| 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Alerts ✅ 2026-08-08; forecast ✅ 2026-08-15 ([22]) |
 | 8 | [**Goal plans**](21-planes-de-metas.md) | Adds due dates, required periodic contributions, and pause/resume to the shipped manual goals. | Alerts | ✅ 2026-08-08 |
-| 9 | **Mexican card and instalment support** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and cash-flow forecast | Proposed |
+| 9 | **Mexican card and instalment support** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and [22] ✅ | Proposed |
 
 ### Deliberately deferred
 
@@ -111,6 +111,14 @@ may be implemented in parallel.
   and possible restoration.
 
 ## Log
+
+**2026-08-15 — 22 (cash-flow forecast) completed.**
+
+- A new `GET /forecast?days=14..180` (default 90) returns a day-by-day projection of the household balance plus a 30-day list of upcoming movements. It is read-only by design: no transaction is inserted and no `next_run_date` changes; the leading `materialize_due` call is the same idempotent catch-up every read endpoint already performs.
+- The opening balance reuses the exact `GET /accounts` formula, now extracted into a shared helper (`app/services/account_balances.py`) so the two can never drift. That formula is unfiltered by date, so a movement already recorded with a future date is part of the opening balance; re-applying it as a day delta would count it twice. The day walk is therefore driven **only** by projected occurrences of active recurring rules on shared accounts, iterated with `advance()` from `next_run_date` without materializing — the anchor-day monthly clamp (Jan 31 → Feb 28/29 → Mar 31) stays owned by `advance`. The series starts at exactly the "Saldo del hogar" hero figure, with no jumps.
+- Recorded future movements (soft-deleted excluded) appear only in the 30-day `upcoming` list. Transfers stay excluded from the income/expense columns everywhere, as in the rest of the app: a shared→shared transfer nets to zero, while a shared→personal transfer already reduces the opening balance. Rules on personal accounts, personal-account movements, and soft-deleted transactions never enter the projection.
+- The dashboard gains a full-width `ForecastCard` at the bottom of the grid: a single-series "Saldo proyectado" area chart (brand-blue stroke, dashed zero reference line, legend, hoverable) next to up to four upcoming movements with signed, `--income`/`--expense` amounts, and a "N más" overflow. It honors the balance concealment toggle (masked amounts and figure-free `aria-label`) and the existing `motion` item variants; every mutation that touches transactions, transfers, recurring rules, accounts, or import revert/restore now also invalidates the forecast query.
+- Backend tests passed (210; 13 PostgreSQL-dependent migration tests skipped without a configured test database), including the opening-balance parity with `/accounts`, the final-balance invariant, the Feb 28/29 → Mar 31 anchor-day crossing, the 422 bounds, read-only guarantees, and household isolation. Frontend lint and production build passed.
 
 **2026-08-08 — Goal plans completed.**
 

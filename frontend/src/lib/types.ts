@@ -212,6 +212,42 @@ export interface BudgetStatus {
   percentage: number
 }
 
+/** Daily point of the cash-flow forecast. */
+export interface ForecastPoint {
+  /** ISO date: YYYY-MM-DD */
+  date: string
+  income: number
+  expense: number
+  /** Net change of the household balance that day (sign included). */
+  delta: number
+  /** Projected balance at the end of the day. */
+  balance: number
+}
+
+/** Expected movement: recorded with a future date or a projected occurrence. */
+export interface ForecastUpcoming {
+  /** ISO date: YYYY-MM-DD */
+  date: string
+  /** Effect on the shared household cash. */
+  type: "income" | "expense"
+  amount: number
+  label: string
+  source: "transaction" | "recurring"
+}
+
+/**
+ * Day-by-day projection of the household balance (shared accounts only)
+ * and upcoming movements in a fixed window.
+ */
+export interface Forecast {
+  /** ISO date: YYYY-MM-DD */
+  asOf: string
+  days: number
+  openingBalance: number
+  balance: ForecastPoint[]
+  upcoming: ForecastUpcoming[]
+}
+
 /** Meta de ahorro manual. Sus contribuciones no crean movimientos financieros. */
 export interface SavingsGoal {
   id: string
