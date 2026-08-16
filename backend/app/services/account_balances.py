@@ -1,8 +1,8 @@
-"""Fórmula de saldo derivada del libro mayor.
+"""Balance formula derived from the ledger.
 
-`list_accounts`, la proyección de flujo de efectivo y cualquier otro
-consumidor calculan desde aquí para que la fórmula no se desincronice:
-`opening_balance + income + inflow − expense − outflow`, con
+`list_accounts`, the cash-flow forecast, and any other consumer compute
+from here so the formula cannot drift:
+`opening_balance + income + inflow − expense − outflow`, with
 `deleted_at IS NULL`.
 """
 
@@ -12,10 +12,10 @@ from app.models import Account, Transaction
 
 
 def balance_sums(db, household_id: str, visibility) -> dict[str, dict[str, float]]:
-    """Suma de montos por cuenta y tipo efectivo (income, expense, inflow, outflow).
+    """Sum of amounts per account and cash type (income, expense, inflow, outflow).
 
-    `visibility` es un predicado sobre `Account` (`visible_accounts`,
-    `shared_accounts` o cualquier filtro equivalente).
+    `visibility` is a predicate over `Account` (`visible_accounts`,
+    `shared_accounts`, or any equivalent filter).
     """
     totals = db.execute(
         select(
@@ -38,9 +38,9 @@ def balance_sums(db, household_id: str, visibility) -> dict[str, dict[str, float
 
 
 def account_balance(opening_balance: float | str, sums: dict[str, float]) -> float:
-    """Saldo de una cuenta a partir de sus sumas por tipo.
+    """Account balance from its per-type sums.
 
-    Acepta `opening_balance` como `Numeric`/`Decimal` directo del modelo.
+    Accepts `opening_balance` as `Numeric`/`Decimal` straight from the model.
     """
     return (
         float(opening_balance)

@@ -1,6 +1,6 @@
-"""Proyección de flujo de efectivo: opening balance, deltas diarios,
-reglas recurrentes proyectadas (sin materializar), ventana de próximos
-movimientos, y garantía de solo lectura."""
+"""Cash-flow forecast: opening balance, daily deltas, projected recurring
+rules (without materializing), the upcoming-movements window, and the
+read-only guarantee."""
 
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -25,8 +25,8 @@ def make_headers(user: User) -> dict[str, str]:
 
 @pytest.fixture(name="world")
 def world_fixture(session):
-    """Dos hogares aislados; h1 con cuenta compartida, cuenta personal y
-    categorías, h2 con la mínima para comparar aislamiento."""
+    """Two isolated households; h1 with a shared account, a personal account
+    and categories, h2 with the minimum to compare isolation."""
     u1 = User(email="uno@example.com", hashed_password="x", name="Uno")
     u2 = User(email="dos@example.com", hashed_password="x", name="Dos")
     session.add_all([u1, u2])
@@ -111,11 +111,11 @@ def _iso(offset_days: int) -> str:
     return (date.today() + timedelta(days=offset_days)).isoformat()
 
 
-# ---------- Opening balance y serie ----------
+# ---------- Opening balance and series ----------
 
 
 def test_opening_balance_matches_shared_accounts(client, session, world):
-    """El opening balance coincide con la suma de saldos compartidos de /accounts."""
+    """The opening balance matches the sum of shared balances from /accounts."""
     today = date.today()
     _add_transaction(
         session, household=world["h1"], account=world["account1"], category=world["income1"],
@@ -138,9 +138,10 @@ def test_opening_balance_matches_shared_accounts(client, session, world):
 
 
 def test_recorded_future_movements_are_baked_into_opening_once(client, session, world):
-    """Un movimiento registrado a futuro ya está en el opening (la fórmula no
-    filtra por fecha, como /accounts): no debe repetirse como delta en la
-    serie, solo aparecer en upcoming. La serie cierra: final == opening + Σ."""
+    """A movement recorded in the future is already in the opening balance
+    (the formula is not filtered by date, like /accounts): it must not be
+    repeated as a delta in the series, only appear in upcoming. The series
+    closes: final == opening + sum."""
     _add_transaction(
         session, household=world["h1"], account=world["account1"], category=world["expense1"],
         member=world["u1"], tx_type="expense", amount=150.75, tx_date=date.today() + timedelta(days=2),
@@ -162,21 +163,21 @@ def test_recorded_future_movements_are_baked_into_opening_once(client, session, 
     assert rows[_iso(0)]["delta"] == 0.0
     assert rows[_iso(0)]["balance"] == body["openingBalance"]
 
-    # Ya descontados/sumados en el opening: sin dip en la serie.
+    # Already counted in the opening balance: no dip in the series.
     assert body["openingBalance"] == round(1000.0 - 150.75 + 1000.0, 2)
     for offset in (1, 2, 4, 6, 9):
         assert rows[_iso(offset)]["delta"] == 0.0
         assert rows[_iso(offset)]["income"] == 0.0
         assert rows[_iso(offset)]["expense"] == 0.0
 
-    # El opening coincide con lo que /accounts muestra en el mismo instante.
+    # The opening balance matches what /accounts shows at the same instant.
     accounts = client.get("/accounts", headers=world["headers1"]).json()
     shared_total = round(
         sum(account["balance"] for account in accounts if not account["isPersonal"]), 2
     )
     assert body["openingBalance"] == shared_total
 
-    # Pero sí figuran en la lista de próximos movimientos.
+    # But they do appear in the upcoming-movements list.
     labels = {event["date"]: event["label"] for event in body["upcoming"]}
     assert labels[_iso(2)] == "Comida"
     assert labels[_iso(6)] == "Salario"
@@ -201,7 +202,7 @@ def test_default_days_returns_91_rows_and_range_validation(client, world):
     assert client.get("/forecast?days=180", headers=world["headers1"]).status_code == 200
 
 
-# ---------- Reglas recurrentes ----------
+# ---------- Recurring rules ----------
 
 
 def test_weekly_rule_every_7_days_up_to_horizon(client, session, world):
@@ -222,13 +223,13 @@ def test_weekly_rule_every_7_days_up_to_horizon(client, session, world):
     resp90 = client.get("/forecast?days=90", headers=world["headers1"])
     rows90 = _by_date(resp90.json())
     hits90 = [offset for offset in range(1, 91) if rows90[_iso(offset)]["delta"] != 0.0]
-    # 2 + 7k <= 90 ⇒ k = 0..12.
+    # 2 + 7k <= 90 => k = 0..12.
     assert hits90 == [2 + 7 * k for k in range(13)]
 
 
 @pytest.mark.parametrize(("year", "february_day"), [(2027, 28), (2028, 29)])
 def test_monthly_anchor_day_31_crosses_february(session, world, year, february_day):
-    """ene 31 → feb 28/29 → mar 31: el clamp lo aporta advance(), no el forecast."""
+    """Jan 31 -> Feb 28/29 -> Mar 31: the clamp comes from advance(), not the forecast."""
     _add_rule(
         session, household=world["h1"], account=world["account1"], category=world["expense1"],
         member=world["u1"], rule_type="expense", amount=2500.0, frequency="monthly",
@@ -259,7 +260,7 @@ def test_paused_rule_projects_nothing(client, session, world):
     assert all(event["source"] != "recurring" for event in body["upcoming"])
 
 
-# ---------- Transfers y exclusiones ----------
+# ---------- Transfers and exclusions ----------
 
 
 def test_transfer_shared_to_shared_moves_no_cash(client, session, world):
@@ -287,8 +288,9 @@ def test_transfer_shared_to_shared_moves_no_cash(client, session, world):
 
 
 def test_transfer_shared_to_personal_reduces_household_cash(client, session, world):
-    """Sacar efectivo a una cuenta personal reduce la caja compartida: ya en
-    el opening (misma fórmula que /accounts) y sin doble dip en la serie."""
+    """Moving cash to a personal account reduces the shared cash: already in
+    the opening balance (same formula as /accounts) and with no double dip
+    in the series."""
     resp = client.post(
         "/transactions",
         json={
@@ -310,10 +312,10 @@ def test_transfer_shared_to_personal_reduces_household_cash(client, session, wor
     shared_total = round(
         sum(account["balance"] for account in accounts if not account["isPersonal"]), 2
     )
-    # El retiro a futuro ya descuenta el opening (coincide con /accounts).
+    # The future withdrawal already reduces the opening balance (matches /accounts).
     assert body["openingBalance"] == shared_total == 750.0
     assert rows[_iso(5)]["delta"] == 0.0
-    # Transfer excluido de las columnas income/expense.
+    # Transfers stay excluded from the income/expense columns.
     assert rows[_iso(5)]["income"] == 0.0
     assert rows[_iso(5)]["expense"] == 0.0
     assert body["balance"][-1]["balance"] == body["openingBalance"]
@@ -337,7 +339,7 @@ def test_personal_account_and_soft_deleted_transactions_excluded(client, session
     assert rows[_iso(4)]["delta"] == 0.0
 
 
-# ---------- Solo lectura ----------
+# ---------- Read-only ----------
 
 
 def test_forecast_is_read_only(client, session, world):
@@ -364,7 +366,7 @@ def test_forecast_is_read_only(client, session, world):
 
     resp = client.get("/forecast", headers=world["headers1"])
     assert resp.status_code == 200
-    # El GET no materializa nada ni avanza reglas: no hay ocurrencia vencida.
+    # The GET materializes nothing and advances no rule: no occurrence is due.
     assert before_count == session.scalar(
         select(func.count()).select_from(Transaction).where(Transaction.household_id == world["h1"].id)
     )
@@ -377,7 +379,7 @@ def test_forecast_is_read_only(client, session, world):
     assert before_runs == after_runs
 
 
-# ---------- Aislamiento y 400 ----------
+# ---------- Isolation and 400 ----------
 
 
 def test_forecast_is_isolated_per_household(client, session, world):
@@ -408,7 +410,7 @@ def test_user_without_household_gets_400(client, session):
     assert resp.status_code == 400
 
 
-# ---------- Próximos movimientos ----------
+# ---------- Upcoming movements ----------
 
 
 def test_upcoming_includes_recorded_and_recurring_in_30_days(client, session, world):
@@ -426,7 +428,7 @@ def test_upcoming_includes_recorded_and_recurring_in_30_days(client, session, wo
         member=world["u1"], rule_type="expense", amount=49.0, frequency="weekly",
         next_run_date=date.today() + timedelta(days=5), note="Streaming",
     )
-    # Fuera de la ventana de 30 días: no debe aparecer.
+    # Outside the 30-day window: must not appear.
     _add_transaction(
         session, household=world["h1"], account=world["account1"], category=world["expense1"],
         member=world["u1"], tx_type="expense", amount=60.0, tx_date=date.today() + timedelta(days=32),
@@ -437,21 +439,21 @@ def test_upcoming_includes_recorded_and_recurring_in_30_days(client, session, wo
     resp = client.get("/forecast?days=90", headers=world["headers1"])
     assert resp.status_code == 200
     upcoming = resp.json()["upcoming"]
-    # La regla semanal proyecta todas sus ocurrencias dentro de la ventana.
+    # The weekly rule projects all of its occurrences inside the window.
     assert [(event["date"], event["type"], event["label"], event["source"]) for event in upcoming] == [
         (_iso(3), "expense", "Mercado", "transaction"),
         (_iso(5), "expense", "Streaming", "recurring"),
         (_iso(12), "expense", "Streaming", "recurring"),
         (_iso(19), "expense", "Streaming", "recurring"),
         (_iso(26), "expense", "Streaming", "recurring"),
-        # Sin nota: label = nombre de la categoría.
+        # No note: label = category name.
         (_iso(28), "income", "Salario", "transaction"),
     ]
     assert all(event["amount"] in (120.0, 49.0, 800.0) for event in upcoming)
     dates = [event["date"] for event in upcoming]
     assert dates == sorted(dates)
     labels = [event["label"] for event in upcoming]
-    # Fuera de la ventana de 30 días: no aparece.
+    # Outside the 30-day window: does not appear.
     assert _iso(32) not in dates
     assert "Lejos" not in labels
 
@@ -470,7 +472,7 @@ def test_upcoming_is_capped_at_20(client, session, world):
     upcoming = resp.json()["upcoming"]
     assert len(upcoming) == 20
     labels = {event["label"] for event in upcoming}
-    # Con 21 candidatos en la ventana, el corte ordenado deja fuera el último.
+    # With 21 candidates in the window, the ordered cut leaves the last out.
     assert "m21" not in labels
 
 

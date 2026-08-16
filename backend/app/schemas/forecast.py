@@ -19,7 +19,7 @@ class ForecastPoint(_CamelModel):
 
 class ForecastUpcoming(_CamelModel):
     date: date
-    #: Efecto sobre la caja compartida del hogar.
+    #: Effect on the shared household cash.
     type: Literal["income", "expense"]
     amount: float
     label: str

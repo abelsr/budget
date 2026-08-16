@@ -21,8 +21,8 @@ def get_forecast(
     if user.household_id is None:
         raise HTTPException(status_code=400, detail="El usuario no pertenece a un hogar")
 
-    # Convención de todos los endpoints de lectura: materializar antes de leer,
-    # para que el opening balance no falte ninguna ocurrencia vencida.
+    # Convention of every read endpoint: materialize before reading, so the
+    # opening balance is missing no overdue occurrence.
     materialize_due(db, user.household_id, user.id)
     result = build_forecast(db, user.household_id, date.today(), days)
     return ForecastResponse(

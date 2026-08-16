@@ -1,21 +1,22 @@
-"""Proyección diaria del flujo de efectivo del hogar.
+"""Day-by-day cash-flow forecast of the household balance.
 
-Lectura puramente derivada: no inserta transacciones ni avanza
-`next_run_date` (el estado vive ahí). El endpoint llama antes a
-`materialize_due` —convención de todos los endpoints de lectura—, que es
-idempotente y garantiza que no falte ninguna ocurrencia vencida en el
+Purely derived read: it inserts no transactions and does not advance
+`next_run_date` (the state lives there). The endpoint calls
+`materialize_due` first, per the convention of every read endpoint, which
+is idempotent and guarantees no overdue occurrence is missing from the
 opening balance.
 
-Entrada de la proyección, en orden:
-1. Saldo actual del hogar (solo cuentas compartidas, misma fórmula que
-   `GET /accounts` vía `account_balances`). Esa fórmula **no filtra por
-   fecha**: un movimiento registrado con fecha futura ya está incluido aquí,
-   así que volver a aplicarlo como delta diario lo contaría dos veces. Por
-   eso el walk solo suma ocurrencias **aún no materializadas** (recurrentes).
-2. Ocurrencias futuras de reglas recurrentes activas en cuentas
-   compartidas, proyectadas con `advance()` sin materializar.
-Los movimientos registrados con fecha futura (incluido transfer, excluidos
-los soft-deleted) no entran al walk: solo aparecen en la lista `upcoming`.
+Projection inputs, in order:
+1. Current household balance (shared accounts only, same formula as
+   `GET /accounts` via `account_balances`). That formula is **not filtered
+   by date**: a movement recorded with a future date is already included
+   here, so applying it again as a daily delta would count it twice. The
+   walk therefore only adds occurrences **not yet materialized** (recurring
+   rules).
+2. Future occurrences of active recurring rules on shared accounts,
+   projected with `advance()` without materializing them.
+Recorded movements with a future date (transfers included, soft-deleted
+excluded) do not enter the walk: they only appear in the `upcoming` list.
 """
 
 from collections import defaultdict
@@ -30,9 +31,9 @@ from app.services.account_access import shared_accounts
 from app.services.account_balances import account_balance, balance_sums
 from app.services.recurring import advance
 
-#: Ventana fija de la lista de próximos movimientos, en días.
+#: Fixed window of the upcoming-movements list, in days.
 UPCOMING_WINDOW_DAYS = 30
-#: Tope de eventos en la lista de próximos movimientos.
+#: Cap on events in the upcoming-movements list.
 UPCOMING_LIMIT = 20
 
 
@@ -48,10 +49,11 @@ class ForecastPoint:
 @dataclass(frozen=True)
 class UpcomingEvent:
     date: date
-    #: Efecto sobre la caja compartida: "income" entra, "expense" sale. Un
-    #: transfer a futuro se reporta por ese efecto (vía compartida → "expense",
-    #: hacia compartida → "income"); un transfer entre dos cuentas
-    #: compartidas no aparece porque no mueve la caja del hogar.
+    #: Effect on the shared household cash: "income" comes in, "expense"
+    #: goes out. A future transfer is reported by that effect (from a shared
+    #: account -> "expense", into a shared account -> "income"); a transfer
+    #: between two shared accounts does not appear because it does not move
+    #: household cash.
     type: str
     amount: float
     label: str
@@ -78,10 +80,10 @@ def _project_rule(
     delta_by_date: dict,
     events: list[UpcomingEvent],
 ) -> None:
-    """Encadena `advance()` desde `next_run_date` hasta pasar el horizonte.
+    """Chain `advance()` from `next_run_date` until past the horizon.
 
-    El clamp mensual de `anchor_day` (ene 31 → feb 28 → mar 31) lo define
-    `advance()`; aquí solo se recorre, sin reimplementar calendario.
+    The monthly `anchor_day` clamp (Jan 31 -> Feb 28 -> Mar 31) is defined
+    by `advance()`; this only walks it, without reimplementing the calendar.
     """
     amount = float(rule.amount)
     current = rule.next_run_date
@@ -107,15 +109,15 @@ def _project_rule(
 
 
 def build_forecast(db: Session, household_id: str, as_of: date, days: int) -> ForecastResult:
-    """Serie de `days + 1` filas desde `as_of` (la primera con delta 0).
+    """Series of `days + 1` rows from `as_of` (the first with delta 0).
 
-    Invariante: el balance final coincide con el opening balance más la suma
-    de los deltas, todo redondeado a 2 decimales por fila.
+    Invariant: the final balance equals the opening balance plus the sum of
+    the deltas, rounded to 2 decimals per row.
     """
     horizon = as_of + timedelta(days=days)
     window_end = as_of + timedelta(days=UPCOMING_WINDOW_DAYS)
 
-    # Saldo inicial: misma fórmula que GET /accounts, solo cuentas compartidas.
+    # Opening balance: same formula as GET /accounts, shared accounts only.
     shared = {
         account.id: account
         for account in db.scalars(select(Account).where(Account.household_id == household_id, shared_accounts()))
@@ -136,9 +138,9 @@ def build_forecast(db: Session, household_id: str, as_of: date, days: int) -> Fo
     events: list[UpcomingEvent] = []
     upcoming_transfers: dict[str, list[Transaction]] = defaultdict(list)
 
-    # Solo para `upcoming`: los movimientos registrados (pasados o futuros)
-    # ya figuran en el opening balance (la fórmula no filtra por fecha), por
-    # lo que no deben repetirse como delta en la serie.
+    # Only for `upcoming`: recorded movements (past or future) are already
+    # in the opening balance (the formula is not filtered by date), so they
+    # must not be repeated as a delta in the series.
     for tx in db.scalars(
         select(Transaction)
         .join(Account, Account.id == Transaction.account_id)
@@ -165,9 +167,9 @@ def build_forecast(db: Session, household_id: str, as_of: date, days: int) -> Fo
             )
         )
 
-    # Un grupo con dos filas aquí ⇒ ambas cuentas compartidas: la caja del
-    # hogar no cambia, no se lista. Una sola fila ⇒ el otro extremo es
-    # personal y el efecto sobre la caja compartida sí se lista.
+    # A group with two rows here means both accounts are shared: household
+    # cash does not change, so it is not listed. One row means the other end
+    # is personal and the effect on shared cash is listed.
     for rows in upcoming_transfers.values():
         if len(rows) != 1:
             continue

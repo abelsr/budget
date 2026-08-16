@@ -193,7 +193,7 @@ export function useRangeSummary(from: string, to: string) {
   })
 }
 
-/** Proyección de flujo de efectivo (horizonte por defecto de 90 días). */
+/** Cash-flow forecast (default horizon of 90 days). */
 export function useForecast() {
   return useQuery({
     queryKey: keys.forecast,
