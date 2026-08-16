@@ -241,7 +241,7 @@ function ForecastCard({ forecast, concealed }: { forecast: Forecast | undefined;
           <div className="min-w-0">
             <p className="text-[11px] font-medium text-muted-foreground">Próximos movimientos</p>
             {upcoming.length === 0 ? (
-              <p className="py-8 text-[13px] text-muted-foreground">Sin movimientos previstos para los próximos 90 días.</p>
+              <p className="py-8 text-[13px] text-muted-foreground">Sin movimientos previstos para los próximos 30 días.</p>
             ) : (
               <>
                 <ul className="mt-1">

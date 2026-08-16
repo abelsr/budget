@@ -90,7 +90,8 @@ declarado del item 9 (tarjetas MX e instalados).
     `--expense` y `.tnum`.
   - Respeta `concealed`: montos enmascarados y `aria-label` sin cifras, igual
     que el resto de cards. Empty state cuando no hay `upcoming`: "Sin
-    movimientos previstos para los próximos 90 días."
+    movimientos previstos para los próximos 30 días" (la ventana de
+    `upcoming` es fija de 30 días, aunque la serie proyecte más).
   - Sin nav item nuevo, sin cambio de hero (`§8`): la card usa `dashboard-card`
     y no introduce una superficie azul hero.
 
