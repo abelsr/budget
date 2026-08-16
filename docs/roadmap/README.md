@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 21 of 21 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans) · last updated 2026-08-08
+> **Progress:** 21 of 21 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans) · 22 in progress · last updated 2026-08-15
 
 ## Immediate — robustness
 
@@ -67,9 +67,9 @@ before adding more visual polish, bank aggregation, or generative AI.
 | 4 | **Merchants and categorization rules** | Prevents repetitive categorization and improves the quality of reports and budgets. | CSV import | ✅ 2026-08-08 |
 | 5 | **Split transactions** | A single purchase can belong to several categories; forcing one category makes budgets inaccurate. | Transfers and report invariants | ✅ 2026-08-08 |
 | 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | ✅ 2026-08-08 |
-| 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Alerts ✅ 2026-08-08; forecast proposed |
+| 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Alerts ✅ 2026-08-08; calendar/forecast → [22](22-cash-flow-forecast.md) 🚧 |
 | 8 | [**Goal plans**](21-planes-de-metas.md) | Adds due dates, required periodic contributions, and pause/resume to the shipped manual goals. | Alerts | ✅ 2026-08-08 |
-| 9 | **Mexican card and instalment support** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and cash-flow forecast | Proposed |
+| 9 | **Mexican card and instalment support** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and [22](22-cash-flow-forecast.md) | Proposed |
 
 ### Deliberately deferred
 
