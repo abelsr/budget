@@ -26,6 +26,7 @@ from app.schemas.transactions import (
 )
 from app.services.recurring import advance, materialize_due
 from app.services.account_access import can_operate, visible_accounts
+from app.services.instalment_plans import active_plan_for
 from app.services.reconciliation import invalidate_completed_reconciliation
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -523,6 +524,11 @@ def update_transaction(
         db.refresh(tx)
         return _tx_out(tx, db, user.id)
     data = payload.model_dump(exclude_unset=True)
+    if ("amount" in data or "account_id" in data) and active_plan_for(db, tx.id) is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="No se puede editar el monto o la cuenta de una compra con un plan de instalados activo",
+        )
     if data.get("type") == "transfer" or "source_account_id" in data or "destination_account_id" in data:
         raise HTTPException(status_code=422, detail="Una transacción existente no se puede convertir en transferencia")
     splits = data.pop("splits", None)
@@ -585,6 +591,8 @@ def delete_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) -> 
     tx = _get_transaction(db, household_id, user.id, transaction_id)
     if tx.import_batch_id is not None:
         raise HTTPException(status_code=409, detail="No se puede eliminar una transacción importada")
+    if active_plan_for(db, tx.id) is not None:
+        raise HTTPException(status_code=409, detail="La compra tiene un plan de instalados activo; cancela el plan primero")
     if tx.type == "transfer":
         if tx.transfer_group_id is None:
             raise HTTPException(status_code=409, detail="La transferencia está incompleta")

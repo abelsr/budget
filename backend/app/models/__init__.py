@@ -4,7 +4,7 @@ from app.models.accounts import Account
 from app.models.categories import Category, MerchantRule
 from app.models.identity import Household, Invitation, User, new_id
 from app.models.imports import ImportBatch, ImportFingerprint, ImportRow
-from app.models.planning import Alert, Budget, RecurringRule, SavingsGoal
+from app.models.planning import Alert, Budget, InstalmentPlan, RecurringRule, SavingsGoal
 from app.models.transactions import (
     Attachment,
     ReconciliationSession,

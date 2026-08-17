@@ -78,16 +78,27 @@ function AccountForm({
     account?.cardBrand ?? "",
   )
   const [lastFour, setLastFour] = useState(account?.lastFour ?? "")
+  const [statementDayText, setStatementDayText] = useState(
+    account?.statementDay != null ? String(account.statementDay) : "",
+  )
+  const [paymentDueDaysText, setPaymentDueDaysText] = useState(
+    account?.paymentDueDays != null ? String(account.paymentDueDays) : "",
+  )
   const [isPersonal, setIsPersonal] = useState(account?.isPersonal ?? false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const openingBalance = Number(balanceText.replace(",", ".")) || 0
   const lastFourValid = lastFour === "" || /^\d{4}$/.test(lastFour)
+  const statementDay = statementDayText === "" ? null : Number(statementDayText)
+  const paymentDueDays = paymentDueDaysText === "" ? null : Number(paymentDueDaysText)
+  const cycleValid =
+    (statementDay === null || (statementDay >= 1 && statementDay <= 28)) &&
+    (paymentDueDays === null || (paymentDueDays >= 1 && paymentDueDays <= 60))
   const isPending =
     createAccount.isPending ||
     updateAccount.isPending ||
     deleteAccount.isPending
-  const canSave = name.trim().length > 0 && lastFourValid && !isPending
+  const canSave = name.trim().length > 0 && lastFourValid && cycleValid && !isPending
 
   const error =
     createAccount.error ?? updateAccount.error ?? deleteAccount.error
@@ -105,6 +116,9 @@ function AccountForm({
         ? "Esta cuenta dejará de ser visible para el hogar y ya no sumará a sus balances. ¿Continuar?"
         : "Esta cuenta y sus movimientos volverán a ser visibles para todo el hogar. ¿Continuar?",
     )) return
+    // The cycle fields only apply to credit cards; clearing them on a kind
+    // change is what the backend requires (422 otherwise).
+    const withCycle = kind === "credit"
     const input = {
       name: name.trim(),
       kind,
@@ -113,6 +127,8 @@ function AccountForm({
       cardBrand: cardBrand || null,
       lastFour: lastFour || null,
       isPersonal,
+      statementDay: withCycle ? statementDay : null,
+      paymentDueDays: withCycle ? paymentDueDays : null,
     }
     if (account) {
       updateAccount.mutate({ id: account.id, ...input }, { onSuccess: onDone })
@@ -279,6 +295,45 @@ function AccountForm({
           )}
           </div>
         </div>
+
+        {/* Ciclo de la tarjeta (solo crédito) — deriva corte y fecha de pago */}
+        {kind === "credit" && (
+          <div>
+            <p id="account-card-cycle-label" className="mb-2 text-[13px] font-medium text-muted-foreground">
+              Ciclo de la tarjeta <span className="font-normal">(opcional)</span>
+            </p>
+            <div className="flex gap-2" aria-labelledby="account-card-cycle-label">
+              <div className="flex-1">
+                <input
+                  id="account-statement-day"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={statementDayText}
+                  onChange={(e) => setStatementDayText(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Día de corte (1–28)"
+                  className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
+                  aria-label="Día de corte del ciclo de la tarjeta"
+                />
+              </div>
+              <div className="flex-1">
+                <input
+                  id="account-payment-due-days"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={paymentDueDaysText}
+                  onChange={(e) => setPaymentDueDaysText(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Días hasta el pago (ej. 20)"
+                  className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
+                  aria-label="Días entre el corte y la fecha límite de pago"
+                />
+              </div>
+            </div>
+            {(statementDay !== null && (statementDay < 1 || statementDay > 28)) ||
+            (paymentDueDays !== null && (paymentDueDays < 1 || paymentDueDays > 60)) ? (
+              <p className="text-[12px] text-expense">Corte entre 1 y 28; pago entre 1 y 60 días.</p>
+            ) : null}
+          </div>
+        )}
 
         {/* Vista previa del widget tipo wallet */}
         {lastFour !== "" && (

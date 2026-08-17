@@ -26,6 +26,7 @@ import type {
   ReconciliationDetail,
   ReconciliationSession,
   SavingsGoal,
+  InstalmentPlan,
   Transaction,
 } from "@/lib/types"
 
@@ -53,6 +54,7 @@ export const keys = {
   importBatches: ["import", "batches"] as const,
   importBatch: (id: string) => ["import", "batches", id] as const,
   merchantRules: ["merchant-rules"] as const,
+  instalmentPlans: ["instalment-plans"] as const,
   reconciliation: (accountId: string, id: string) => ["accounts", accountId, "reconciliations", id] as const,
 }
 
@@ -410,6 +412,8 @@ export interface AccountInput {
   cardBrand?: Account["cardBrand"]
   lastFour?: string | null
   isPersonal?: boolean
+  statementDay?: number | null
+  paymentDueDays?: number | null
 }
 
 export interface CategoryInput {
@@ -761,6 +765,83 @@ export function useDeleteGoal() {
   const invalidate = useInvalidator(keys.goals)
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/goals/${id}`, { method: "DELETE" }),
+    onSuccess: invalidate,
+  })
+}
+
+
+// ---------- Instalment plans (MSI) ----------
+
+export function useInstalmentPlans() {
+  return useQuery({
+    queryKey: keys.instalmentPlans,
+    queryFn: () => apiFetch<InstalmentPlan[]>("/instalment-plans"),
+  })
+}
+
+export function useInstalmentPlan(id: string | undefined) {
+  return useQuery({
+    queryKey: ["instalment-plans", id] as const,
+    enabled: !!id,
+    queryFn: () => apiFetch<InstalmentPlan>(`/instalment-plans/${id}`),
+  })
+}
+
+function useInstalmentInvalidate() {
+  // Plans never move balances by themselves, but "record payment now"
+  // creates a transfer, so accounts, transactions and the forecast
+  // (which lists instalment due dates) are invalidated as well.
+  return useInvalidator(
+    keys.instalmentPlans,
+    keys.accounts,
+    keys.transactions,
+    keys.forecast,
+    keys.alerts,
+    keys.summary,
+  )
+}
+
+export function useCreateInstalmentPlan() {
+  const invalidate = useInstalmentInvalidate()
+  return useMutation({
+    mutationFn: (input: { sourceTransactionId: string; months: number; firstDueDate: string }) =>
+      apiFetch<InstalmentPlan>("/instalment-plans", { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function usePayInstalmentPlan() {
+  const invalidate = useInstalmentInvalidate()
+  return useMutation({
+    mutationFn: ({ id, sourceAccountId, date }: { id: string; sourceAccountId?: string; date?: string }) =>
+      apiFetch<InstalmentPlan>(`/instalment-plans/${id}/pay`, {
+        method: "POST",
+        body: JSON.stringify({ sourceAccountId: sourceAccountId ?? null, date: date ?? null }),
+      }),
+    onSuccess: invalidate,
+  })
+}
+
+export function usePauseInstalmentPlan() {
+  const invalidate = useInstalmentInvalidate()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<InstalmentPlan>(`/instalment-plans/${id}/pause`, { method: "POST" }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useResumeInstalmentPlan() {
+  const invalidate = useInstalmentInvalidate()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<InstalmentPlan>(`/instalment-plans/${id}/resume`, { method: "POST" }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useCancelInstalmentPlan() {
+  const invalidate = useInstalmentInvalidate()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/instalment-plans/${id}`, { method: "DELETE" }),
     onSuccess: invalidate,
   })
 }

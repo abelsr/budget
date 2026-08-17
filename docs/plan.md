@@ -162,10 +162,14 @@ verified end-to-end, including access from a phone over the local IP.
   pause/resume on dated goals; never creates ledger movements (2026-08-08).
 - ✅ **Cash-flow forecast:** `GET /forecast` daily balance projection plus a
   30-day upcoming list, rendered on the dashboard (2026-08-15).
+- ✅ **Mexican cards and instalments:** per-card cycle dates (statement day +
+  days-to-payment-due, derived not stored), MSI plans with an anchor-day
+  schedule that sums exactly to the purchase, payment-due forecast events and
+  alerts, and cash→card payment transfers (2026-08-16).
 
 **Infrastructure:**
 
-- ✅ Multi-tenant FastAPI backend (210 pytest tests, in-memory SQLite).
+- ✅ Multi-tenant FastAPI backend (241 pytest tests, in-memory SQLite).
 - ✅ camelCase responses end-to-end; `/api` proxy in Vite (dev) and nginx (prod).
 - ✅ Secrets in `.env` (root and backend/, ignored by git; templates in
   `.env.example` in both).
@@ -183,8 +187,7 @@ verified end-to-end, including access from a phone over the local IP.
 
 > Full details in **[docs/roadmap/](roadmap/README.md)** — one file per
 > pending item with why, scope, design, and acceptance criteria, plus the
-> log of what's already done. Open: 23 (Mexican cards and instalments) and
-> 24 (undo for delete and quick entry), both proposed.
+> log of what's already done. Open: 24 (undo for delete and quick entry), proposed.
 
 **Immediate (robustness):**
 
@@ -212,5 +215,4 @@ verified end-to-end, including access from a phone over the local IP.
 
 **Proposed (next up):**
 
-- 📄 [Mexican cards and instalments](roadmap/23-tarjetas-mx-e-instalados.md): card cycle dates, payment-due forecast events and alerts, MSI plans (2026-08-16).
 - 📄 [Undo for delete and quick entry](roadmap/24-undo-eliminacion.md): soft delete for manual deletions, restore endpoint, Deshacer snackbar, 30-day purge (2026-08-16).

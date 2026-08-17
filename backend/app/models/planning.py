@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Index, JSON, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, CheckConstraint, ForeignKey, Index, JSON, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -73,3 +73,33 @@ class Alert(Base):
     dedupe_key: Mapped[str] = mapped_column(String(180))
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class InstalmentPlan(Base):
+    """Months-without-interest plan for a card purchase.
+
+    Advisory like goal plans: it never creates ledger movements. The
+    schedule is derived from `first_due_date` (anchor-day walk, no stored
+    rows); `paid_count` advances by explicit user action only.
+    """
+
+    __tablename__ = "instalment_plans"
+    __table_args__ = (
+        UniqueConstraint("household_id", "source_transaction_id", name="uq_instalment_plans_household_source"),
+        CheckConstraint("months >= 2 AND months <= 48", name="ck_instalment_plans_months"),
+        CheckConstraint("status IN ('active', 'paused', 'completed', 'cancelled')", name="ck_instalment_plans_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
+    source_transaction_id: Mapped[str] = mapped_column(ForeignKey("transactions.id"))
+    months: Mapped[int] = mapped_column()
+    total_amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    monthly_amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    first_due_date: Mapped[date] = mapped_column(Date)
+    paid_count: Mapped[int] = mapped_column(default=0, server_default="0")
+    status: Mapped[str] = mapped_column(String(12), default="active", server_default="active")
+    created_by_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
