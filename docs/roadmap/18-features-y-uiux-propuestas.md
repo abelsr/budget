@@ -44,7 +44,7 @@ monitoring (17). The proposals below fill gaps that are
 
 ## Batch A — Core data features (recommended first)
 
-### A1. Transfers between accounts
+### A1. Transfers between accounts — ✅ 2026-08-05
 
 **Why.** Moving money between accounts (cash → card, card → savings) is a
 daily action for a family. Today there is no way to express it: any record is
@@ -153,7 +153,7 @@ the migration only adds columns.
 
 ---
 
-### A3. Reports and trends
+### A3. Reports and trends — ✅ 2026-08-04
 
 **Why.** The dashboard answers "how is *this* month going?" but nothing asks
 "are we spending more than last quarter?" or "what did the year look like?".
@@ -187,7 +187,7 @@ Without trends the app describes the present but not the direction.
 
 ---
 
-### A4. Data export (CSV / household)
+### A4. Data export (CSV / household) — ✅ 2026-08-04
 
 **Why.** Self-hosting means the family owns the data — they should be able to
 leave (or just back up) without the dev running `pg_dump`. A one-click CSV of
@@ -218,7 +218,7 @@ transactions is the minimum, and it doubles as a human-readable audit.
 
 ---
 
-### A5. In-app alerts (budget overrun, overdue rules, goal reached, negative balance)
+### A5. In-app alerts (budget overrun, overdue rules, goal reached, negative balance) — ✅ 2026-08-08
 
 **Why.** Budgets and goals only inform when the user opens the right screen.
 A budget that silently ran out at 80% loses its point. Alerts turn the app

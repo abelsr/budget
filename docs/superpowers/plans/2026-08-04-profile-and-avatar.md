@@ -21,17 +21,17 @@
 - Modify: `backend/app/api/routes/auth.py`
 - Test: `backend/tests/test_auth.py`
 
-- [ ] **Step 1: Write failing API tests**
+- [x] **Step 1: Write failing API tests**
   - Patch `/auth/me` changes name, sex, and birth date for the authenticated user.
   - Invalid sex, future birth date, and empty update return `422`.
   - `POST /auth/change-password` accepts the current password and rejects an incorrect or short replacement password while the existing token still accesses `/auth/me`.
-- [ ] **Step 2: Run `uv run pytest tests/test_auth.py -v` and confirm the new tests fail.**
-- [ ] **Step 3: Add the `sex`, `birth_date`, `avatar_path`, and `avatar_updated_at` nullable columns plus an Alembic migration.**
-- [ ] **Step 4: Add typed request models and authenticated profile/password endpoints.**
+- [x] **Step 2: Run `uv run pytest tests/test_auth.py -v` and confirm the new tests fail.**
+- [x] **Step 3: Add the `sex`, `birth_date`, `avatar_path`, and `avatar_updated_at` nullable columns plus an Alembic migration.**
+- [x] **Step 4: Add typed request models and authenticated profile/password endpoints.**
   - `sex` accepts `female`, `male`, `non_binary`, or `prefer_not_to_say`.
   - Birth date cannot be future or older than 120 years.
   - Password changes rehash with the existing hasher and do not invalidate existing stateless JWTs.
-- [ ] **Step 5: Run `uv run pytest tests/test_auth.py -v`.**
+- [x] **Step 5: Run `uv run pytest tests/test_auth.py -v`.**
 
 ### Task 2: Manage a protected normalized avatar
 
@@ -40,16 +40,16 @@
 - Modify: `backend/app/api/routes/auth.py`
 - Test: `backend/tests/test_auth.py`
 
-- [ ] **Step 1: Write failing tests with storage mocked.**
+- [x] **Step 1: Write failing tests with storage mocked.**
   - An image upload is converted to a 512 px WebP avatar and reflected in `/auth/me`.
   - Unsupported, malformed, and oversized input return a clear 4xx response.
   - Avatar download requires authentication; delete clears both object and profile field.
-- [ ] **Step 2: Run the targeted tests and confirm they fail.**
-- [ ] **Step 3: Implement upload, authenticated download, and deletion.**
+- [x] **Step 2: Run the targeted tests and confirm they fail.**
+- [x] **Step 3: Implement upload, authenticated download, and deletion.**
   - Limit raw input to 2 MB and accept images only.
   - Decode with Pillow, fit to a square, encode WebP, and use a stable per-user object key.
   - On storage failure, retain the existing DB record and report `502`.
-- [ ] **Step 4: Run `uv run pytest tests/test_auth.py -v`.**
+- [x] **Step 4: Run `uv run pytest tests/test_auth.py -v`.**
 
 ## Chunk 2: Account Settings Interface
 
@@ -64,16 +64,16 @@
 - Modify: `docs/roadmap/10-perfil-y-password.md`
 - Modify: `docs/roadmap/README.md`
 
-- [ ] **Step 1: Extend the session type and auth context with profile update, avatar upload/delete, and password-change operations.**
-- [ ] **Step 2: Build the Account sheet.**
+- [x] **Step 1: Extend the session type and auth context with profile update, avatar upload/delete, and password-change operations.**
+- [x] **Step 2: Build the Account sheet.**
   - Display protected avatar or initials, allow replacement/removal, name editing, sex selection, and birth-date editing.
   - Calculate and show age locally from the birth date; do not send an age field to the API.
   - Show upload and API failures beside their relevant controls.
-- [ ] **Step 3: Build the password sheet.**
+- [x] **Step 3: Build the password sheet.**
   - Require current password, replacement, and confirmation.
   - Validate match and eight-character minimum before submission and show server failures in context.
-- [ ] **Step 4: Replace Settings' “Próximamente” account row and sidebar initial with the current session/avatar.**
-- [ ] **Step 5: Run `npm run build` and manually verify mobile and desktop layouts.**
+- [x] **Step 4: Replace Settings' “Próximamente” account row and sidebar initial with the current session/avatar.**
+- [x] **Step 5: Run `npm run build` and manually verify mobile and desktop layouts.**
 
 ## Chunk 3: End-To-End Verification And Documentation
 
@@ -83,7 +83,7 @@
 - Modify: `docs/roadmap/10-perfil-y-password.md`
 - Modify: `docs/roadmap/README.md`
 
-- [ ] **Step 1: Run `uv run pytest tests/test_auth.py tests/test_migrations.py`.**
-- [ ] **Step 2: Run `uv run alembic heads` and confirm exactly one head.**
-- [ ] **Step 3: Run `npm run build`.**
-- [ ] **Step 4: Mark item 10 complete only after every acceptance criterion has been verified.**
+- [x] **Step 1: Run `uv run pytest tests/test_auth.py tests/test_migrations.py`.**
+- [x] **Step 2: Run `uv run alembic heads` and confirm exactly one head.**
+- [x] **Step 3: Run `npm run build`.**
+- [x] **Step 4: Mark item 10 complete only after every acceptance criterion has been verified.**
