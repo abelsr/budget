@@ -85,7 +85,7 @@ budget/
 └── frontend/           ← React + Vite PWA (nginx in prod)
 ```
 
-## Current status (2026-08-06)
+## Current status (2026-08-16)
 
 **Repo published on GitHub.** Full stack running on Docker Compose
 (frontend nginx :8081, backend :8000, Postgres 17, MinIO S3 API internal on
@@ -141,9 +141,31 @@ verified end-to-end, including access from a phone over the local IP.
   translucent materials, springs, pointer-down feedback,
   `prefers-reduced-motion`, Spanish.
 
+**Next cycle (financial integrity, complete):**
+
+- ✅ **Transfers between accounts:** a `transfer_groups` pair of two linked
+  rows, excluded from income/expense, donut, budgets, and reports everywhere,
+  each side independently reconcilable (2026-08-05).
+- ✅ **Reports and exports:** range summaries plus CSV, XLSX, DOCX, and PDF
+  exports (2026-08-04).
+- ✅ **Merchants and categorization rules:** normalized merchant patterns
+  auto-categorize CSV imports (2026-08-08).
+- ✅ **Split transactions:** one movement, several category allocations;
+  budgets, reports, and filters are allocation-aware (2026-08-08).
+- ✅ **Monthly budgets with optional rollover:** explicit per-month budgets
+  over the backwards-compatible global default, surplus carry opt-in
+  (2026-08-08).
+- ✅ **In-app alerts:** lazy, idempotent budget-threshold, overdue-rule,
+  reached-goal, and negative-balance notifications with a desktop bell
+  (2026-08-08).
+- ✅ **Goal plans:** advisory monthly contribution requirement with
+  pause/resume on dated goals; never creates ledger movements (2026-08-08).
+- ✅ **Cash-flow forecast:** `GET /forecast` daily balance projection plus a
+  30-day upcoming list, rendered on the dashboard (2026-08-15).
+
 **Infrastructure:**
 
-- ✅ Multi-tenant FastAPI backend (78 pytest tests, in-memory SQLite).
+- ✅ Multi-tenant FastAPI backend (210 pytest tests, in-memory SQLite).
 - ✅ camelCase responses end-to-end; `/api` proxy in Vite (dev) and nginx (prod).
 - ✅ Secrets in `.env` (root and backend/, ignored by git; templates in
   `.env.example` in both).
@@ -161,10 +183,8 @@ verified end-to-end, including access from a phone over the local IP.
 
 > Full details in **[docs/roadmap/](roadmap/README.md)** — one file per
 > pending item with why, scope, design, and acceptance criteria, plus the
-> log of what's already done. Closed: 01 (Alembic), 02 (invitations), 03
-> (PWA), 04 (backups), 05 (onboarding), 06 (recurring), 07 (budgets), 08
-> (CSV import), 09 (filters), 10 (profile and password), 11–14 (growth), 16
-> (CI), and 19 (account reconciliation).
+> log of what's already done. Open: 23 (Mexican cards and instalments) and
+> 24 (undo for delete and quick entry), both proposed.
 
 **Immediate (robustness):**
 
@@ -186,5 +206,11 @@ verified end-to-end, including access from a phone over the local IP.
 **Production:**
 
 - ✅ [CI with GitHub Actions](roadmap/16-ci-github-actions.md): pytest + lint + build + docker build + **migrations against a real Postgres** on every push and PR, passing (2026-07-24). Strict branch protection on `main` since 2026-07-25: the 4 checks are required (including for the owner), so changes now go through branch + PR.
-- ⬜ [Monitoring](roadmap/17-monitoreo.md): JSON logs, downtime and disk alerts.
+- ✅ [Monitoring](roadmap/17-monitoreo.md): JSON logs with request ids, `/health` database check, optional Uptime Kuma profile, and a disk-check cron script (2026-08-08).
 - ✅ [Account reconciliation](roadmap/19-conciliacion-de-cuentas.md): statement-balance sessions, movement states, and stale-session review after edits or import reversals (2026-08-06).
+- ✅ [In-app alerts](roadmap/20-alertas-en-app.md): bell with real unread count and a responsive alert sheet (2026-08-08).
+
+**Proposed (next up):**
+
+- 📄 [Mexican cards and instalments](roadmap/23-tarjetas-mx-e-instalados.md): card cycle dates, payment-due forecast events and alerts, MSI plans (2026-08-16).
+- 📄 [Undo for delete and quick entry](roadmap/24-undo-eliminacion.md): soft delete for manual deletions, restore endpoint, Deshacer snackbar, 30-day purge (2026-08-16).
