@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Align the authenticated budget interface with `pantallas.png` while preserving the existing API-backed workflows.
+**Goal:** Align the authenticated budget interface with `docs/brand/pantallas-referencia.png` while preserving the existing API-backed workflows.
 
 **Architecture:** Keep the current React routes and query hooks, but reshape the shared shell and dashboard into the reference information architecture. Reuse the existing transaction and scanner mutations; only change their responsive presentation so desktop and mobile reflect the supplied screens.
 
