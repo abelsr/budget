@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 22 of 24 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans, cash-flow forecast); 23 and 24 proposed · last updated 2026-08-16
+> **Progress:** 23 of 24 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans, cash-flow forecast, Mexican cards and instalments); 24 proposed · last updated 2026-08-16
 
 ## Immediate — robustness
 
@@ -48,7 +48,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 
 | # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
-| 23 | [Mexican cards and instalments](23-tarjetas-mx-e-instalados.md) | 📄 Proposed 2026-08-16 | High | L |
+| 23 | [Mexican cards and instalments](23-tarjetas-mx-e-instalados.md) | ✅ 2026-08-16 | High | L |
 | 24 | [Undo for delete and quick entry](24-undo-eliminacion.md) | 📄 Proposed 2026-08-16 | Medium | S–M |
 
 ## Suggested attack order
@@ -76,7 +76,7 @@ before adding more visual polish, bank aggregation, or generative AI.
 | 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | ✅ 2026-08-08 |
 | 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Alerts ✅ 2026-08-08; forecast ✅ 2026-08-15 ([22]) |
 | 8 | [**Goal plans**](21-planes-de-metas.md) | Adds due dates, required periodic contributions, and pause/resume to the shipped manual goals. | Alerts | ✅ 2026-08-08 |
-| 9 | **[Mexican card and instalment support](23-tarjetas-mx-e-instalados.md)** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and [22] ✅ | 📄 [23] Proposed |
+| 9 | **[Mexican card and instalment support](23-tarjetas-mx-e-instalados.md)** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and [22] ✅ | ✅ 2026-08-16 ([23]) |
 
 ### Deliberately deferred
 
@@ -118,6 +118,15 @@ may be implemented in parallel.
   and possible restoration.
 
 ## Log
+
+**2026-08-16 — 23 (Mexican cards and instalments) completed.**
+
+- `accounts` gains `statement_day` (1–28) and `payment_due_days` (1–60), credit-only (422 otherwise, including a kind change away from credit with the cycle still set). Last/next statement and next payment dates are derived, never stored, in a pure helper (`app/services/card_calendar.py`) shared by the account API, the forecast, and the alerts.
+- `instalment_plans`: one plan per purchase (unique constraint), 2–48 months, `total_amount` stored so the derived schedule — `first_due_date` walked monthly with the recurring anchor-day clamp — always sums exactly to the purchase (last instalment absorbs the remainder). Advisory like goal plans: no ledger movements of its own. Paying with a source account creates a standard cash→card `transfer_groups` pair (excluded from income/expense everywhere) and marks the instalment paid; manual "mark paid" is also available. Pause/resume/cancel; guards: deleting or amount-editing a planned purchase and deleting a card with active plans → 409.
+- Forecast: the balance series is untouched (a card payment is a transfer that nets to zero); `upcoming` gains advisory `card_due` events (estimated outstanding = `max(0, −card balance)`, which already reflects recorded future inflows) and `instalment_due` events for active plans only.
+- Alerts: `card_payment_due` and `instalment_due` on the lazy idempotent pass, 3-day lead, deduped per account/plan + due date.
+- Frontend: card-cycle section in the account form, cycle chip and MSI plan rows on the Accounts page, plan create/detail sheets from the transaction detail (badge on planned purchases), and the two new alert kinds.
+- Backend tests passed (241; the 13 PostgreSQL migration tests passed against a disposable PostgreSQL 17 instance, schema == models, reversible, data survives). Frontend typecheck, lint, and production build passed.
 
 **2026-08-15 — 22 (cash-flow forecast) completed.**
 

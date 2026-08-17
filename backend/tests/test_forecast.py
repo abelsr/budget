@@ -496,3 +496,167 @@ def test_upcoming_includes_transfer_to_personal(client, session, world):
     assert transfer_events == [
         {"date": _iso(7), "type": "expense", "amount": 100.0, "label": "Giro", "source": "transaction"}
     ]
+
+
+# ---------- Card due and instalment due (advisory liquidity events) ----------
+
+
+def _cycle_for_due(in_days: int) -> tuple[int, int]:
+    """statement_day/payment_due_days such that the next payment due lands today+in_days."""
+    from app.services.card_calendar import next_statement_date
+
+    target = date.today() + timedelta(days=in_days)
+    for statement_day in range(28, 0, -1):
+        next_stmt = next_statement_date(statement_day, date.today())
+        diff = (target - next_stmt).days
+        if 1 <= diff <= 60:
+            return statement_day, diff
+    raise AssertionError("no cycle found for the target due date")
+
+
+@pytest.fixture(name="card_world")
+def card_world_fixture(session):
+    user = User(email="card@example.com", hashed_password="x", name="Card")
+    session.add(user)
+    session.flush()
+    household = Household(name="Tarjetas", owner_id=user.id)
+    session.add(household)
+    session.flush()
+    user.household_id = household.id
+    category = Category(household_id=household.id, name="Hogar", icon="x", color="#000000", type="expense")
+    card, cash = (
+        Account(household_id=household.id, name="BBVA", kind="credit", opening_balance=0),
+        Account(household_id=household.id, name="Efectivo", kind="cash", opening_balance=20000),
+    )
+    session.add_all([category, card, cash])
+    session.commit()
+    return {
+        "user": user,
+        "household": household,
+        "category": category,
+        "card": card,
+        "cash": cash,
+        "headers": make_headers(user),
+    }
+
+
+def test_card_due_event_in_upcoming(client, session, card_world):
+    today = date.today()
+    statement_day, due_days = _cycle_for_due(10)
+    card_world["card"].statement_day = statement_day
+    card_world["card"].payment_due_days = due_days
+    session.add(
+        Transaction(
+            household_id=card_world["household"].id, type="expense", amount=12000,
+            category_id=card_world["category"].id, account_id=card_world["card"].id,
+            member_id=card_world["user"].id, date=today,
+        )
+    )
+    session.commit()
+
+    upcoming = client.get("/forecast?days=30", headers=card_world["headers"]).json()["upcoming"]
+    card_events = [event for event in upcoming if event["source"] == "card_due"]
+    assert len(card_events) == 1
+    event = card_events[0]
+    assert event["type"] == "expense"
+    assert event["amount"] == 12000.0
+    assert "BBVA" in event["label"]
+    # the advisory event must not move the balance series
+    body = client.get("/forecast?days=30", headers=card_world["headers"]).json()
+    rows = _by_date(body)
+    assert rows[_iso(0)]["balance"] == body["openingBalance"]
+    assert rows[_iso(30)]["balance"] == round(body["openingBalance"] + sum(row["delta"] for row in body["balance"]), 2)
+
+
+def test_card_due_reduced_by_scheduled_inflows(client, session, card_world):
+    statement_day, due_days = _cycle_for_due(10)
+    card_world["card"].statement_day = statement_day
+    card_world["card"].payment_due_days = due_days
+    session.add(
+        Transaction(
+            household_id=card_world["household"].id, type="expense", amount=12000,
+            category_id=card_world["category"].id, account_id=card_world["card"].id,
+            member_id=card_world["user"].id, date=date.today(),
+        )
+    )
+    session.commit()
+    resp = client.post(
+        "/transactions",
+        json={
+            "type": "transfer",
+            "amount": 5000.0,
+            "sourceAccountId": card_world["cash"].id,
+            "destinationAccountId": card_world["card"].id,
+            "date": _iso(2),
+        },
+        headers=card_world["headers"],
+    )
+    assert resp.status_code == 201, resp.text
+    upcoming = client.get("/forecast?days=30", headers=card_world["headers"]).json()["upcoming"]
+    card_events = [event for event in upcoming if event["source"] == "card_due"]
+    assert len(card_events) == 1
+    assert card_events[0]["amount"] == 7000.0
+
+
+def test_no_card_due_without_cycle(client, session, card_world):
+    session.add(
+        Transaction(
+            household_id=card_world["household"].id, type="expense", amount=12000,
+            category_id=card_world["category"].id, account_id=card_world["card"].id,
+            member_id=card_world["user"].id, date=date.today(),
+        )
+    )
+    session.commit()
+    upcoming = client.get("/forecast?days=30", headers=card_world["headers"]).json()["upcoming"]
+    assert [event for event in upcoming if event["source"] == "card_due"] == []
+
+
+def test_instalment_due_events_only_for_active_plans(client, session, card_world):
+    from app.models import InstalmentPlan
+
+    today = date.today()
+    session.add(
+        Transaction(
+            household_id=card_world["household"].id, type="expense", amount=3000,
+            category_id=card_world["category"].id, account_id=card_world["card"].id,
+            member_id=card_world["user"].id, date=today,
+        )
+    )
+    session.commit()
+    purchase = session.query(Transaction).filter_by(amount=3000).one()
+    purchase2 = Transaction(
+        household_id=card_world["household"].id, type="expense", amount=1200,
+        category_id=card_world["category"].id, account_id=card_world["card"].id,
+        member_id=card_world["user"].id, date=today,
+    )
+    session.add_all([purchase2])
+    session.flush()
+    active_plan = InstalmentPlan(
+        household_id=card_world["household"].id,
+        account_id=card_world["card"].id,
+        source_transaction_id=purchase.id,
+        months=3,
+        total_amount=3000,
+        monthly_amount=1000,
+        first_due_date=today + timedelta(days=5),
+        created_by_id=card_world["user"].id,
+    )
+    paused = InstalmentPlan(
+        household_id=card_world["household"].id,
+        account_id=card_world["card"].id,
+        source_transaction_id=purchase2.id,
+        months=3,
+        total_amount=1200,
+        monthly_amount=400,
+        first_due_date=today + timedelta(days=5),
+        created_by_id=card_world["user"].id,
+        status="paused",
+    )
+    session.add_all([active_plan, paused])
+    session.commit()
+
+    upcoming = client.get("/forecast?days=30", headers=card_world["headers"]).json()["upcoming"]
+    instalment_events = [event for event in upcoming if event["source"] == "instalment_due"]
+    assert len(instalment_events) == 1  # the paused plan is not listed
+    assert instalment_events[0]["amount"] == 1000.0
+    assert instalment_events[0]["date"] == _iso(5)

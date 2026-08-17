@@ -1,6 +1,6 @@
 # Mexican card and instalment support
 
-**Status:** 📄 Proposed · **Priority:** High · **Effort:** L · **Dependencies:**
+**Status:** ✅ 2026-08-16 · **Priority:** High · **Effort:** L · **Dependencies:**
 transfers ✅, recurring transactions ✅, [19 — account reconciliation](19-conciliacion-de-cuentas.md) ✅,
 [22 — cash-flow forecast](22-cash-flow-forecast.md) ✅
 
@@ -130,9 +130,10 @@ Guards:
 - `upcoming` (30-day window) gains two advisory event sources:
   - `card_due`: one per derived payment due date in the window, per credit
     account that has a cycle configured. `estimatedAmount` = outstanding
-    `max(0, −card balance)`, reduced by inflow transfers already recorded to
-    that card with a date ≥ today (the household may already have scheduled
-    part of the payment). Label: `Pago tarjeta {name}`.
+    `max(0, −card balance)`. The balance formula is not filtered by date, so
+    inflow transfers already recorded to the card (e.g. a scheduled payment)
+    reduce the estimate by construction — no separate deduction is made.
+    Label: `Pago tarjeta {name}`.
   - `instalment_due`: the next unpaid due date of each active plan in the
     window, with the instalment amount (last instalment uses the remainder).
   - Both are liquidity events: they tell the household how much it must move,

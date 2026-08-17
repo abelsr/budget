@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Bell, CalendarClock, CircleAlert, PiggyBank, Wallet } from "lucide-react"
+import { Bell, CalendarClock, CircleAlert, CreditCard, PiggyBank, Wallet } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
@@ -13,11 +13,13 @@ const alertVisual: Record<AlertKind, { icon: typeof Bell; tone: string }> = {
   recurring_overdue: { icon: CalendarClock, tone: "bg-primary/12 text-primary" },
   goal_reached: { icon: PiggyBank, tone: "bg-income/12 text-income" },
   negative_balance: { icon: Wallet, tone: "bg-expense/12 text-expense" },
+  card_payment_due: { icon: CreditCard, tone: "bg-primary/12 text-primary" },
+  instalment_due: { icon: CalendarClock, tone: "bg-primary/12 text-primary" },
 }
 
 function destination(kind: AlertKind) {
   if (kind === "recurring_overdue") return "/app/ajustes/recurrentes"
-  if (kind === "negative_balance") return "/app/cuentas"
+  if (kind === "negative_balance" || kind === "card_payment_due" || kind === "instalment_due") return "/app/cuentas"
   return "/app"
 }
 

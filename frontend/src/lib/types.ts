@@ -42,6 +42,13 @@ export interface Account {
   cardBrand?: CardBrand | null
   /** Últimos 4 dígitos del número de tarjeta (nunca el número completo). */
   lastFour?: string | null
+  /** Día de corte del ciclo de la tarjeta (1–28, solo tarjetas de crédito). */
+  statementDay?: number | null
+  /** Días entre el corte y la fecha límite de pago. */
+  paymentDueDays?: number | null
+  lastStatementDate?: string | null
+  nextStatementDate?: string | null
+  nextPaymentDueDate?: string | null
   isPersonal: boolean
 }
 
@@ -232,7 +239,7 @@ export interface ForecastUpcoming {
   type: "income" | "expense"
   amount: number
   label: string
-  source: "transaction" | "recurring"
+  source: "transaction" | "recurring" | "card_due" | "instalment_due"
 }
 
 /**
@@ -268,7 +275,7 @@ export interface SavingsGoal {
   requiredMonthlyContribution: number | null
 }
 
-export type AlertKind = "budget_warning" | "budget_exceeded" | "recurring_overdue" | "goal_reached" | "negative_balance"
+export type AlertKind = "budget_warning" | "budget_exceeded" | "recurring_overdue" | "goal_reached" | "negative_balance" | "card_payment_due" | "instalment_due"
 
 export interface Alert {
   id: string
@@ -370,4 +377,30 @@ export interface ImportRevertConflict {
 
 export interface ImportRevertConflictDetail {
   conflicts: ImportRevertConflict[]
+}
+
+export interface InstalmentScheduleItem {
+  /** ISO date: YYYY-MM-DD */
+  date: string
+  /** Four-decimal amount; the last instalment absorbs the rounding remainder. */
+  amount: number
+  paid: boolean
+}
+
+export interface InstalmentPlan {
+  id: string
+  householdId: string
+  accountId: string
+  accountName: string
+  sourceTransactionId: string
+  months: number
+  totalAmount: number
+  monthlyAmount: number
+  firstDueDate: string
+  paidCount: number
+  status: "active" | "paused" | "completed" | "cancelled"
+  nextDueDate?: string | null
+  nextDueAmount?: number | null
+  schedule: InstalmentScheduleItem[]
+  createdAt: string
 }
