@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
-import { ArrowLeftRight, Eye, FileText, Image as ImageIcon, Repeat, Trash2 } from "lucide-react"
+import { ArrowLeftRight, CreditCard, Eye, FileText, Image as ImageIcon, Repeat, Trash2 } from "lucide-react"
 import { motion } from "motion/react"
 
+import { InstalmentPlanCreateSheet, InstalmentPlanSheet } from "@/components/InstalmentPlanSheets"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +20,7 @@ import {
   useCategories,
   useDeleteAttachment,
   useDeleteTransaction,
+  useInstalmentPlans,
   useUpdateTransaction,
 } from "@/lib/queries"
 import { springIndicator } from "@/lib/springs"
@@ -135,10 +137,16 @@ function ViewMode({
 }) {
   const deleteTransaction = useDeleteTransaction()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [planSheetPlanId, setPlanSheetPlanId] = useState<string | null>(null)
+  const [createPlanOpen, setCreatePlanOpen] = useState(false)
   const isIncome = transaction.type === "income"
   const isTransfer = transaction.type === "transfer"
   const isInflow = transaction.transferDirection === "inflow"
   const { data: categories = [] } = useCategories()
+  const { data: plans = [] } = useInstalmentPlans()
+  const plan = plans.find((item) => item.sourceTransactionId === transaction.id)
+  const msiEligible =
+    !isTransfer && !isIncome && account?.kind === "credit" && !account.isPersonal
   const authorName = transaction.authorName ?? member?.name
 
   function remove() {
@@ -189,6 +197,16 @@ function ViewMode({
             Recurrente
           </Badge>
         )}
+        {plan && (
+          <button
+            type="button"
+            onClick={() => setPlanSheetPlanId(plan.id)}
+            aria-label="Ver plan de instalados de esta compra"
+            className="pressable rounded-full bg-primary/12 px-2.5 py-1 text-[11px] font-semibold text-primary"
+          >
+            MSI · {plan.paidCount}/{plan.months}
+          </button>
+        )}
       </div>
 
       {/* Filas de detalle estilo lista iOS */}
@@ -210,6 +228,18 @@ function ViewMode({
         />
         <DetailRow label="Miembro" value={authorName ?? "—"} />
       </div>
+
+      {/* Plan MSI para compras en tarjeta compartida */}
+      {msiEligible && !plan && (
+        <button
+          type="button"
+          onClick={() => setCreatePlanOpen(true)}
+          className="pressable flex w-full items-center justify-center gap-2 rounded-2xl bg-primary/12 px-4 py-3 text-[14px] font-semibold text-primary"
+        >
+          <CreditCard size={16} aria-hidden="true" />
+          Crear plan MSI
+        </button>
+      )}
 
       {/* Comprobantes */}
       {transaction.attachments.length > 0 && (
@@ -255,6 +285,20 @@ function ViewMode({
           Eliminar {isTransfer ? "transferencia" : "movimiento"}
         </button>
       )}
+
+      <InstalmentPlanSheet
+        open={planSheetPlanId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPlanSheetPlanId(null)
+        }}
+        planId={planSheetPlanId}
+      />
+      <InstalmentPlanCreateSheet
+        open={createPlanOpen}
+        onOpenChange={setCreatePlanOpen}
+        transaction={transaction}
+        account={account}
+      />
     </div>
   )
 }
