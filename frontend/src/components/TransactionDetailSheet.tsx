@@ -21,9 +21,11 @@ import {
   useDeleteAttachment,
   useDeleteTransaction,
   useInstalmentPlans,
+  useRestoreTransaction,
   useUpdateTransaction,
 } from "@/lib/queries"
 import { springIndicator } from "@/lib/springs"
+import { useSnackbar } from "@/components/ui/snackbar"
 import type {
   Account,
   Attachment,
@@ -136,6 +138,8 @@ function ViewMode({
   onClose: () => void
 }) {
   const deleteTransaction = useDeleteTransaction()
+  const restoreTransaction = useRestoreTransaction()
+  const showSnackbar = useSnackbar()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [planSheetPlanId, setPlanSheetPlanId] = useState<string | null>(null)
   const [createPlanOpen, setCreatePlanOpen] = useState(false)
@@ -150,9 +154,14 @@ function ViewMode({
   const authorName = transaction.authorName ?? member?.name
 
   function remove() {
-    deleteTransaction.mutate(transaction.id, {
+    const deletedId = transaction.id
+    deleteTransaction.mutate(deletedId, {
       onSuccess: () => {
         navigator.vibrate?.(10)
+        showSnackbar({
+          message: "Movimiento eliminado",
+          action: { label: "Deshacer", onClick: () => restoreTransaction.mutate(deletedId) },
+        })
         onClose()
       },
     })
@@ -259,7 +268,7 @@ function ViewMode({
       {confirmDelete ? (
         <div className="rounded-2xl bg-expense/10 p-4">
           <p className="text-center text-[13px] font-medium text-expense">
-            ¿Eliminar esta {isTransfer ? "transferencia" : "movimiento"}? No se puede deshacer.
+            ¿Eliminar esta {isTransfer ? "transferencia" : "movimiento"}? Podrás deshacerlo unos segundos.
           </p>
           <div className="mt-3 flex gap-2">
             <button

@@ -511,6 +511,21 @@ export function useDeleteTransaction() {
   })
 }
 
+export function useRestoreTransaction() {
+  const invalidate = useInvalidator(
+    keys.transactions,
+    keys.accounts,
+    keys.summary,
+    keys.budgetsStatus,
+    keys.rangeSummary,
+    keys.forecast,
+  )
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<Transaction>(`/transactions/${id}/restore`, { method: "POST" }),
+    onSuccess: invalidate,
+  })
+}
+
 export function useCreateReconciliation() {
   const queryClient = useQueryClient()
   return useMutation({

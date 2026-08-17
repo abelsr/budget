@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 23 of 24 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans, cash-flow forecast, Mexican cards and instalments); 24 proposed · last updated 2026-08-16
+> **Progress:** 24 of 24 done — roadmap complete (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans, cash-flow forecast, Mexican cards and instalments, undo for delete and quick entry) · last updated 2026-08-16
 
 ## Immediate — robustness
 
@@ -49,7 +49,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 | # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
 | 23 | [Mexican cards and instalments](23-tarjetas-mx-e-instalados.md) | ✅ 2026-08-16 | High | L |
-| 24 | [Undo for delete and quick entry](24-undo-eliminacion.md) | 📄 Proposed 2026-08-16 | Medium | S–M |
+| 24 | [Undo for delete and quick entry](24-undo-eliminacion.md) | ✅ 2026-08-16 | Medium | S–M |
 
 ## Suggested attack order
 
@@ -118,6 +118,14 @@ may be implemented in parallel.
   and possible restoration.
 
 ## Log
+
+**2026-08-16 — 24 (Undo for delete and quick entry) completed.**
+
+- Manual deletion is now a soft delete (`delete_reason='manual'`, reusing the import-revert infrastructure): the movement disappears from every list, summary, and balance, but the row stays for restoration. A transfer soft-deletes both rows and **keeps the `transfer_groups` row** so its `client_id` still blocks replays (409) forever.
+- `POST /transactions/{id}/restore` reverses a manual delete (one-off or both transfer rows atomically): 404 when nothing was deleted, 409 for `import_revert` rows (those restore from the batch flow). Restore invalidates completed reconciliation sessions, exactly like the import-revert flow.
+- Lazy purge (`app/services/housekeeping.py`, no scheduler): inside the `materialize_due` read pass, at most once per day per process, hard-deletes rows soft-deleted more than 30 days ago — with their splits, edit events, and attachment rows + MinIO objects (idempotent delete, failures logged and skipped). Rows referenced by an instalment plan are kept; a failing purge never breaks a read.
+- Frontend: global snackbar provider (8 s, one action, `aria-live`, reduced-motion aware). Quick entry shows “Movimiento creado — Deshacer” (pending outbox item → discarded locally, never sent; synced → deleted); delete shows “Movimiento eliminado — Deshacer” (restore endpoint). Recurring entries get no undo snackbar: the recurring rule would be orphaned. The delete confirm copy now says “Podrás deshacerlo unos segundos”.
+- Backend tests passed (254; full E2E replay against a disposable PostgreSQL 17: create → replay → delete → replay-409 → restore → purge). Frontend typecheck, lint, and production build passed.
 
 **2026-08-16 — 23 (Mexican cards and instalments) completed.**
 

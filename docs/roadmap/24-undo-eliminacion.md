@@ -1,6 +1,6 @@
 # Undo for delete and quick entry
 
-**Status:** 📄 Proposed · **Priority:** Medium · **Effort:** S–M ·
+**Status:** ✅ 2026-08-16 · **Priority:** Medium · **Effort:** S–M ·
 **Dependencies:** none (the soft-delete infrastructure already exists from
 [19 — reconciliation](19-conciliacion-de-cuentas.md) and the CSV import work)
 

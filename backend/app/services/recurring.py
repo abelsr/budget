@@ -105,4 +105,7 @@ def materialize_due(
 
     if created:
         db.commit()
+    from app.services.housekeeping import maybe_purge
+
+    maybe_purge(db)
     return created
