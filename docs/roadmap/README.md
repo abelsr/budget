@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 22 of 22 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans, cash-flow forecast) · last updated 2026-08-15
+> **Progress:** 22 of 23 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans, cash-flow forecast); 23 proposed · last updated 2026-08-16
 
 ## Immediate — robustness
 
@@ -44,6 +44,12 @@ criteria. When tackling one: read it in full, update its **Status** to
 | 19 | [Account reconciliation](19-conciliacion-de-cuentas.md) | ✅ 2026-08-06 | High | M |
 | 20 | [In-app alerts](20-alertas-en-app.md) | ✅ 2026-08-08 | Medium | M |
 
+## Pending
+
+| # | Document | Status | Priority | Effort |
+|---|---|---|---|---|
+| 23 | [Mexican cards and instalments](23-tarjetas-mx-e-instalados.md) | 📄 Proposed 2026-08-16 | High | L |
+
 ## Suggested attack order
 
 `02 ✅ → 01 ✅ → 05 ✅ → 16 ✅ → 06 ✅ → 07 ✅ → 04 ✅ → 09 ✅ → 10 ✅ → 03 ✅ → 11 ✅ → 12 ✅ → 13 ✅ → 14 ✅ → 08 ✅ → 19 ✅`
@@ -69,7 +75,7 @@ before adding more visual polish, bank aggregation, or generative AI.
 | 6 | **Monthly budgets and optional rollover** | Turns global category limits into a real monthly planning tool. | Transfers and split transactions excluded from budget math | ✅ 2026-08-08 |
 | 7 | **Alerts and cash-flow calendar** | Makes budgets, goals, recurring rules, and upcoming bills proactive. | Reliable transactions and monthly budgets | Alerts ✅ 2026-08-08; forecast ✅ 2026-08-15 ([22]) |
 | 8 | [**Goal plans**](21-planes-de-metas.md) | Adds due dates, required periodic contributions, and pause/resume to the shipped manual goals. | Alerts | ✅ 2026-08-08 |
-| 9 | **Mexican card and instalment support** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and [22] ✅ | Proposed |
+| 9 | **[Mexican card and instalment support](23-tarjetas-mx-e-instalados.md)** | Track statement dates, payment dates, and months-without-interest purchases. | Transfers, recurrence, and [22] ✅ | 📄 [23] Proposed |
 
 ### Deliberately deferred
 
