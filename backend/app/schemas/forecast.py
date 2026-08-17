@@ -23,7 +23,7 @@ class ForecastUpcoming(_CamelModel):
     type: Literal["income", "expense"]
     amount: float
     label: str
-    source: Literal["transaction", "recurring"]
+    source: Literal["transaction", "recurring", "card_due", "instalment_due"]
 
 
 class ForecastResponse(_CamelModel):

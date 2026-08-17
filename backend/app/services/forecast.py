@@ -26,9 +26,10 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Account, Category, RecurringRule, Transaction
+from app.models import Account, Category, InstalmentPlan, RecurringRule, Transaction
 from app.services.account_access import shared_accounts
 from app.services.account_balances import account_balance, balance_sums
+from app.services.card_calendar import next_statement_date, next_unpaid_due, payment_due_date
 from app.services.recurring import advance
 
 #: Fixed window of the upcoming-movements list, in days.
@@ -195,6 +196,50 @@ def build_forecast(db: Session, household_id: str, as_of: date, days: int) -> Fo
         _project_rule(
             rule, as_of, horizon, window_end, category_names,
             income_by_date, expense_by_date, delta_by_date, events,
+        )
+
+    # Card payment due dates and MSI instalment due dates are advisory
+    # liquidity events: paying a card is a transfer that nets to zero in the
+    # shared household balance, so they never enter the daily walk.
+    for account in shared.values():
+        if account.kind != "credit" or account.statement_day is None or account.payment_due_days is None:
+            continue
+        due = payment_due_date(next_statement_date(account.statement_day, as_of), account.payment_due_days)
+        if not (as_of < due <= window_end):
+            continue
+        card_balance = account_balance(account.opening_balance, account_sums.get(account.id, {}))
+        # The balance formula is not filtered by date, so recorded inflows
+        # scheduled before the due date already reduce the estimate.
+        outstanding = max(0.0, -card_balance)
+        events.append(
+            UpcomingEvent(
+                date=due,
+                type="expense",
+                amount=round(outstanding, 2),
+                label=f"Pago tarjeta {account.name}",
+                source="card_due",
+            )
+        )
+
+    for plan in db.scalars(
+        select(InstalmentPlan).where(
+            InstalmentPlan.household_id == household_id,
+            InstalmentPlan.status == "active",
+        )
+    ):
+        nxt = next_unpaid_due(plan)
+        if nxt is None or not (as_of < nxt[0] <= window_end):
+            continue
+        card = shared.get(plan.account_id)
+        suffix = f" · {card.name}" if card is not None else ""
+        events.append(
+            UpcomingEvent(
+                date=nxt[0],
+                type="expense",
+                amount=round(nxt[1], 2),
+                label=f"Instalado {plan.paid_count + 1}/{plan.months}{suffix}",
+                source="instalment_due",
+            )
         )
 
     events.sort(key=lambda event: (event.date, event.source, event.type, event.label))
