@@ -68,7 +68,8 @@ screen, semantic green/red reserved for money flow). Interaction follows the
    [docs/roadmap/README.md](roadmap/README.md).
 
 **Concrete next step:** Mexican card and instalment support (item 9 in the
-[roadmap index](roadmap/README.md)).
+[roadmap index](roadmap/README.md); design in
+[docs/roadmap/23-tarjetas-mx-e-instalados.md](roadmap/23-tarjetas-mx-e-instalados.md)).
 Details and log in [docs/roadmap/](roadmap/README.md).
 
 ## Repo structure
