@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import func, select, update
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import Account, Household, RecurringRule, SavingsGoal, Transaction, User
+from app.models import Account, Household, InstalmentPlan, RecurringRule, SavingsGoal, Transaction, User
 from app.schemas.accounts import AccountCreate, AccountOut, AccountUpdate
 from app.services.account_access import can_operate, visible_accounts
 from app.services.account_balances import account_balance, balance_sums
@@ -167,6 +167,15 @@ def delete_account(account_id: str, db: DbDep, user: CurrentUserDep) -> None:
     )
     if has_rules:
         raise HTTPException(status_code=409, detail="La cuenta tiene reglas recurrentes")
+    # Defensive: a purchase (even soft-deleted) already blocks deletion with
+    # "tiene movimientos"; this keeps the guard if that check ever narrows.
+    has_plans = db.scalar(
+        select(InstalmentPlan.id)
+        .where(InstalmentPlan.account_id == account.id, InstalmentPlan.status.in_(["active", "paused"]))
+        .limit(1)
+    )
+    if has_plans:
+        raise HTTPException(status_code=409, detail="La cuenta tiene planes de instalados activos")
     # SQLite test databases do not enforce foreign keys; production's FK also
     # has ON DELETE SET NULL, so a goal always survives account deletion.
     db.execute(
