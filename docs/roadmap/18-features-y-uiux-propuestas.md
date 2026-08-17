@@ -257,7 +257,7 @@ from a ledger into a small safety net.
 
 ---
 
-### A6. Undo for delete and quick entry
+### A6. Undo for delete and quick entry — 📄 promoted to [24](24-undo-eliminacion.md) 2026-08-16
 
 **Why.** The design guidelines promise *agency* ("easy undo"). Today the only
 destructive path is a two-step confirm and then it's gone forever. A short
