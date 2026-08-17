@@ -19,7 +19,7 @@
 **Files:**
 - Create: `backend/alembic/versions/a3f5b7c9d1e2_tarjetas_mx_e_instalados.py` (revises `c7d8e9f0a1b2`, the current head)
 
-- [ ] **Step 1: Write the migration**
+- [x] **Step 1: Write the migration**
 
 ```python
 """cuentas de tarjeta y planes de instalados
@@ -82,11 +82,11 @@ def downgrade() -> None:
     op.drop_column("accounts", "statement_day")
 ```
 
-- [ ] **Step 2: Verify model/migration drift is detected**
+- [x] **Step 2: Verify model/migration drift is detected**
 
 Run: `cd backend && uv run pytest tests/test_migrations.py -q` (Postgres needed; skipped locally is fine) and `uv run alembic heads` → expected: single head `a3f5b7c9d1e2`. Without the model (next task) `alembic check` would report drift — that is the intended failing state.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/alembic/versions/a3f5b7c9d1e2_tarjetas_mx_e_instalados.py
@@ -100,7 +100,7 @@ git commit -m "Add migration for card cycle dates and instalment plans"
 - Modify: `backend/app/models/planning.py`
 - Modify: `backend/app/models/__init__.py`
 
-- [ ] **Step 1: Add account columns**
+- [x] **Step 1: Add account columns**
 
 In `app/models/accounts.py`, after `last_four`:
 
@@ -109,7 +109,7 @@ In `app/models/accounts.py`, after `last_four`:
     payment_due_days: Mapped[int | None] = mapped_column(nullable=True)
 ```
 
-- [ ] **Step 2: Add `InstalmentPlan`**
+- [x] **Step 2: Add `InstalmentPlan`**
 
 In `app/models/planning.py`, after `Alert`:
 
@@ -146,15 +146,15 @@ class InstalmentPlan(Base):
 
 `planning.py` already imports `CheckConstraint`? If not, add it to the sqlalchemy import line.
 
-- [ ] **Step 3: Re-export**
+- [x] **Step 3: Re-export**
 
 In `app/models/__init__.py`, add `InstalmentPlan` to the `app.models.planning` import (alphabetical).
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `cd backend && uv run pytest -q` → expected: all pass (new columns/table created by `create_all`; nothing references them yet).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/models/
@@ -167,7 +167,7 @@ git commit -m "Add card cycle fields and InstalmentPlan model"
 - Create: `backend/app/services/card_calendar.py`
 - Test: `backend/tests/test_card_calendar.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 from datetime import date
@@ -236,12 +236,12 @@ def test_schedule_last_installment_absorbs_rounding():
     assert round(sum(a for _, a in schedule), 4) == 5101.0
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `cd backend && uv run pytest tests/test_card_calendar.py -q`
 Expected: FAIL — `ModuleNotFoundError: app.services.card_calendar`
 
-- [ ] **Step 3: Implement `app/services/card_calendar.py`**
+- [x] **Step 3: Implement `app/services/card_calendar.py`**
 
 ```python
 """Pure date math for card cycles and MSI instalment schedules.
@@ -312,11 +312,11 @@ def next_unpaid_due(plan) -> tuple[date, float] | None:
     return instalment_schedule(plan)[plan.paid_count]
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 Run: `cd backend && uv run pytest tests/test_card_calendar.py -q` → Expected: PASS (7 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/card_calendar.py backend/tests/test_card_calendar.py
@@ -334,7 +334,7 @@ git commit -m "Add card calendar date helpers"
 - Modify: `backend/app/api/routes/accounts.py`
 - Test: `backend/tests/test_card_cycle.py` (new)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Follow the existing fixture style in `tests/test_personal_accounts.py` (register → household → accounts). Key cases:
 
@@ -357,11 +357,11 @@ def test_patch_cycle_to_credit_only(client, auth):
     # PATCH {kind: "credit", statementDay: 15, paymentDueDays: 20} -> 200
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `cd backend && uv run pytest tests/test_card_cycle.py -q` → Expected: FAIL (422/500 or field ignored)
 
-- [ ] **Step 3: Schemas**
+- [x] **Step 3: Schemas**
 
 In `app/schemas/accounts.py`:
 
@@ -369,7 +369,7 @@ In `app/schemas/accounts.py`:
 - `AccountUpdate`: add the same two fields (nullable, same bounds).
 - `AccountOut`: add `statement_day: int | None`, `payment_due_days: int | None`, `next_statement_date: str | None`, `last_statement_date: str | None`, `next_payment_due_date: str | None` (ISO strings via `.isoformat()`).
 
-- [ ] **Step 4: Endpoint wiring**
+- [x] **Step 4: Endpoint wiring**
 
 In `app/api/routes/accounts.py`:
 
@@ -415,12 +415,12 @@ Set the two fields on the `Account(...)` constructor.
 
 (Both rules collapse to: *after this update, `kind != "credit"` implies both cycle fields must be None* — implement with one `if` over the effective post-update state.)
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `cd backend && uv run pytest tests/test_card_cycle.py -q` → Expected: PASS
 Run: `cd backend && uv run pytest -q` → Expected: all pass (existing account tests unaffected)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/schemas/accounts.py backend/app/api/routes/accounts.py backend/tests/test_card_cycle.py
@@ -436,7 +436,7 @@ git commit -m "Expose card cycle dates on account endpoints"
 **Files:**
 - Create: `backend/app/schemas/instalment_plans.py`
 
-- [ ] **Step 1: Write the schemas**
+- [x] **Step 1: Write the schemas**
 
 ```python
 from datetime import date
@@ -495,7 +495,7 @@ class InstalmentPlanOut(_CamelModel):
 - Modify: `backend/app/main.py` (register router)
 - Test: `backend/tests/test_instalment_plans.py` (new)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Setup helpers (reuse patterns from `tests/test_budgets.py` / `test_goals.py`): create a credit account (shared, with cycle optional) and an expense transaction on it via `POST /api/transactions`. Key cases:
 
@@ -539,11 +539,11 @@ def test_pause_resume_cancel(client, auth):
     # pause/cancel a completed plan -> 409
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `cd backend && uv run pytest tests/test_instalment_plans.py -q` → Expected: FAIL (404 no route)
 
-- [ ] **Step 3: Service `app/services/instalment_plans.py`**
+- [x] **Step 3: Service `app/services/instalment_plans.py`**
 
 ```python
 """MSI instalment plan lifecycle. Advisory: never creates ledger movements
@@ -680,7 +680,7 @@ def set_status(db: Session, plan: InstalmentPlan, status: str) -> None:
     plan.status = status
 ```
 
-- [ ] **Step 4: Router `app/api/routes/instalment_plans.py`**
+- [x] **Step 4: Router `app/api/routes/instalment_plans.py`**
 
 `APIRouter(prefix="/instalment-plans", tags=["instalment-plans"])`; endpoints (all sync `def`, `DbDep`/`CurrentUserDep`):
 
@@ -693,12 +693,12 @@ def set_status(db: Session, plan: InstalmentPlan, status: str) -> None:
 
 Register in `app/main.py` alongside the other routers.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `cd backend && uv run pytest tests/test_instalment_plans.py -q` → Expected: PASS
 Run: `cd backend && uv run pytest -q` → Expected: all pass
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/schemas/instalment_plans.py backend/app/services/instalment_plans.py backend/app/api/routes/instalment_plans.py backend/app/main.py backend/tests/test_instalment_plans.py
@@ -712,7 +712,7 @@ git commit -m "Add instalment plan endpoints"
 - Modify: `backend/app/api/routes/accounts.py` (delete)
 - Test: extend `backend/tests/test_instalment_plans.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_delete_purchase_blocked_by_active_plan(client, auth, plan):
@@ -734,9 +734,9 @@ def test_delete_card_account_blocked_by_active_plan(client, auth, plan, card_acc
 
 (If the account-delete guard is unreachable because the purchase always blocks with "tiene movimientos", keep the guard anyway for the soft-deleted-purchase edge — an import-reverted purchase keeps `deleted_at` set, so the movement count... note: `has_movements` counts ALL rows including soft-deleted, so the guard is still defensive. Keep it; test with a soft-deleted purchase.)
 
-- [ ] **Step 2: Run to verify failure** → Expected: FAIL (delete succeeds / edit succeeds today)
+- [x] **Step 2: Run to verify failure** → Expected: FAIL (delete succeeds / edit succeeds today)
 
-- [ ] **Step 3: Implement guards**
+- [x] **Step 3: Implement guards**
 
 `transactions.py` `delete_transaction`, at the top (after `_get_transaction`, before the imported-row check or just after it):
 
@@ -764,9 +764,9 @@ def test_delete_card_account_blocked_by_active_plan(client, auth, plan, card_acc
         raise HTTPException(status_code=409, detail="La cuenta tiene planes de instalados activos")
 ```
 
-- [ ] **Step 4: Run tests** → Expected: PASS; full suite green.
+- [x] **Step 4: Run tests** → Expected: PASS; full suite green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/api/routes/transactions.py backend/app/api/routes/accounts.py backend/tests/test_instalment_plans.py
@@ -784,7 +784,7 @@ git commit -m "Guard purchases, transfers of ownership, and card accounts agains
 - Modify: `backend/app/schemas/forecast.py`
 - Test: extend `backend/tests/test_forecast.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_card_due_event_in_upcoming(client, auth, card_account_with_cycle, negative_card_balance):
@@ -806,9 +806,9 @@ def test_no_card_events_without_cycle(client, auth, card_account_without_cycle):
     # -> no card_due events
 ```
 
-- [ ] **Step 2: Run to verify failure** → Expected: FAIL (no events)
+- [x] **Step 2: Run to verify failure** → Expected: FAIL (no events)
 
-- [ ] **Step 3: Implement in `build_forecast`**
+- [x] **Step 3: Implement in `build_forecast`**
 
 After the recurring-rules loop, before `events.sort(...)`:
 
@@ -860,9 +860,9 @@ Imports: `from app.services.card_calendar import next_statement_date, payment_du
 
 `app/schemas/forecast.py`: `ForecastUpcoming.source: Literal["transaction", "recurring", "card_due", "instalment_due"]`.
 
-- [ ] **Step 4: Run tests** → Expected: PASS; full suite green (existing forecast invariants untouched).
+- [x] **Step 4: Run tests** → Expected: PASS; full suite green (existing forecast invariants untouched).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/forecast.py backend/app/schemas/forecast.py backend/tests/test_forecast.py
@@ -875,7 +875,7 @@ git commit -m "Add card due and instalment due events to the forecast"
 - Modify: `backend/app/services/alerts.py`
 - Test: extend `backend/tests/test_alerts.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_card_payment_due_alert_within_lead_days(client, auth, card_with_cycle_due_in_3_days):
@@ -893,9 +893,9 @@ def test_instalment_due_alert_within_lead_days(client, auth, plan_due_in_2_days)
 
 Helper: to control "due in N days" without time travel, pick `statement_day`/`payment_due_days` (and `first_due_date`) arithmetically against `date.today()`.
 
-- [ ] **Step 2: Run to verify failure** → Expected: FAIL (kinds missing)
+- [x] **Step 2: Run to verify failure** → Expected: FAIL (kinds missing)
 
-- [ ] **Step 3: Implement in `generate_alerts`**
+- [x] **Step 3: Implement in `generate_alerts`**
 
 After the overdue-rules block:
 
@@ -940,9 +940,9 @@ After the overdue-rules block:
 
 (Use the existing `balance_sums` helper for the card balance — do not hand-roll the SQL.)
 
-- [ ] **Step 4: Run tests** → Expected: PASS; full suite green.
+- [x] **Step 4: Run tests** → Expected: PASS; full suite green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/app/services/alerts.py backend/tests/test_alerts.py
@@ -959,7 +959,7 @@ git commit -m "Add card payment due and instalment due alerts"
 - Modify: `frontend/src/lib/types.ts`
 - Modify: `frontend/src/lib/queries.ts`
 
-- [ ] **Step 1: Types**
+- [x] **Step 1: Types**
 
 `Account`: add `statementDay?: number | null`, `paymentDueDays?: number | null`, `nextStatementDate?: string | null`, `lastStatementDate?: string | null`, `nextPaymentDueDate?: string | null`.
 
@@ -995,7 +995,7 @@ export interface InstalmentPlan {
 }
 ```
 
-- [ ] **Step 2: Queries (follow the existing hook patterns in `queries.ts`)**
+- [x] **Step 2: Queries (follow the existing hook patterns in `queries.ts`)**
 
 ```ts
 export function useInstalmentPlans() {
@@ -1008,11 +1008,11 @@ export function useInstalmentPlan(id: string | undefined) {
 
 Mutations: `useCreateInstalmentPlan`, `usePayInstalmentPlan`, `usePauseInstalmentPlan`, `useResumeInstalmentPlan`, `useCancelInstalmentPlan`. Each invalidates: `instalment-plans`, `accounts`, `transactions`, `forecast`, `alerts` (the pay-with-transfer mutation also `summary`).
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `cd frontend && npx tsc -b` → Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/lib/types.ts frontend/src/lib/queries.ts
@@ -1025,22 +1025,22 @@ git commit -m "Add frontend types and queries for card cycle and instalment plan
 - Modify: `frontend/src/components/AccountFormSheet.tsx`
 - Modify: `frontend/src/pages/AccountsPage.tsx` (and the account card widget if it renders meta)
 
-- [ ] **Step 1: AccountFormSheet**
+- [x] **Step 1: AccountFormSheet**
 
 - State: `statementDay: string`, `paymentDueDays: string` (empty = null).
 - When `kind === "credit"`: show a "Ciclo de la tarjeta" section with two number inputs — "Día de corte (1–28)" and "Días hasta el pago (default 20, 1–60)".
 - On submit: include `statementDay: number | null` and `paymentDueDays: number | null` (null when empty or kind != credit; when kind switches away from credit, send null to clear — the backend requires it).
 - On edit of an existing account: prefill from the account.
 
-- [ ] **Step 2: AccountsPage / card widget**
+- [x] **Step 2: AccountsPage / card widget**
 
 For credit accounts with a cycle: render a chip `Corte {statementDay} · Pago {nextPaymentDueDate formatted}` (e.g. "Corte 15 · Pago 4 sep") using `nextPaymentDueDate`. Under each credit account, list its active/paused plans (from `useInstalmentPlans()` filtered by `accountId`) as compact rows: `MSI $850 × 6 · 3/6 · próx. 31 ago` → tap opens the plan sheet (Task 12). Paused plans show "pausado".
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `cd frontend && npm run lint && npx tsc -b` → Expected: pass
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/AccountFormSheet.tsx frontend/src/pages/AccountsPage.tsx
@@ -1053,7 +1053,7 @@ git commit -m "Add card cycle to the account form and list"
 - Create: `frontend/src/components/InstalmentPlanSheets.tsx`
 - Modify: `frontend/src/components/TransactionDetailSheet.tsx`
 
-- [ ] **Step 1: `InstalmentPlanSheets.tsx`** (model on `SavingsGoalSheets.tsx`)
+- [x] **Step 1: `InstalmentPlanSheets.tsx`** (model on `SavingsGoalSheets.tsx`)
 
 - `InstalmentPlanCreateSheet({ open, onOpenChange, transaction, account })`:
   - Inputs: months (number 2–48), firstDueDate (date input; default `account.nextPaymentDueDate ?? transaction.date + 1 month`).
@@ -1066,17 +1066,17 @@ git commit -m "Add card cycle to the account form and list"
   - Actions (active only): "Registrar pago ahora" (pick source from shared cash/debit/savings accounts, defaults to first cash account → `pay` with `sourceAccountId` + today), "Marcar pagado" (no transfer), "Pausar"/"Reanudar", "Cancelar plan" (two-step confirm, like the existing delete pattern).
   - All amounts respect the balance-concealment toggle where the sheet renders inside a concealing context (follow the pattern in `SavingsGoalSheets.tsx`).
 
-- [ ] **Step 2: `TransactionDetailSheet.tsx`**
+- [x] **Step 2: `TransactionDetailSheet.tsx`**
 
 When the transaction is an expense on a credit account:
 - If a plan exists for `transaction.id` (from `useInstalmentPlans()`): show a badge row `MSI · $850 × 6 · 3 pagados · próx. 31 ago` → tap opens `InstalmentPlanSheet`.
 - Else (and only when the account is `kind === "credit"` and shared): a "Crear plan MSI" button → `InstalmentPlanCreateSheet`.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `cd frontend && npm run lint && npx tsc -b` → Expected: pass
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/InstalmentPlanSheets.tsx frontend/src/components/TransactionDetailSheet.tsx
@@ -1088,7 +1088,7 @@ git commit -m "Add instalment plan sheets and transaction badge"
 **Files:**
 - Modify: `frontend/src/components/AlertsSheet.tsx`
 
-- [ ] **Step 1: Extend `alertVisual` and `destination`**
+- [x] **Step 1: Extend `alertVisual` and `destination`**
 
 ```ts
 card_payment_due: { icon: CreditCard, tone: "bg-primary/12 text-primary" },
@@ -1098,11 +1098,11 @@ instalment_due: { icon: CalendarClock, tone: "bg-primary/12 text-primary" },
 
 Import `CreditCard` from `lucide-react`. (The dashboard `ForecastCard` already renders any upcoming event with label + signed amount; the new `source` values flow through — verify in the build, no code change expected.)
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `cd frontend && npm run lint && npm run build` → Expected: pass
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/AlertsSheet.tsx
@@ -1118,33 +1118,33 @@ git commit -m "Render card and instalment alert kinds"
 **Files:**
 - Modify: `docs/roadmap/README.md`, `docs/roadmap/23-tarjetas-mx-e-instalados.md`, `docs/plan.md`
 
-- [ ] **Step 1: Backend**
+- [x] **Step 1: Backend**
 
 Run: `cd backend && uv run pytest -q` → Expected: all pass (210+ new).
 Run (if Postgres available locally, otherwise rely on CI): `docker run --rm -d --name pg-migtest -p 55432:5432 -e POSTGRES_USER=budget -e POSTGRES_PASSWORD=budget -e POSTGRES_DB=budget postgres:17-alpine` then `MIGRATIONS_TEST_DATABASE_URL=postgresql+psycopg://budget:budget@localhost:55432/postgres uv run pytest tests/test_migrations.py -q` → Expected: pass (schema == models, reversible, data survives).
 
-- [ ] **Step 2: Frontend**
+- [x] **Step 2: Frontend**
 
 Run: `cd frontend && npm run lint && npm run build` → Expected: pass (pre-existing chunk-size warning acceptable).
 
-- [ ] **Step 3: Manual browser pass** (stack up via `docker compose up -d --build`)
+- [x] **Step 3: Manual browser pass** (stack up via `docker compose up -d --build`)
 
 Check: create credit account with cycle → chip + derived dates; create purchase → plan sheet → schedule; record payment (transfer) → balances move, expense totals unchanged; forecast shows the two new events; bell shows the due alerts; pause/cancel flows; two-step delete of a planned purchase is blocked with 409 copy.
 
-- [ ] **Step 4: Docs**
+- [x] **Step 4: Docs**
 
 - `docs/roadmap/23-tarjetas-mx-e-instalados.md`: header `**Status:** ✅ 2026-08-16`.
 - `docs/roadmap/README.md`: row 23 → `✅ 2026-08-16`; progress line → `23 of 24 done ... 24 proposed`; append a dated log entry summarizing the implementation (mirror the style of the 2026-08-15 entry).
 - `docs/plan.md`: move the 23 line from Proposed to the next-cycle Progress list as ✅.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/
 git commit -m "Mark roadmap 23 (Mexican cards and instalments) done"
 ```
 
-- [ ] **Step 6: Push + PR**
+- [x] **Step 6: Push + PR**
 
 ```bash
 git push -u origin feat/mexican-cards-instalments
