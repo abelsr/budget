@@ -4,7 +4,7 @@ One file per pending item, with its why, scope, proposed design, and acceptance
 criteria. When tackling one: read it in full, update its **Status** to
 🚧 In progress, and when done, mark it ✅ with the date.
 
-> **Progress:** 22 of 23 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans, cash-flow forecast); 23 proposed · last updated 2026-08-16
+> **Progress:** 22 of 24 done (01–14, 16, 17, 19, split transactions, monthly budgets with rollover, in-app alerts, goal plans, cash-flow forecast); 23 and 24 proposed · last updated 2026-08-16
 
 ## Immediate — robustness
 
@@ -49,6 +49,7 @@ criteria. When tackling one: read it in full, update its **Status** to
 | # | Document | Status | Priority | Effort |
 |---|---|---|---|---|
 | 23 | [Mexican cards and instalments](23-tarjetas-mx-e-instalados.md) | 📄 Proposed 2026-08-16 | High | L |
+| 24 | [Undo for delete and quick entry](24-undo-eliminacion.md) | 📄 Proposed 2026-08-16 | Medium | S–M |
 
 ## Suggested attack order
 
