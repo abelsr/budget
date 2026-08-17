@@ -6,9 +6,14 @@ from sqlalchemy import case, extract, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Account, Alert, Budget, RecurringRule, SavingsGoal, Transaction, TransactionSplit
+from app.models import Account, Alert, Budget, InstalmentPlan, RecurringRule, SavingsGoal, Transaction, TransactionSplit
+from app.services.account_balances import account_balance, balance_sums
+from app.services.card_calendar import next_statement_date, next_unpaid_due, payment_due_date
 
 OVERDUE_RULE_DAYS = 3
+#: How many days before a due date the lead alert fires.
+CARD_DUE_LEAD_DAYS = 3
+INSTALMENT_DUE_LEAD_DAYS = 3
 
 
 def _create_once(
@@ -105,6 +110,38 @@ def generate_alerts(db: Session, household_id: str, today: date | None = None) -
             db, household_id=household_id, user_id=owner_id, kind="recurring_overdue",
             message=f"Una regla recurrente está vencida desde el {rule.next_run_date.isoformat()}.",
             payload={"recurring_rule_id": rule.id}, dedupe_key=f"recurring_overdue:{rule.id}:{rule.next_run_date.isoformat()}",
+        ):
+            created += 1
+
+    for account in db.scalars(select(Account).where(
+        Account.household_id == household_id, Account.kind == "credit",
+        Account.statement_day.is_not(None), Account.payment_due_days.is_not(None),
+        Account.owner_id.is_(None),
+    )):
+        due = payment_due_date(next_statement_date(account.statement_day, today), account.payment_due_days)
+        if not (0 <= (due - today).days <= CARD_DUE_LEAD_DAYS):
+            continue
+        sums = balance_sums(db, household_id, Account.id == account.id).get(account.id, {})
+        outstanding = max(0.0, -account_balance(account.opening_balance, sums))
+        if _create_once(
+            db, household_id=household_id, user_id=None, kind="card_payment_due",
+            message=f"El pago de la tarjeta \"{account.name}\" vence el {due.isoformat()} (≈ {outstanding:,.2f}).",
+            payload={"account_id": account.id, "due_date": due.isoformat(), "estimated_amount": round(outstanding, 2)},
+            dedupe_key=f"card_due:{account.id}:{due.isoformat()}",
+        ):
+            created += 1
+
+    for plan in db.scalars(select(InstalmentPlan).where(
+        InstalmentPlan.household_id == household_id, InstalmentPlan.status == "active",
+    )):
+        nxt = next_unpaid_due(plan)
+        if nxt is None or not (0 <= (nxt[0] - today).days <= INSTALMENT_DUE_LEAD_DAYS):
+            continue
+        if _create_once(
+            db, household_id=household_id, user_id=None, kind="instalment_due",
+            message=f"Vence el instalado {plan.paid_count + 1}/{plan.months} ({nxt[1]:,.2f}) el {nxt[0].isoformat()}.",
+            payload={"plan_id": plan.id, "source_transaction_id": plan.source_transaction_id, "due_date": nxt[0].isoformat()},
+            dedupe_key=f"instalment_due:{plan.id}:{nxt[0].isoformat()}",
         ):
             created += 1
 

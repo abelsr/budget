@@ -70,3 +70,116 @@ def test_overdue_alert_generates_the_pending_rule(client, session, world):
     assert generated.json()["generated"] == 1
     after_generate = client.get("/alerts", headers=world["headers"]).json()
     assert next(item for item in after_generate if item["id"] == alert["id"])["readAt"] is not None
+
+
+# ---------- Card payment due and instalment due ----------
+
+
+def _cycle_for_due(in_days: int) -> tuple[int, int]:
+    """statement_day/payment_due_days such that the next payment due lands today+in_days."""
+    from app.services.card_calendar import next_statement_date
+
+    target = date.today() + timedelta(days=in_days)
+    for statement_day in range(28, 0, -1):
+        next_stmt = next_statement_date(statement_day, date.today())
+        diff = (target - next_stmt).days
+        if 1 <= diff <= 60:
+            return statement_day, diff
+    raise AssertionError("no cycle found for the target due date")
+
+
+def _card_household(session):
+    user = User(email="card@example.com", hashed_password="x", name="Card")
+    session.add(user)
+    session.flush()
+    household = Household(name="Tarjetas", owner_id=user.id)
+    session.add(household)
+    session.flush()
+    user.household_id = household.id
+    category = Category(household_id=household.id, name="Hogar", icon="x", color="#000000", type="expense")
+    card = Account(household_id=household.id, name="BBVA", kind="credit", opening_balance=0)
+    session.add_all([category, card])
+    session.commit()
+    return user, household, category, card
+
+
+def test_card_payment_due_alert_within_lead_days(client, session):
+    user, household, category, card = _card_household(session)
+    statement_day, due_days = _cycle_for_due(3)
+    card.statement_day = statement_day
+    card.payment_due_days = due_days
+    session.add(
+        Transaction(household_id=household.id, type="expense", amount=12000, category_id=category.id, account_id=card.id, member_id=user.id, date=date.today())
+    )
+    session.commit()
+    headers = headers_for(user)
+    alerts = client.get("/alerts", headers=headers).json()
+    card_alerts = [alert for alert in alerts if alert["kind"] == "card_payment_due"]
+    assert len(card_alerts) == 1
+    assert card_alerts[0]["payload"]["account_id"] == card.id
+    assert card_alerts[0]["payload"]["estimated_amount"] == 12000.0
+    # idempotent: a second read creates nothing new
+    assert [alert for alert in client.get("/alerts", headers=headers).json() if alert["kind"] == "card_payment_due"] == card_alerts
+
+
+def test_card_payment_due_not_before_lead_days(client, session):
+    user, household, category, card = _card_household(session)
+    statement_day, due_days = _cycle_for_due(4)
+    card.statement_day = statement_day
+    card.payment_due_days = due_days
+    session.add(
+        Transaction(household_id=household.id, type="expense", amount=12000, category_id=category.id, account_id=card.id, member_id=user.id, date=date.today())
+    )
+    session.commit()
+    alerts = client.get("/alerts", headers=headers_for(user)).json()
+    assert [alert for alert in alerts if alert["kind"] == "card_payment_due"] == []
+
+
+def test_instalment_due_alert_within_lead_days(client, session):
+    from app.models import InstalmentPlan
+
+    user, household, category, card = _card_household(session)
+    session.add(
+        Transaction(household_id=household.id, type="expense", amount=3000, category_id=category.id, account_id=card.id, member_id=user.id, date=date.today())
+    )
+    session.commit()
+    purchase = session.query(Transaction).one()
+    session.add(
+        InstalmentPlan(
+            household_id=household.id,
+            account_id=card.id,
+            source_transaction_id=purchase.id,
+            months=3,
+            total_amount=3000,
+            monthly_amount=1000,
+            first_due_date=date.today() + timedelta(days=2),
+            created_by_id=user.id,
+        )
+    )
+    session.commit()
+    headers = headers_for(user)
+    alerts = client.get("/alerts", headers=headers).json()
+    instalment_alerts = [alert for alert in alerts if alert["kind"] == "instalment_due"]
+    assert len(instalment_alerts) == 1
+    assert instalment_alerts[0]["payload"]["plan_id"] is not None
+    # idempotent
+    assert [alert for alert in client.get("/alerts", headers=headers).json() if alert["kind"] == "instalment_due"] == instalment_alerts
+    # a paused plan with the same due date emits nothing new
+    purchase2 = Transaction(household_id=household.id, type="expense", amount=1200, category_id=category.id, account_id=card.id, member_id=user.id, date=date.today())
+    session.add(purchase2)
+    session.flush()
+    session.add(
+        InstalmentPlan(
+            household_id=household.id,
+            account_id=card.id,
+            source_transaction_id=purchase2.id,
+            months=3,
+            total_amount=1200,
+            monthly_amount=400,
+            first_due_date=date.today() + timedelta(days=2),
+            created_by_id=user.id,
+            status="paused",
+        )
+    )
+    session.commit()
+    assert [alert for alert in client.get("/alerts", headers=headers).json() if alert["kind"] == "instalment_due"] == instalment_alerts
