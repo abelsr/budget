@@ -25,6 +25,8 @@ class Account(Base):
     bank: Mapped[str | None] = mapped_column(String(60), nullable=True)
     card_brand: Mapped[str | None] = mapped_column(String(10), nullable=True)
     last_four: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    statement_day: Mapped[int | None] = mapped_column(nullable=True)
+    payment_due_days: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     household: Mapped["Household"] = relationship(back_populates="accounts")
