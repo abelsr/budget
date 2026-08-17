@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import func, select, update
 
@@ -6,6 +8,7 @@ from app.models import Account, Household, RecurringRule, SavingsGoal, Transacti
 from app.schemas.accounts import AccountCreate, AccountOut, AccountUpdate
 from app.services.account_access import can_operate, visible_accounts
 from app.services.account_balances import account_balance, balance_sums
+from app.services.card_calendar import last_statement_date, next_statement_date, payment_due_date
 from app.services.recurring import materialize_due
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -24,7 +27,20 @@ def _get_account(db, household_id: str, user_id: str, account_id: str) -> Accoun
     return account
 
 
-def _account_out(account: Account, balance: float) -> AccountOut:
+def _card_dates(account: Account, today: date) -> tuple[str | None, str | None, str | None]:
+    """(last_statement, next_statement, next_payment_due) as ISO strings."""
+    if account.kind != "credit" or account.statement_day is None or account.payment_due_days is None:
+        return (None, None, None)
+    nxt = next_statement_date(account.statement_day, today)
+    return (
+        last_statement_date(account.statement_day, today).isoformat(),
+        nxt.isoformat(),
+        payment_due_date(nxt, account.payment_due_days).isoformat(),
+    )
+
+
+def _account_out(account: Account, balance: float, today: date | None = None) -> AccountOut:
+    last_statement, next_statement, next_due = _card_dates(account, today or date.today())
     return AccountOut(
         id=account.id,
         household_id=account.household_id,
@@ -36,6 +52,11 @@ def _account_out(account: Account, balance: float) -> AccountOut:
         card_brand=account.card_brand,
         last_four=account.last_four,
         is_personal=account.owner_id is not None,
+        statement_day=account.statement_day,
+        payment_due_days=account.payment_due_days,
+        last_statement_date=last_statement,
+        next_statement_date=next_statement,
+        next_payment_due_date=next_due,
     )
 
 
@@ -64,6 +85,8 @@ def create_account(
     payload: AccountCreate, db: DbDep, user: CurrentUserDep
 ) -> AccountOut:
     household_id = _household_id(user)
+    if (payload.statement_day is not None or payload.payment_due_days is not None) and payload.kind != "credit":
+        raise HTTPException(status_code=422, detail="Las fechas de ciclo solo aplican a cuentas de tarjeta de crédito")
     account = Account(
         household_id=household_id,
         name=payload.name,
@@ -73,6 +96,8 @@ def create_account(
         card_brand=payload.card_brand,
         last_four=payload.last_four,
         owner_id=user.id if payload.is_personal else None,
+        statement_day=payload.statement_day,
+        payment_due_days=payload.payment_due_days,
     )
     db.add(account)
     db.commit()
@@ -88,6 +113,13 @@ def update_account(
     account = _get_account(db, household_id, user.id, account_id)
     data = payload.model_dump(exclude_unset=True)
     is_personal = data.pop("is_personal", None)
+    # After this update, a non-credit account must not keep cycle dates.
+    effective_kind = data.get("kind") or account.kind
+    if effective_kind != "credit":
+        next_statement_day = data.get("statement_day", account.statement_day)
+        next_payment_due_days = data.get("payment_due_days", account.payment_due_days)
+        if next_statement_day is not None or next_payment_due_days is not None:
+            raise HTTPException(status_code=422, detail="Las fechas de ciclo solo aplican a cuentas de tarjeta de crédito")
     if is_personal is True and account.owner_id is None:
         household = db.get(Household, household_id)
         if household is None or household.owner_id != user.id:

@@ -29,6 +29,8 @@ class AccountCreate(_CamelModel):
     card_brand: CardBrand | None = None
     last_four: str | None = None
     is_personal: bool = False
+    statement_day: int | None = Field(default=None, ge=1, le=28)
+    payment_due_days: int | None = Field(default=None, ge=1, le=60)
 
     _clean_bank = field_validator("bank")(_clean_optional)
 
@@ -51,6 +53,8 @@ class AccountUpdate(_CamelModel):
     card_brand: CardBrand | None = None
     last_four: str | None = None
     is_personal: bool | None = None
+    statement_day: int | None = Field(default=None, ge=1, le=28)
+    payment_due_days: int | None = Field(default=None, ge=1, le=60)
 
     _clean_bank = field_validator("bank")(_clean_optional)
 
@@ -76,3 +80,8 @@ class AccountOut(_CamelModel):
     card_brand: str | None
     last_four: str | None
     is_personal: bool
+    statement_day: int | None
+    payment_due_days: int | None
+    last_statement_date: str | None
+    next_statement_date: str | None
+    next_payment_due_date: str | None
