@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -598,17 +598,64 @@ def delete_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) -> 
             raise HTTPException(status_code=409, detail="La transferencia está incompleta")
         rows = _transfer_rows(db, tx.transfer_group_id)
         _assert_transfer_access(rows, household_id, user.id, db)
-        group = db.get(TransferGroup, tx.transfer_group_id)
+        now = datetime.now(timezone.utc)
         for row in rows:
             invalidate_completed_reconciliation(db, row)
-        db.delete(rows[0])
-        db.delete(rows[1])
-        # The group is the FK parent; remove both transfer rows first.
-        db.flush()
-        if group is not None:
-            db.delete(group)
+            row.deleted_at = now
+            row.delete_reason = "manual"
+        # The group is kept on purpose: its client_id must keep blocking replays.
         db.commit()
         return
     invalidate_completed_reconciliation(db, tx)
-    db.delete(tx)
+    tx.deleted_at = datetime.now(timezone.utc)
+    tx.delete_reason = "manual"
     db.commit()
+
+
+@router.post("/{transaction_id}/restore")
+def restore_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) -> TransactionOut:
+    """Restores a manually soft-deleted movement; import reverts use the batch flow."""
+    household_id = _household_id(user)
+    # Unlike the normal read, restore must see soft-deleted rows.
+    tx = db.scalar(
+        select(Transaction)
+        .join(Account)
+        .where(
+            Transaction.id == transaction_id,
+            Transaction.household_id == household_id,
+            Transaction.deleted_at.is_not(None),
+            visible_accounts(user.id),
+        )
+        .with_for_update(of=Transaction)
+    )
+    if tx is None:
+        raise HTTPException(status_code=404, detail="No hay ningún movimiento eliminado que restaurar")
+    if tx.delete_reason == "import_revert":
+        raise HTTPException(status_code=409, detail="Los movimientos importados se restauran desde el lote de importación")
+    rows = [tx]
+    if tx.type == "transfer":
+        if tx.transfer_group_id is None:
+            raise HTTPException(status_code=409, detail="La transferencia está incompleta")
+        rows = _soft_deleted_transfer_rows(db, tx.transfer_group_id)
+    for row in rows:
+        invalidate_completed_reconciliation(db, row)
+        row.deleted_at = None
+        row.delete_reason = None
+    db.commit()
+    db.refresh(tx)
+    return _tx_out(tx, db, user.id)
+
+
+def _soft_deleted_transfer_rows(db, group_id: str) -> list[Transaction]:
+    """Both rows of a group regardless of the deleted flag, with the same
+    consistency checks as `_transfer_rows` (which filters soft-deleted rows)."""
+    rows = db.scalars(
+        select(Transaction)
+        .where(Transaction.transfer_group_id == group_id)
+        .with_for_update()
+    ).all()
+    if len(rows) != 2 or {row.transfer_direction for row in rows} != {"outflow", "inflow"}:
+        raise HTTPException(status_code=409, detail="La transferencia está incompleta")
+    if _money(rows[0].amount) != _money(rows[1].amount) or rows[0].account_id == rows[1].account_id:
+        raise HTTPException(status_code=409, detail="La transferencia es inválida")
+    return rows

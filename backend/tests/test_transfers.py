@@ -70,8 +70,14 @@ def test_transfer_replays_by_group_and_deletes_atomically(client, session, world
     assert len(rows) == 2
     response = client.delete(f"/transactions/{rows[1].id}", headers=world["headers1"])
     assert response.status_code == 204
-    assert session.query(Transaction).count() == 0
-    assert session.query(TransferGroup).count() == 0
+    # soft delete: both rows stay (hidden) and the group keeps its client_id guard
+    rows = session.query(Transaction).all()
+    assert len(rows) == 2
+    assert all(row.deleted_at is not None and row.delete_reason == "manual" for row in rows)
+    assert session.query(TransferGroup).count() == 1
+    # a replay of the same client_id still collides
+    replay = client.post("/transactions", json=payload, headers=world["headers1"])
+    assert replay.status_code == 409
 
 
 def test_transfer_rejects_invalid_or_single_account_payloads(client, world):
