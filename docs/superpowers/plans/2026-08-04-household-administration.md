@@ -23,21 +23,21 @@
 - Test: `backend/tests/test_households_summary.py`
 - Test: `backend/tests/test_auth.py`
 
-- [ ] **Step 1: Write failing owner and member permission tests.**
+- [x] **Step 1: Write failing owner and member permission tests.**
   - Registering a household assigns its creator as owner.
   - Existing households backfill their earliest user as owner through the migration.
   - Every active member can list all active members, including an `isOwner` marker.
   - Only the owner can create/list/revoke invitations or remove another active member.
   - A non-owner receives `403`; an owner cannot remove themselves; foreign/not-found IDs receive `404`.
-- [ ] **Step 2: Run the targeted tests and confirm they fail.**
-- [ ] **Step 3: Add nullable-then-backfilled-and-non-null `owner_id` to households.**
+- [x] **Step 2: Run the targeted tests and confirm they fail.**
+- [x] **Step 3: Add nullable-then-backfilled-and-non-null `owner_id` to households.**
   - Add the foreign key after backfill in a deployment-safe migration.
   - Chain from `e52fa631c4bd` so Alembic retains one head.
-- [ ] **Step 4: Add owner-only administration endpoints.**
+- [x] **Step 4: Add owner-only administration endpoints.**
   - `GET /households/me/invitations` returns active invitations without exposing their tokens.
   - `DELETE /households/me/invitations/{id}` revokes an active invitation.
   - `DELETE /households/me/members/{id}` detaches the user (`household_id = NULL`), preserving their user and transaction records.
-- [ ] **Step 5: Run targeted tests and Alembic heads.**
+- [x] **Step 5: Run targeted tests and Alembic heads.**
 
 ### Task 2: Preserve and prove transaction authorship
 
@@ -48,10 +48,10 @@
 - Test: `backend/tests/test_core.py`
 - Test: `backend/tests/test_households_summary.py`
 
-- [ ] **Step 1: Write tests that a supplied `memberId` cannot impersonate another member and removal preserves existing `memberId`.**
-- [ ] **Step 2: Run the focused tests and confirm the missing assertion fails.**
-- [ ] **Step 3: Clarify `member_id` as the immutable author in model/schema/API comments without accepting it as writable input.**
-- [ ] **Step 4: Run targeted tests.**
+- [x] **Step 1: Write tests that a supplied `memberId` cannot impersonate another member and removal preserves existing `memberId`.**
+- [x] **Step 2: Run the focused tests and confirm the missing assertion fails.**
+- [x] **Step 3: Clarify `member_id` as the immutable author in model/schema/API comments without accepting it as writable input.**
+- [x] **Step 4: Run targeted tests.**
 
 ## Chunk 2: Member Directory Interface
 
@@ -64,13 +64,13 @@
 - Modify: `frontend/src/lib/types.ts`
 - Modify: `frontend/src/lib/auth.tsx` if the owner marker belongs in session
 
-- [ ] **Step 1: Add typed queries/mutations for members and active invitations.**
-- [ ] **Step 2: Build the responsive members sheet.**
+- [x] **Step 1: Add typed queries/mutations for members and active invitations.**
+- [x] **Step 2: Build the responsive members sheet.**
   - All members see the active directory with self and owner labels but no destructive controls.
   - Owner sees invite action, active invitations with revoke controls, and a confirmation before removing another member.
   - Owner has no control to remove themselves.
-- [ ] **Step 3: Invalidate member/invitation queries after each owner mutation and show inline API errors.**
-- [ ] **Step 4: Run `npm run build` and inspect the mobile sheet and desktop layout.**
+- [x] **Step 3: Invalidate member/invitation queries after each owner mutation and show inline API errors.**
+- [x] **Step 4: Run `npm run build` and inspect the mobile sheet and desktop layout.**
 
 ## Chunk 3: Documentation And Verification
 
@@ -80,6 +80,6 @@
 - Modify: `docs/roadmap/02-invitaciones-end-to-end.md`
 - Modify: `docs/plan.md`
 
-- [ ] **Step 1: Update invitation documentation to supersede “everyone is equal” with the owner policy.**
-- [ ] **Step 2: Run `uv run pytest`, `uv run alembic heads`, `npm run build`, and `npm run lint`.**
-- [ ] **Step 3: Verify no migration branch or documentation contradiction remains.**
+- [x] **Step 1: Update invitation documentation to supersede “everyone is equal” with the owner policy.**
+- [x] **Step 2: Run `uv run pytest`, `uv run alembic heads`, `npm run build`, and `npm run lint`.**
+- [x] **Step 3: Verify no migration branch or documentation contradiction remains.**
