@@ -169,7 +169,7 @@ verified end-to-end, including access from a phone over the local IP.
 
 **Infrastructure:**
 
-- ✅ Multi-tenant FastAPI backend (241 pytest tests, in-memory SQLite).
+- ✅ Multi-tenant FastAPI backend (254 pytest tests, in-memory SQLite).
 - ✅ camelCase responses end-to-end; `/api` proxy in Vite (dev) and nginx (prod).
 - ✅ Secrets in `.env` (root and backend/, ignored by git; templates in
   `.env.example` in both).
@@ -187,7 +187,7 @@ verified end-to-end, including access from a phone over the local IP.
 
 > Full details in **[docs/roadmap/](roadmap/README.md)** — one file per
 > pending item with why, scope, design, and acceptance criteria, plus the
-> log of what's already done. Open: 24 (undo for delete and quick entry), proposed.
+> log of what's already done. All 24 roadmap items are complete (last: 24, undo for delete and quick entry, 2026-08-16).
 
 **Immediate (robustness):**
 
@@ -213,6 +213,6 @@ verified end-to-end, including access from a phone over the local IP.
 - ✅ [Account reconciliation](roadmap/19-conciliacion-de-cuentas.md): statement-balance sessions, movement states, and stale-session review after edits or import reversals (2026-08-06).
 - ✅ [In-app alerts](roadmap/20-alertas-en-app.md): bell with real unread count and a responsive alert sheet (2026-08-08).
 
-**Proposed (next up):**
+**Roadmap closed (2026-08-16):**
 
-- 📄 [Undo for delete and quick entry](roadmap/24-undo-eliminacion.md): soft delete for manual deletions, restore endpoint, Deshacer snackbar, 30-day purge (2026-08-16).
+- ✅ [Undo for delete and quick entry](roadmap/24-undo-eliminacion.md): soft delete for manual deletions, restore endpoint, Deshacer snackbar, 30-day lazy purge (2026-08-16).

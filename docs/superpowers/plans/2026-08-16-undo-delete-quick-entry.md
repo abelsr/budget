@@ -22,7 +22,7 @@
 - Modify: `backend/app/api/routes/transactions.py`
 - Test: `backend/tests/test_undo.py` (new)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 from datetime import date, datetime, timedelta, timezone
@@ -157,12 +157,12 @@ def test_restore_invalidates_completed_reconciliation(client, session):
     # restore the tx -> session stays stale (not re-completed)
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `cd backend && uv run pytest tests/test_undo.py -q`
 Expected: FAIL (delete hard-deletes today; restore route missing)
 
-- [ ] **Step 3: Rewrite the delete mechanics**
+- [x] **Step 3: Rewrite the delete mechanics**
 
 In `app/api/routes/transactions.py` `delete_transaction`, replace the hard-delete branches:
 
@@ -188,7 +188,7 @@ In `app/api/routes/transactions.py` `delete_transaction`, replace the hard-delet
 
 (`datetime`/`timezone` imports already exist in the file; verify.)
 
-- [ ] **Step 4: Add the restore endpoint** (right after `delete_transaction`)
+- [x] **Step 4: Add the restore endpoint** (right after `delete_transaction`)
 
 ```python
 @router.post("/{transaction_id}/restore")
@@ -221,12 +221,12 @@ def restore_transaction(transaction_id: str, db: DbDep, user: CurrentUserDep) ->
 
 Note: `_transfer_rows` must accept soft-deleted rows — verify its predicate does NOT filter `deleted_at` (the import-revert flow already restores transfer rows through it). If it filters, add a `include_deleted=True` path or query the group rows directly.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `cd backend && uv run pytest tests/test_undo.py -q` → Expected: PASS
 Run: `cd backend && uv run pytest -q` → Expected: all pass (existing delete tests must still pass — check `tests/test_offline_transactions.py` and any transfer-delete test that asserted hard deletion; update their assertions to the soft-delete reality if they checked row absence).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/api/routes/transactions.py backend/tests/test_undo.py
@@ -240,7 +240,7 @@ git commit -m "Make manual deletions reversible with a restore endpoint"
 - Modify: `backend/app/services/recurring.py` (call site)
 - Test: `backend/tests/test_purge.py` (new)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def _soft_delete_aged(session, tx, days_ago: int):
@@ -269,9 +269,9 @@ def test_purge_failure_never_breaks_reads(client, session, monkeypatch):
     # monkeypatch the purge inner to raise; GET /transactions still 200
 ```
 
-- [ ] **Step 2: Run to verify failure** → Expected: FAIL (module missing)
+- [x] **Step 2: Run to verify failure** → Expected: FAIL (module missing)
 
-- [ ] **Step 3: Implement `app/services/housekeeping.py`**
+- [x] **Step 3: Implement `app/services/housekeeping.py`**
 
 ```python
 """Lazy housekeeping for self-hosted deployments: no scheduler.
@@ -349,7 +349,7 @@ def _purge_one(db: Session, tx: Transaction) -> None:
 
 (Import `delete` from sqlalchemy; `InstalmentPlan` is NOT touched by the purge — a plan on a purged purchase keeps referencing the transaction id... **decide and document**: plans on soft-deleted purchases. Check: can a purchase with an active plan be soft-deleted? No — the guard 409s. A CANCELLED/completed plan may reference a deleted purchase; purging the purchase row would break the FK (`source_transaction_id` → transactions.id, no ondelete). **Therefore the purge must skip transactions referenced by any instalment plan** — add a `db.scalar(select(InstalmentPlan.id).where(source_transaction_id == tx.id))` check and skip (log) when referenced. Add a test for that.)
 
-- [ ] **Step 4: Hook into `materialize_due`**
+- [x] **Step 4: Hook into `materialize_due`**
 
 At the end of `materialize_due` in `app/services/recurring.py`, after the commit logic:
 
@@ -359,12 +359,12 @@ At the end of `materialize_due` in `app/services/recurring.py`, after the commit
     return created
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `cd backend && uv run pytest tests/test_purge.py -q` → Expected: PASS
 Run: `cd backend && uv run pytest -q` → Expected: all pass
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/services/housekeeping.py backend/app/services/recurring.py backend/tests/test_purge.py
@@ -382,7 +382,7 @@ git commit -m "Add lazy purge of soft-deleted transactions"
 - Modify: `frontend/src/lib/offline.tsx`
 - Modify: `frontend/src/components/layout/AppShell.tsx`
 
-- [ ] **Step 1: `ui/snackbar.tsx`**
+- [x] **Step 1: `ui/snackbar.tsx`**
 
 A `SnackbarProvider` that renders a fixed bottom-center snackbar (single instance, 8 s auto-dismiss, one optional action, `aria-live="polite"`, spring/cross-fade respecting `prefers-reduced-motion` via the app-level `MotionConfig`). Exposes:
 
@@ -394,15 +394,15 @@ export interface SnackbarOptions {
 export function useSnackbar(): (options: SnackbarOptions) => void
 ```
 
-- [ ] **Step 2: `offline.tsx`**
+- [x] **Step 2: `offline.tsx`**
 
 Add `discard(clientId: string): Promise<void>` to the context: deletes the store entry (no-op when absent) and calls `refreshPending()`.
 
-- [ ] **Step 3: Wire the provider** in `AppShell` around the root `<div>`.
+- [x] **Step 3: Wire the provider** in `AppShell` around the root `<div>`.
 
-- [ ] **Step 4: Verify** — `cd frontend && npx tsc -b` → no errors.
+- [x] **Step 4: Verify** — `cd frontend && npx tsc -b` → no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/ui/snackbar.tsx frontend/src/lib/offline.tsx frontend/src/components/layout/AppShell.tsx
@@ -416,7 +416,7 @@ git commit -m "Add snackbar provider and outbox discard"
 - Modify: `frontend/src/components/AddTransactionSheet.tsx`
 - Modify: `frontend/src/components/TransactionDetailSheet.tsx`
 
-- [ ] **Step 1: `useRestoreTransaction`** in `queries.ts` (same invalidation set as `useDeleteTransaction`):
+- [x] **Step 1: `useRestoreTransaction`** in `queries.ts` (same invalidation set as `useDeleteTransaction`):
 
 ```ts
 export function useRestoreTransaction() {
@@ -428,7 +428,7 @@ export function useRestoreTransaction() {
 }
 ```
 
-- [ ] **Step 2: Quick entry undo** in `AddTransactionSheet.tsx` `save()` success path:
+- [x] **Step 2: Quick entry undo** in `AddTransactionSheet.tsx` `save()` success path:
 
 ```tsx
 const showSnackbar = useSnackbar()
@@ -447,7 +447,7 @@ showSnackbar({ message: "Movimiento creado", action: { label: "Deshacer", onClic
 
 Apply to both branches (with file: show it after `onSettled` of the attachment upload; without file: in the plain `onSuccess`).
 
-- [ ] **Step 3: Delete undo** in `TransactionDetailSheet.tsx` `remove()`:
+- [x] **Step 3: Delete undo** in `TransactionDetailSheet.tsx` `remove()`:
 
 ```tsx
 const showSnackbar = useSnackbar()
@@ -458,11 +458,11 @@ showSnackbar({ message: "Movimiento eliminado", action: { label: "Deshacer", onC
 
 Capture `deletedId = transaction.id` before `onClose()`.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `cd frontend && npm run lint && npx tsc -b && npm run build` → Expected: pass (pre-existing chunk-size warning acceptable)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/lib/queries.ts frontend/src/components/AddTransactionSheet.tsx frontend/src/components/TransactionDetailSheet.tsx
@@ -478,11 +478,11 @@ git commit -m "Add Deshacer snackbars for delete and quick entry"
 **Files:**
 - Modify: `docs/roadmap/README.md`, `docs/roadmap/24-undo-eliminacion.md`, `docs/plan.md`
 
-- [ ] **Step 1: Backend** — `cd backend && uv run pytest -q` → all pass.
-- [ ] **Step 2: Frontend** — `cd frontend && npm run lint && npm run build` → pass.
-- [ ] **Step 3: Manual browser pass** (stack up): delete a movement → snackbar → Deshacer restores it; quick entry → Deshacer removes it; delete an offline (airplane mode) entry → Deshacer removes it locally; a soft-deleted row stays restorable; imported rows still 409 on direct delete/restore.
-- [ ] **Step 4: Docs** — doc 24 header `✅ 2026-08-16`; README row 24 → ✅, progress → `24 of 24 done`, dated log entry; plan.md: 24 moves from Proposed to Progress. Mark all plan checkboxes done.
-- [ ] **Step 5: Commit + push + PR**
+- [x] **Step 1: Backend** — `cd backend && uv run pytest -q` → all pass.
+- [x] **Step 2: Frontend** — `cd frontend && npm run lint && npm run build` → pass.
+- [x] **Step 3: Manual browser pass** (stack up): delete a movement → snackbar → Deshacer restores it; quick entry → Deshacer removes it; delete an offline (airplane mode) entry → Deshacer removes it locally; a soft-deleted row stays restorable; imported rows still 409 on direct delete/restore.
+- [x] **Step 4: Docs** — doc 24 header `✅ 2026-08-16`; README row 24 → ✅, progress → `24 of 24 done`, dated log entry; plan.md: 24 moves from Proposed to Progress. Mark all plan checkboxes done.
+- [x] **Step 5: Commit + push + PR**
 
 ```bash
 git add docs/
