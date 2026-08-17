@@ -16,11 +16,14 @@ import {
   useAccounts,
   useAddTransaction,
   useCategories,
+  useDeleteTransaction,
   useUploadAttachment,
 } from "@/lib/queries"
 import { springIndicator } from "@/lib/springs"
 import { toISODate } from "@/lib/format"
-import type { Frequency, TransactionSplit, TransactionType } from "@/lib/types"
+import { useSnackbar } from "@/components/ui/snackbar"
+import { useOffline } from "@/lib/offline"
+import type { Frequency, Transaction, TransactionSplit, TransactionType } from "@/lib/types"
 
 /** Opciones del selector "Repetir". `null` = movimiento de una sola vez. */
 const repeatOptions: { value: Frequency | null; label: string }[] = [
@@ -70,6 +73,9 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   const { data: accounts = [] } = useAccounts()
   const { data: categories = [] } = useCategories()
   const addTransaction = useAddTransaction()
+  const deleteTransaction = useDeleteTransaction()
+  const showSnackbar = useSnackbar()
+  const { discard } = useOffline()
   const uploadAttachment = useUploadAttachment()
 
   const [type, setType] = useState<TransactionType>("expense")
@@ -106,6 +112,21 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
       : categoryId !== null)
   const isSaving = addTransaction.isPending || uploadAttachment.isPending
 
+  // "Deshacer" tras el registro rápido: descarta del outbox si quedó sin
+  // sincronizar, o borra la fila si ya está en el servidor. Con "repetir"
+  // no se ofrece: la regla recurrente quedaría huérfana.
+  function announceCreated(created: Transaction, repeatValue: Frequency | null) {
+    if (repeatValue) return
+    const undo = () => {
+      if (created.id.startsWith("pending:")) {
+        void discard(created.id.slice("pending:".length))
+      } else {
+        deleteTransaction.mutate(created.id)
+      }
+    }
+    showSnackbar({ message: "Movimiento creado", action: { label: "Deshacer", onClick: undo } })
+  }
+
   function save() {
     if (!canSave || !effectiveAccountId) return
     const payload = type === "transfer"
@@ -117,6 +138,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
       payload,
       {
         onSuccess: (created) => {
+          announceCreated(created, repeat)
           if (file) {
             uploadAttachment.mutate(
               { transactionId: created.id, file },

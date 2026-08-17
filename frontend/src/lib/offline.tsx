@@ -22,6 +22,7 @@ type OfflineState = {
   pending: PendingTransaction[]
   queue: (input: SimpleTransaction) => Promise<Transaction>
   flush: () => Promise<void>
+  discard: (clientId: string) => Promise<void>
   cacheUpdatedAt: number
 }
 
@@ -154,6 +155,15 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     return pendingAsTransaction(entry)
   }, [refreshPending])
 
+  const discard = useCallback(async (clientId: string) => {
+    const db = await dbPromise
+    const existing = await db.get(STORE, clientId)
+    if (existing) {
+      await db.delete(STORE, clientId)
+      await refreshPending()
+    }
+  }, [refreshPending])
+
   useEffect(() => {
     void refreshPending()
     refreshCacheAge()
@@ -187,7 +197,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     if (session?.id) void flush()
   }, [flush, refreshPending, session?.id])
 
-  return <OfflineContext value={{ online, pending, queue, flush, cacheUpdatedAt }}>{children}</OfflineContext>
+  return <OfflineContext value={{ online, pending, queue, flush, discard, cacheUpdatedAt }}>{children}</OfflineContext>
 }
 
 export function useOffline() {

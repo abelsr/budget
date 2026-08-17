@@ -21,6 +21,7 @@ import { AddTransactionButton } from "@/components/AddTransactionSheet"
 import { BrandMark } from "@/components/BrandMark"
 import { ProfileAvatar } from "@/components/ProfileAvatar"
 import { AlertsButton } from "@/components/AlertsSheet"
+import { SnackbarProvider } from "@/components/ui/snackbar"
 import { useOffline } from "@/lib/offline"
 
 type NavigationItem = {
@@ -65,6 +66,7 @@ export function AppShell() {
   const profileName = session?.name ?? members[0]?.name ?? "Mi perfil"
   const profileEmail = session?.email ?? ""
   return (
+    <SnackbarProvider>
     <div className="min-h-dvh">
       {/* Sidebar (desktop) */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-52 flex-col border-r bg-sidebar md:flex">
@@ -188,6 +190,7 @@ export function AppShell() {
         </div>
       </nav>
     </div>
+    </SnackbarProvider>
   )
 }
 
