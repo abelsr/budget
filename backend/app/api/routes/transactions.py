@@ -302,7 +302,10 @@ def create_transaction(
     household_id = _household_id(user)
     client_id = str(payload.client_id) if payload.client_id is not None else None
     if payload.type == "transfer":
-        assert payload.source_account_id is not None and payload.destination_account_id is not None
+        # TransactionCreate.validate_shape garantiza que ambos están presentes.
+        source_id, destination_id = payload.source_account_id, payload.destination_account_id
+        if source_id is None or destination_id is None:  # pragma: no cover
+            raise HTTPException(status_code=422, detail="Una transferencia requiere cuenta origen y destino")
         if client_id is not None:
             existing_transaction = db.scalar(select(Transaction).where(
                 Transaction.household_id == household_id,
@@ -332,18 +335,18 @@ def create_transaction(
                 if not _same_transfer_payload(rows, payload):
                     raise HTTPException(status_code=409, detail="El clientId ya se usó con un movimiento distinto")
                 return _tx_out(next(row for row in rows if row.transfer_direction == "outflow"), db, user.id)
-        _validate_transfer_accounts(db, household_id, user.id, payload.source_account_id, payload.destination_account_id)
+        _validate_transfer_accounts(db, household_id, user.id, source_id, destination_id)
         group = TransferGroup(household_id=household_id, client_id=client_id, created_by_id=user.id)
         db.add(group)
         db.flush()
         outgoing = Transaction(
             household_id=household_id, type="transfer", amount=payload.amount,
-            account_id=payload.source_account_id, member_id=user.id, date=payload.date,
+            account_id=source_id, member_id=user.id, date=payload.date,
             note=payload.note, transfer_group_id=group.id, transfer_direction="outflow",
         )
         incoming = Transaction(
             household_id=household_id, type="transfer", amount=payload.amount,
-            account_id=payload.destination_account_id, member_id=user.id, date=payload.date,
+            account_id=destination_id, member_id=user.id, date=payload.date,
             note=payload.note, transfer_group_id=group.id, transfer_direction="inflow",
         )
         db.add_all([outgoing, incoming])
@@ -389,11 +392,14 @@ def create_transaction(
                     detail="El clientId ya se usó con un movimiento distinto",
                 )
             return _tx_out(existing)
-    assert payload.account_id is not None
+    # TransactionCreate.validate_shape garantiza cuenta (y categoría, salvo splits).
+    if payload.account_id is None:  # pragma: no cover
+        raise HTTPException(status_code=422, detail="El movimiento requiere categoría y cuenta")
     if payload.splits:
         _validate_splits(db, household_id, user.id, payload.type, payload.amount, payload.splits)
     else:
-        assert payload.category_id is not None
+        if payload.category_id is None:  # pragma: no cover
+            raise HTTPException(status_code=422, detail="El movimiento requiere categoría y cuenta")
         _validate_refs(db, household_id, user.id, payload.category_id, payload.account_id)
     tx = Transaction(
         household_id=household_id,
