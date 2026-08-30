@@ -74,9 +74,12 @@ This compose file is for a single-process self-host. Keep the backend and
 database off the public network and terminate HTTPS at a reverse proxy before
 exposing the frontend. Do not publish registration on plain HTTP.
 
-- Set `JWT_SECRET` to a unique random value of at least 32 bytes, for example
-  `openssl rand -hex 32`. It must never use the compose development default or
-  be committed. Changing it signs out every user.
+- `JWT_SECRET` is **required**: `docker compose up` refuses to start without
+  it, and the backend (`APP_ENV=production`) refuses to start with a value
+  shorter than 32 bytes or the old development default. Generate one with
+  `openssl rand -hex 32`. Changing it signs out every user.
+- `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` are **required** in `.env`; the
+  factory `minioadmin` credentials are rejected in production.
 - Set `CORS_ORIGINS` to a JSON list containing only the exact HTTPS frontend
   origins, such as `["https://budget.example.com"]`. Do not use `*`: requests
   include credentials.
