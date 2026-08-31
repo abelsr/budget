@@ -92,13 +92,13 @@ services:
     healthcheck:
       # 127.0.0.1, not localhost: nginx listens on IPv4 only, and BusyBox wget
       # resolves localhost to ::1 first, which would make a healthy container
-      # report unhealthy.
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/"]
+      # report unhealthy. Port 8080: nginx-unprivileged cannot bind :80.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/"]
       interval: 10s
       timeout: 5s
       retries: 5
     ports:
-      - "8081:80"
+      - "8081:8080"
 
   uptime-kuma:
     profiles: [monitoring]
