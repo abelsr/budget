@@ -3,71 +3,32 @@ rules (without materializing), the upcoming-movements window, and the
 read-only guarantee."""
 
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
 
-import jwt
 import pytest
 from sqlalchemy import func, select
 
-from app.config import settings
 from app.models import Account, Category, Household, RecurringRule, Transaction, User
 from app.services.forecast import build_forecast
-
-
-def make_headers(user: User) -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-    return {"Authorization": f"Bearer {token}"}
+from tests.helpers import auth_headers
 
 
 @pytest.fixture(name="world")
-def world_fixture(session):
+def world_fixture(world_factory):
     """Two isolated households; h1 with a shared account, a personal account
     and categories, h2 with the minimum to compare isolation."""
-    u1 = User(email="uno@example.com", hashed_password="x", name="Uno")
-    u2 = User(email="dos@example.com", hashed_password="x", name="Dos")
-    session.add_all([u1, u2])
-    session.flush()
-    h1 = Household(name="Hogar Uno", owner_id=u1.id)
-    h2 = Household(name="Hogar Dos", owner_id=u2.id)
-    session.add_all([h1, h2])
-    session.flush()
-    u1.household_id = h1.id
-    u2.household_id = h2.id
-    session.commit()
-    account1 = Account(household_id=h1.id, name="Débito", kind="debit", opening_balance=1000.0)
-    savings1 = Account(household_id=h1.id, name="Ahorro", kind="savings", opening_balance=0)
-    personal1 = Account(household_id=h1.id, name="Personal", kind="cash", opening_balance=0, owner_id=u1.id)
-    account2 = Account(household_id=h2.id, name="Débito", kind="debit", opening_balance=0)
-    expense1 = Category(
-        household_id=h1.id, name="Comida", icon="pizza", color="#30b0c7", type="expense"
+    return world_factory(
+        accounts=(
+            {"household": 1, "name": "Débito", "kind": "debit", "opening_balance": 1000.0},
+            {"household": 1, "name": "Ahorro", "kind": "savings", "opening_balance": 0},
+            {"household": 1, "name": "Personal", "kind": "cash", "opening_balance": 0, "owner": 1},
+            {"household": 2, "name": "Débito", "kind": "debit", "opening_balance": 0},
+        ),
+        categories=(
+            {"household": 1, "name": "Comida", "icon": "pizza", "color": "#30b0c7", "type": "expense"},
+            {"household": 1, "name": "Salario", "icon": "briefcase", "color": "#00ff00", "type": "income"},
+            {"household": 2, "name": "Comida", "icon": "pizza", "color": "#30b0c7", "type": "expense"},
+        ),
     )
-    income1 = Category(
-        household_id=h1.id, name="Salario", icon="briefcase", color="#00ff00", type="income"
-    )
-    expense2 = Category(
-        household_id=h2.id, name="Comida", icon="pizza", color="#30b0c7", type="expense"
-    )
-    session.add_all([account1, savings1, personal1, account2, expense1, income1, expense2])
-    session.commit()
-    return {
-        "h1": h1,
-        "h2": h2,
-        "u1": u1,
-        "u2": u2,
-        "account1": account1,
-        "savings1": savings1,
-        "personal1": personal1,
-        "account2": account2,
-        "expense1": expense1,
-        "income1": income1,
-        "expense2": expense2,
-        "headers1": make_headers(u1),
-        "headers2": make_headers(u2),
-    }
 
 
 def _add_transaction(session, *, household, account, category, member, tx_type, amount, tx_date, note=None):
@@ -114,15 +75,15 @@ def _iso(offset_days: int) -> str:
 # ---------- Opening balance and series ----------
 
 
-def test_opening_balance_matches_shared_accounts(client, session, world):
+def test_opening_balance_matches_shared_accounts(freeze_time, client, session, world):
     """The opening balance matches the sum of shared balances from /accounts."""
     today = date.today()
     _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["income1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][1],
         member=world["u1"], tx_type="income", amount=500.0, tx_date=today - timedelta(days=5),
     )
     _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], tx_type="expense", amount=200.0, tx_date=today - timedelta(days=3),
     )
     session.commit()
@@ -137,17 +98,17 @@ def test_opening_balance_matches_shared_accounts(client, session, world):
     assert forecast.json()["openingBalance"] == shared_total == 1300.0
 
 
-def test_recorded_future_movements_are_baked_into_opening_once(client, session, world):
+def test_recorded_future_movements_are_baked_into_opening_once(freeze_time, client, session, world):
     """A movement recorded in the future is already in the opening balance
     (the formula is not filtered by date, like /accounts): it must not be
     repeated as a delta in the series, only appear in upcoming. The series
     closes: final == opening + sum."""
     _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], tx_type="expense", amount=150.75, tx_date=date.today() + timedelta(days=2),
     )
     _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["income1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][1],
         member=world["u1"], tx_type="income", amount=1000.0, tx_date=date.today() + timedelta(days=6),
     )
     session.commit()
@@ -187,7 +148,7 @@ def test_recorded_future_movements_are_baked_into_opening_once(client, session, 
     assert body["balance"][-1]["balance"] == round(opening + total_delta, 2)
 
 
-def test_default_days_returns_91_rows_and_range_validation(client, world):
+def test_default_days_returns_91_rows_and_range_validation(freeze_time, client, world):
     default = client.get("/forecast", headers=world["headers1"])
     assert default.status_code == 200
     body = default.json()
@@ -205,9 +166,9 @@ def test_default_days_returns_91_rows_and_range_validation(client, world):
 # ---------- Recurring rules ----------
 
 
-def test_weekly_rule_every_7_days_up_to_horizon(client, session, world):
+def test_weekly_rule_every_7_days_up_to_horizon(freeze_time, client, session, world):
     _add_rule(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], rule_type="expense", amount=10.0, frequency="weekly",
         next_run_date=date.today() + timedelta(days=2), note="Suscripción",
     )
@@ -231,7 +192,7 @@ def test_weekly_rule_every_7_days_up_to_horizon(client, session, world):
 def test_monthly_anchor_day_31_crosses_february(session, world, year, february_day):
     """Jan 31 -> Feb 28/29 -> Mar 31: the clamp comes from advance(), not the forecast."""
     _add_rule(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], rule_type="expense", amount=2500.0, frequency="monthly",
         next_run_date=date(year, 1, 31), anchor_day=31, note="Renta",
     )
@@ -245,9 +206,9 @@ def test_monthly_anchor_day_31_crosses_february(session, world, year, february_d
     ))
 
 
-def test_paused_rule_projects_nothing(client, session, world):
+def test_paused_rule_projects_nothing(freeze_time, client, session, world):
     _add_rule(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], rule_type="expense", amount=999.0, frequency="weekly",
         next_run_date=date.today() + timedelta(days=3), active=False,
     )
@@ -263,14 +224,14 @@ def test_paused_rule_projects_nothing(client, session, world):
 # ---------- Transfers and exclusions ----------
 
 
-def test_transfer_shared_to_shared_moves_no_cash(client, session, world):
+def test_transfer_shared_to_shared_moves_no_cash(freeze_time, client, session, world):
     resp = client.post(
         "/transactions",
         json={
             "type": "transfer",
             "amount": 300.0,
             "sourceAccountId": world["account1"].id,
-            "destinationAccountId": world["savings1"].id,
+            "destinationAccountId": world["accounts"][1].id,
             "date": _iso(5),
         },
         headers=world["headers1"],
@@ -287,7 +248,7 @@ def test_transfer_shared_to_shared_moves_no_cash(client, session, world):
     assert body["balance"][-1]["balance"] == body["openingBalance"]
 
 
-def test_transfer_shared_to_personal_reduces_household_cash(client, session, world):
+def test_transfer_shared_to_personal_reduces_household_cash(freeze_time, client, session, world):
     """Moving cash to a personal account reduces the shared cash: already in
     the opening balance (same formula as /accounts) and with no double dip
     in the series."""
@@ -297,7 +258,7 @@ def test_transfer_shared_to_personal_reduces_household_cash(client, session, wor
             "type": "transfer",
             "amount": 250.0,
             "sourceAccountId": world["account1"].id,
-            "destinationAccountId": world["personal1"].id,
+            "destinationAccountId": world["accounts"][2].id,
             "date": _iso(5),
             "note": "Retiro",
         },
@@ -321,13 +282,13 @@ def test_transfer_shared_to_personal_reduces_household_cash(client, session, wor
     assert body["balance"][-1]["balance"] == body["openingBalance"]
 
 
-def test_personal_account_and_soft_deleted_transactions_excluded(client, session, world):
+def test_personal_account_and_soft_deleted_transactions_excluded(freeze_time, client, session, world):
     _add_transaction(
-        session, household=world["h1"], account=world["personal1"], category=world["income1"],
+        session, household=world["h1"], account=world["accounts"][2], category=world["categories"][1],
         member=world["u1"], tx_type="income", amount=400.0, tx_date=date.today() + timedelta(days=3),
     )
     deleted = _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], tx_type="expense", amount=100.0, tx_date=date.today() + timedelta(days=4),
     )
     deleted.deleted_at = datetime.now(timezone.utc)
@@ -342,14 +303,14 @@ def test_personal_account_and_soft_deleted_transactions_excluded(client, session
 # ---------- Read-only ----------
 
 
-def test_forecast_is_read_only(client, session, world):
+def test_forecast_is_read_only(freeze_time, client, session, world):
     _add_rule(
-        session, household=world["h1"], account=world["account1"], category=world["income1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][1],
         member=world["u1"], rule_type="income", amount=1500.0, frequency="monthly",
         next_run_date=date.today() + timedelta(days=10), anchor_day=10,
     )
     _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], tx_type="expense", amount=80.0, tx_date=date.today() + timedelta(days=5),
     )
     session.commit()
@@ -382,13 +343,13 @@ def test_forecast_is_read_only(client, session, world):
 # ---------- Isolation and 400 ----------
 
 
-def test_forecast_is_isolated_per_household(client, session, world):
+def test_forecast_is_isolated_per_household(freeze_time, client, session, world):
     _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], tx_type="expense", amount=500.0, tx_date=date.today() + timedelta(days=2),
     )
     _add_rule(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], rule_type="expense", amount=75.0, frequency="weekly",
         next_run_date=date.today() + timedelta(days=3),
     )
@@ -406,31 +367,31 @@ def test_user_without_household_gets_400(client, session):
     stray = User(email="sinhogar@example.com", hashed_password="x", name="Sin hogar")
     session.add(stray)
     session.commit()
-    resp = client.get("/forecast", headers=make_headers(stray))
+    resp = client.get("/forecast", headers=auth_headers(stray))
     assert resp.status_code == 400
 
 
 # ---------- Upcoming movements ----------
 
 
-def test_upcoming_includes_recorded_and_recurring_in_30_days(client, session, world):
+def test_upcoming_includes_recorded_and_recurring_in_30_days(freeze_time, client, session, world):
     _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], tx_type="expense", amount=120.0, tx_date=date.today() + timedelta(days=3),
         note="Mercado",
     )
     _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["income1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][1],
         member=world["u1"], tx_type="income", amount=800.0, tx_date=date.today() + timedelta(days=28),
     )
     _add_rule(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], rule_type="expense", amount=49.0, frequency="weekly",
         next_run_date=date.today() + timedelta(days=5), note="Streaming",
     )
     # Outside the 30-day window: must not appear.
     _add_transaction(
-        session, household=world["h1"], account=world["account1"], category=world["expense1"],
+        session, household=world["h1"], account=world["account1"], category=world["categories"][0],
         member=world["u1"], tx_type="expense", amount=60.0, tx_date=date.today() + timedelta(days=32),
         note="Lejos",
     )
@@ -458,10 +419,10 @@ def test_upcoming_includes_recorded_and_recurring_in_30_days(client, session, wo
     assert "Lejos" not in labels
 
 
-def test_upcoming_is_capped_at_20(client, session, world):
+def test_upcoming_is_capped_at_20(freeze_time, client, session, world):
     for offset in range(1, 22):
         _add_transaction(
-            session, household=world["h1"], account=world["account1"], category=world["expense1"],
+            session, household=world["h1"], account=world["account1"], category=world["categories"][0],
             member=world["u1"], tx_type="expense", amount=10.0,
             tx_date=date.today() + timedelta(days=offset), note=f"m{offset}",
         )
@@ -476,14 +437,14 @@ def test_upcoming_is_capped_at_20(client, session, world):
     assert "m21" not in labels
 
 
-def test_upcoming_includes_transfer_to_personal(client, session, world):
+def test_upcoming_includes_transfer_to_personal(freeze_time, client, session, world):
     resp = client.post(
         "/transactions",
         json={
             "type": "transfer",
             "amount": 100.0,
             "sourceAccountId": world["account1"].id,
-            "destinationAccountId": world["personal1"].id,
+            "destinationAccountId": world["accounts"][2].id,
             "date": _iso(7),
             "note": "Giro",
         },
@@ -536,11 +497,11 @@ def card_world_fixture(session):
         "category": category,
         "card": card,
         "cash": cash,
-        "headers": make_headers(user),
+        "headers": auth_headers(user),
     }
 
 
-def test_card_due_event_in_upcoming(client, session, card_world):
+def test_card_due_event_in_upcoming(freeze_time, client, session, card_world):
     today = date.today()
     statement_day, due_days = _cycle_for_due(10)
     card_world["card"].statement_day = statement_day
@@ -568,7 +529,7 @@ def test_card_due_event_in_upcoming(client, session, card_world):
     assert rows[_iso(30)]["balance"] == round(body["openingBalance"] + sum(row["delta"] for row in body["balance"]), 2)
 
 
-def test_card_due_reduced_by_scheduled_inflows(client, session, card_world):
+def test_card_due_reduced_by_scheduled_inflows(freeze_time, client, session, card_world):
     statement_day, due_days = _cycle_for_due(10)
     card_world["card"].statement_day = statement_day
     card_world["card"].payment_due_days = due_days
@@ -598,7 +559,7 @@ def test_card_due_reduced_by_scheduled_inflows(client, session, card_world):
     assert card_events[0]["amount"] == 7000.0
 
 
-def test_no_card_due_without_cycle(client, session, card_world):
+def test_no_card_due_without_cycle(freeze_time, client, session, card_world):
     session.add(
         Transaction(
             household_id=card_world["household"].id, type="expense", amount=12000,
@@ -611,7 +572,7 @@ def test_no_card_due_without_cycle(client, session, card_world):
     assert [event for event in upcoming if event["source"] == "card_due"] == []
 
 
-def test_instalment_due_events_only_for_active_plans(client, session, card_world):
+def test_instalment_due_events_only_for_active_plans(freeze_time, client, session, card_world):
     from app.models import InstalmentPlan
 
     today = date.today()

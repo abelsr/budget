@@ -1,39 +1,20 @@
 """Metas de ahorro: CRUD, aportes manuales y aislamiento por hogar."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
-import jwt
 import pytest
 
-from app.config import settings
-from app.models import Account, Household, SavingsGoal, User
-
-
-def make_headers(user: User) -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-    return {"Authorization": f"Bearer {token}"}
+from app.models import SavingsGoal
 
 
 @pytest.fixture(name="world")
-def world_fixture(session):
-    u1 = User(email="uno@example.com", hashed_password="x", name="Uno")
-    u2 = User(email="dos@example.com", hashed_password="x", name="Dos")
-    session.add_all([u1, u2])
-    session.flush()
-    h1 = Household(name="Hogar Uno", owner_id=u1.id)
-    h2 = Household(name="Hogar Dos", owner_id=u2.id)
-    session.add_all([h1, h2])
-    session.flush()
-    u1.household_id, u2.household_id = h1.id, h2.id
-    a1 = Account(household_id=h1.id, name="Ahorro", kind="savings", opening_balance=0)
-    a2 = Account(household_id=h2.id, name="Ahorro ajeno", kind="savings", opening_balance=0)
-    session.add_all([a1, a2])
-    session.commit()
-    return {"h1": h1, "h2": h2, "u1": u1, "u2": u2, "a1": a1, "a2": a2, "headers1": make_headers(u1), "headers2": make_headers(u2)}
+def world_fixture(world_factory):
+    return world_factory(
+        accounts=(
+            {"household": 1, "name": "Ahorro", "kind": "savings", "opening_balance": 0},
+            {"household": 2, "name": "Ahorro ajeno", "kind": "savings", "opening_balance": 0},
+        ),
+    )
 
 
 def create_goal(client, world, **overrides):
@@ -42,7 +23,7 @@ def create_goal(client, world, **overrides):
         "targetAmount": 1000,
         "currentAmount": 200,
         "targetDate": "2026-12-31",
-        "accountId": world["a1"].id,
+        "accountId": world["account1"].id,
         "icon": "piggy-bank",
         "color": "#30b0c7",
     } | overrides
@@ -98,7 +79,7 @@ def test_goal_rejects_zero_contribution_and_foreign_account(client, world):
         f"/goals/{goal['id']}/contribute", json={"amount": 0}, headers=world["headers1"]
     )
     assert zero.status_code == 422
-    foreign = create_goal(client, world, accountId=world["a2"].id)
+    foreign = create_goal(client, world, accountId=world["account2"].id)
     assert foreign.status_code == 422
 
 
@@ -178,14 +159,14 @@ def test_account_deletion_unlinks_goal(client, session, world):
         name="Fondo",
         target_amount=100,
         current_amount=0,
-        account_id=world["a1"].id,
+        account_id=world["account1"].id,
         target_date=date.today(),
         icon="piggy-bank",
         color="#30b0c7",
     )
     session.add(goal)
     session.commit()
-    deleted = client.delete(f"/accounts/{world['a1'].id}", headers=world["headers1"])
+    deleted = client.delete(f"/accounts/{world['account1'].id}", headers=world["headers1"])
     assert deleted.status_code == 204
     session.refresh(goal)
     assert goal.account_id is None

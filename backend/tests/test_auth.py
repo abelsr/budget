@@ -156,7 +156,8 @@ def test_join_flow(client, session: Session, monkeypatch):
     assert resp.json()["accessToken"]
     # SQLite no aplica bloqueos de fila; esta aserción conserva la intención de
     # serialización que se ejecuta como FOR UPDATE en PostgreSQL.
-    assert locked_queries
+    sqls = [s.compile(compile_kwargs={"literal_binds": False}).string.upper() for s in locked_queries]
+    assert any("FOR UPDATE" in sql for sql in sqls)
 
     user = session.scalar(select(User).where(User.email == "bob@example.com"))
     assert user.household_id == me["householdId"]

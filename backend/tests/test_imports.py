@@ -2,11 +2,7 @@ from datetime import date, datetime
 import json
 
 import pytest
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.database import Base
 from app.models import (
     Account,
     Attachment,
@@ -20,24 +16,13 @@ from app.models import (
     TransferGroup,
     User,
 )
-from tests.test_core import create_account, create_category, create_transaction, world_fixture
-
-world = world_fixture
-
-
-def _csv_upload(client, url, headers, account_id, content, **fields):
-    data = {"accountId": account_id, **fields}
-    return client.post(
-        url,
-        data=data,
-        files={"file": ("statement.csv", content, "text/csv")},
-        headers=headers,
-    )
-
-
-def _mapping() -> str:
-    return '{"date":"Fecha","amount":"Importe","description":"Concepto"}'
-
+from tests.helpers import (
+    _csv_upload,
+    _mapping,
+    create_account,
+    create_category,
+    create_transaction,
+)
 
 CSV = b'Fecha,Importe,Concepto\n31/07/2026,"MXN 1,234.50",Nomina\n01/08/2026,(20.00),Cafe\n'
 
@@ -252,26 +237,11 @@ def test_import_batch_detail_revert_conflict_and_restore(client, session, world)
 
 
 @pytest.fixture(name="session")
-def session_fixture():
-    """Isolate import lifecycle coverage under real SQLite FK enforcement."""
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    @event.listens_for(engine, "connect")
-    def enable_foreign_keys(dbapi_connection, _connection_record) -> None:
-        dbapi_connection.execute("PRAGMA foreign_keys=ON")
-    Base.metadata.create_all(engine)
-    TestingSessionLocal = sessionmaker(
-        bind=engine, autoflush=False, expire_on_commit=False
-    )
-    with TestingSessionLocal() as session:
-        assert session.connection().exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
-        yield session
-    # Disposing the isolated in-memory connection avoids the legacy household/user
-    # cycle during SQLite table teardown while preserving FK checks during tests.
-    engine.dispose()
+def session_fixture(session_factory):
+    """Issue #48: misma configuración de engine que el conftest, pero con
+    ``PRAGMA foreign_keys=ON`` para cubrir el ciclo de vida de imports bajo
+    FK reales de SQLite (como en Postgres). Ya no se redefine el engine."""
+    yield from session_factory(foreign_keys=True)
 
 
 @pytest.fixture(name="imported")

@@ -1,27 +1,9 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
-import jwt
-from sqlalchemy.orm import Session
-
-from app.config import settings
-from app.models import Account, Budget, Category, Household, RecurringRule, Transaction, User
+from app.models import Account, Budget, Category, Household, RecurringRule, Transaction
 from app.models import SavingsGoal
-
-
-def _headers(user: User) -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-    return {"Authorization": f"Bearer {token}"}
-
-
-def _user(session: Session, email: str, name: str) -> User:
-    user = User(email=email, hashed_password="x", name=name)
-    session.add(user)
-    session.flush()
-    return user
+from tests.helpers import auth_headers as _headers
+from tests.helpers import create_user as _user
 
 
 def test_personal_account_isolation_and_household_aggregates(client, session):

@@ -22,6 +22,9 @@ dependencies = [
     "sqlalchemy>=2.0.51",
 ]
 
+[tool.pytest.ini_options]
+markers = ["db: tests que requieren una base de datos real (migraciones Postgres)"]
+
 [tool.fastapi]
 entrypoint = "app.main:app"
 

@@ -1,8 +1,5 @@
 from app.models import Category, MerchantRule, Transaction
-from tests.test_core import create_account, create_category, world_fixture
-from tests.test_imports import _csv_upload, _mapping
-
-world = world_fixture
+from tests.helpers import _csv_upload, _mapping, create_account, create_category
 
 
 def test_rules_normalize_and_isolate_households(client, world):
