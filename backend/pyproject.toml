@@ -27,5 +27,6 @@ entrypoint = "app.main:app"
 
 [dependency-groups]
 dev = [
+    "freezegun>=1.5",
     "pytest>=9.1.1",
 ]
