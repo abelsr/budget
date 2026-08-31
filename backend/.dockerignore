@@ -1,0 +1,25 @@
+# Keep the build context small and, more importantly, stop Docker from
+# following the host .venv symlink (backend/.venv -> the main repo's venv).
+# Without this, COPY would ship the entire host virtualenv into the context.
+.venv
+.venv/
+.env
+.env.*
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.pytest_cache
+*.egg-info
+*.egg-info/
+build/
+dist/
+wheels/
+tests/
+backups/
+backups
+*.db
+*.sqlite3

@@ -1,0 +1,17 @@
+# The build stage (node:24-alpine) runs `npm ci` and `npm run build`, so the
+# source (src/, public/, index.html, vite.config.ts, tsconfig*.json) must stay
+# in the context. Only exclude what would bloat the context or leak secrets.
+node_modules
+node_modules/
+dist
+dist/
+dist-ssr
+.env
+.env.*
+.git
+.gitignore
+*.log
+logs/
+.DS_Store
+.vscode/
+.idea/
