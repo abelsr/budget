@@ -116,6 +116,13 @@ jobs:
   docker:
     name: Imágenes Docker
     runs-on: ubuntu-latest
+    env:
+      # Compose exige los secretos (\${VAR:?}); en el build de CI solo se
+      # valida que los Dockerfiles compilan, no que arranquen, así que
+      # dummy values son suficientes para la interpolación.
+      JWT_SECRET: ci-dummy-not-a-real-secret-0000000000
+      MINIO_ROOT_USER: ci-dummy
+      MINIO_ROOT_PASSWORD: ci-dummy-password
     steps:
       - uses: actions/checkout@v7
 

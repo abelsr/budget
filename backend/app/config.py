@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     """Configuración vía variables de entorno (o .env)."""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    #: development (default) | production. En production los secretos débiles
+    #: hacen fallar el arranque en vez de arrancar con JWTs falsables.
+    app_env: str = "development"
 
     database_url: str = "postgresql+psycopg://budget:budget@localhost:5432/budget"
 
@@ -45,6 +49,29 @@ class Settings(BaseSettings):
     ]
 
     log_level: str = "INFO"
+
+    @model_validator(mode="after")
+    def _refuse_weak_secrets_in_production(self) -> "Settings":
+        """Fail fast: a known/default secret must never guard real sessions.
+
+        In development the defaults are fine; in production the app refuses
+        to start instead of issuing forgeable JWTs or trusting MinIO with
+        factory credentials.
+        """
+        if self.app_env.lower() != "production":
+            return self
+        if len(self.jwt_secret) < 32 or self.jwt_secret == "dev-secret-change-me":
+            raise ValueError(
+                "JWT_SECRET must be a unique value of at least 32 bytes in "
+                "production (e.g. `openssl rand -hex 32`). Refusing to start "
+                "with the development default."
+            )
+        if self.minio_access_key == "minioadmin" or self.minio_secret_key in {"minioadmin", "minioadmin123"}:
+            raise ValueError(
+                "MINIO_ACCESS_KEY / MINIO_SECRET_KEY must not be the factory "
+                "credentials (minioadmin) in production. Set unique values."
+            )
+        return self
 
 
 settings = Settings()
