@@ -115,7 +115,7 @@ def test_create_duplicate_budget_conflicts(client, world):
     assert second.status_code == 409
 
 
-def test_monthly_budget_coexists_with_global_default_and_takes_precedence(client, world):
+def test_monthly_budget_coexists_with_global_default_and_takes_precedence(freeze_time, client, world):
     global_budget = client.post(
         "/budgets",
         json={"categoryId": world["expense1"].id, "amount": 100.0},
@@ -211,7 +211,7 @@ def test_budgets_list_is_isolated_per_household(client, world):
 # ---------- /budgets/status ----------
 
 
-def test_status_computes_spent_and_percentage(client, session, world):
+def test_status_computes_spent_and_percentage(freeze_time, client, session, world):
     client.post(
         "/budgets",
         json={"categoryId": world["expense1"].id, "amount": 200.0},
@@ -235,7 +235,7 @@ def test_status_computes_spent_and_percentage(client, session, world):
     assert rows[0]["percentage"] == 75.0
 
 
-def test_status_ignores_income_in_same_category_scope(client, session, world):
+def test_status_ignores_income_in_same_category_scope(freeze_time, client, session, world):
     """Un ingreso no debe sumar al gasto, aun si por error compartiera categoría."""
     client.post(
         "/budgets",
@@ -254,7 +254,7 @@ def test_status_ignores_income_in_same_category_scope(client, session, world):
     assert resp.json()[0]["spent"] == 0.0
 
 
-def test_status_different_month_resets_without_recreating_budget(client, session, world):
+def test_status_different_month_resets_without_recreating_budget(freeze_time, client, session, world):
     budget = client.post(
         "/budgets",
         json={"categoryId": world["expense1"].id, "amount": 200.0},
@@ -329,7 +329,7 @@ def test_status_is_empty_without_budgets(client, world):
     assert resp.json() == []
 
 
-def test_status_is_isolated_between_households(client, session, world):
+def test_status_is_isolated_between_households(freeze_time, client, session, world):
     client.post(
         "/budgets",
         json={"categoryId": world["expense1"].id, "amount": 200.0},

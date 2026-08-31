@@ -35,7 +35,7 @@ def world_fixture(session):
     return {"user": user, "other": other, "household": household, "account": account, "category": category, "headers": headers_for(user), "other_headers": headers_for(other)}
 
 
-def test_alerts_generate_once_read_and_remain_isolated(client, session, world):
+def test_alerts_generate_once_read_and_remain_isolated(freeze_time, client, session, world):
     today = date.today()
     session.add_all([
         Budget(household_id=world["household"].id, category_id=world["category"].id, amount=100),
@@ -58,7 +58,7 @@ def test_alerts_generate_once_read_and_remain_isolated(client, session, world):
     assert next(alert for alert in after_read if alert["id"] == budget_alert["id"])["readAt"] is not None
 
 
-def test_overdue_alert_generates_the_pending_rule(client, session, world):
+def test_overdue_alert_generates_the_pending_rule(freeze_time, client, session, world):
     rule = RecurringRule(household_id=world["household"].id, type="expense", amount=20, category_id=world["category"].id, account_id=world["account"].id, created_by_id=world["user"].id, frequency="weekly", next_run_date=date.today() - timedelta(days=4), anchor_day=None)
     session.add(rule)
     session.commit()
@@ -103,7 +103,7 @@ def _card_household(session):
     return user, household, category, card
 
 
-def test_card_payment_due_alert_within_lead_days(client, session):
+def test_card_payment_due_alert_within_lead_days(freeze_time, client, session):
     user, household, category, card = _card_household(session)
     statement_day, due_days = _cycle_for_due(3)
     card.statement_day = statement_day
@@ -122,7 +122,7 @@ def test_card_payment_due_alert_within_lead_days(client, session):
     assert [alert for alert in client.get("/alerts", headers=headers).json() if alert["kind"] == "card_payment_due"] == card_alerts
 
 
-def test_card_payment_due_not_before_lead_days(client, session):
+def test_card_payment_due_not_before_lead_days(freeze_time, client, session):
     user, household, category, card = _card_household(session)
     statement_day, due_days = _cycle_for_due(4)
     card.statement_day = statement_day
@@ -135,7 +135,7 @@ def test_card_payment_due_not_before_lead_days(client, session):
     assert [alert for alert in alerts if alert["kind"] == "card_payment_due"] == []
 
 
-def test_instalment_due_alert_within_lead_days(client, session):
+def test_instalment_due_alert_within_lead_days(freeze_time, client, session):
     from app.models import InstalmentPlan
 
     user, household, category, card = _card_household(session)

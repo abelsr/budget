@@ -114,7 +114,7 @@ def _iso(offset_days: int) -> str:
 # ---------- Opening balance and series ----------
 
 
-def test_opening_balance_matches_shared_accounts(client, session, world):
+def test_opening_balance_matches_shared_accounts(freeze_time, client, session, world):
     """The opening balance matches the sum of shared balances from /accounts."""
     today = date.today()
     _add_transaction(
@@ -137,7 +137,7 @@ def test_opening_balance_matches_shared_accounts(client, session, world):
     assert forecast.json()["openingBalance"] == shared_total == 1300.0
 
 
-def test_recorded_future_movements_are_baked_into_opening_once(client, session, world):
+def test_recorded_future_movements_are_baked_into_opening_once(freeze_time, client, session, world):
     """A movement recorded in the future is already in the opening balance
     (the formula is not filtered by date, like /accounts): it must not be
     repeated as a delta in the series, only appear in upcoming. The series
@@ -187,7 +187,7 @@ def test_recorded_future_movements_are_baked_into_opening_once(client, session, 
     assert body["balance"][-1]["balance"] == round(opening + total_delta, 2)
 
 
-def test_default_days_returns_91_rows_and_range_validation(client, world):
+def test_default_days_returns_91_rows_and_range_validation(freeze_time, client, world):
     default = client.get("/forecast", headers=world["headers1"])
     assert default.status_code == 200
     body = default.json()
@@ -205,7 +205,7 @@ def test_default_days_returns_91_rows_and_range_validation(client, world):
 # ---------- Recurring rules ----------
 
 
-def test_weekly_rule_every_7_days_up_to_horizon(client, session, world):
+def test_weekly_rule_every_7_days_up_to_horizon(freeze_time, client, session, world):
     _add_rule(
         session, household=world["h1"], account=world["account1"], category=world["expense1"],
         member=world["u1"], rule_type="expense", amount=10.0, frequency="weekly",
@@ -245,7 +245,7 @@ def test_monthly_anchor_day_31_crosses_february(session, world, year, february_d
     ))
 
 
-def test_paused_rule_projects_nothing(client, session, world):
+def test_paused_rule_projects_nothing(freeze_time, client, session, world):
     _add_rule(
         session, household=world["h1"], account=world["account1"], category=world["expense1"],
         member=world["u1"], rule_type="expense", amount=999.0, frequency="weekly",
@@ -263,7 +263,7 @@ def test_paused_rule_projects_nothing(client, session, world):
 # ---------- Transfers and exclusions ----------
 
 
-def test_transfer_shared_to_shared_moves_no_cash(client, session, world):
+def test_transfer_shared_to_shared_moves_no_cash(freeze_time, client, session, world):
     resp = client.post(
         "/transactions",
         json={
@@ -287,7 +287,7 @@ def test_transfer_shared_to_shared_moves_no_cash(client, session, world):
     assert body["balance"][-1]["balance"] == body["openingBalance"]
 
 
-def test_transfer_shared_to_personal_reduces_household_cash(client, session, world):
+def test_transfer_shared_to_personal_reduces_household_cash(freeze_time, client, session, world):
     """Moving cash to a personal account reduces the shared cash: already in
     the opening balance (same formula as /accounts) and with no double dip
     in the series."""
@@ -321,7 +321,7 @@ def test_transfer_shared_to_personal_reduces_household_cash(client, session, wor
     assert body["balance"][-1]["balance"] == body["openingBalance"]
 
 
-def test_personal_account_and_soft_deleted_transactions_excluded(client, session, world):
+def test_personal_account_and_soft_deleted_transactions_excluded(freeze_time, client, session, world):
     _add_transaction(
         session, household=world["h1"], account=world["personal1"], category=world["income1"],
         member=world["u1"], tx_type="income", amount=400.0, tx_date=date.today() + timedelta(days=3),
@@ -342,7 +342,7 @@ def test_personal_account_and_soft_deleted_transactions_excluded(client, session
 # ---------- Read-only ----------
 
 
-def test_forecast_is_read_only(client, session, world):
+def test_forecast_is_read_only(freeze_time, client, session, world):
     _add_rule(
         session, household=world["h1"], account=world["account1"], category=world["income1"],
         member=world["u1"], rule_type="income", amount=1500.0, frequency="monthly",
@@ -382,7 +382,7 @@ def test_forecast_is_read_only(client, session, world):
 # ---------- Isolation and 400 ----------
 
 
-def test_forecast_is_isolated_per_household(client, session, world):
+def test_forecast_is_isolated_per_household(freeze_time, client, session, world):
     _add_transaction(
         session, household=world["h1"], account=world["account1"], category=world["expense1"],
         member=world["u1"], tx_type="expense", amount=500.0, tx_date=date.today() + timedelta(days=2),
@@ -413,7 +413,7 @@ def test_user_without_household_gets_400(client, session):
 # ---------- Upcoming movements ----------
 
 
-def test_upcoming_includes_recorded_and_recurring_in_30_days(client, session, world):
+def test_upcoming_includes_recorded_and_recurring_in_30_days(freeze_time, client, session, world):
     _add_transaction(
         session, household=world["h1"], account=world["account1"], category=world["expense1"],
         member=world["u1"], tx_type="expense", amount=120.0, tx_date=date.today() + timedelta(days=3),
@@ -458,7 +458,7 @@ def test_upcoming_includes_recorded_and_recurring_in_30_days(client, session, wo
     assert "Lejos" not in labels
 
 
-def test_upcoming_is_capped_at_20(client, session, world):
+def test_upcoming_is_capped_at_20(freeze_time, client, session, world):
     for offset in range(1, 22):
         _add_transaction(
             session, household=world["h1"], account=world["account1"], category=world["expense1"],
@@ -476,7 +476,7 @@ def test_upcoming_is_capped_at_20(client, session, world):
     assert "m21" not in labels
 
 
-def test_upcoming_includes_transfer_to_personal(client, session, world):
+def test_upcoming_includes_transfer_to_personal(freeze_time, client, session, world):
     resp = client.post(
         "/transactions",
         json={
@@ -540,7 +540,7 @@ def card_world_fixture(session):
     }
 
 
-def test_card_due_event_in_upcoming(client, session, card_world):
+def test_card_due_event_in_upcoming(freeze_time, client, session, card_world):
     today = date.today()
     statement_day, due_days = _cycle_for_due(10)
     card_world["card"].statement_day = statement_day
@@ -568,7 +568,7 @@ def test_card_due_event_in_upcoming(client, session, card_world):
     assert rows[_iso(30)]["balance"] == round(body["openingBalance"] + sum(row["delta"] for row in body["balance"]), 2)
 
 
-def test_card_due_reduced_by_scheduled_inflows(client, session, card_world):
+def test_card_due_reduced_by_scheduled_inflows(freeze_time, client, session, card_world):
     statement_day, due_days = _cycle_for_due(10)
     card_world["card"].statement_day = statement_day
     card_world["card"].payment_due_days = due_days
@@ -598,7 +598,7 @@ def test_card_due_reduced_by_scheduled_inflows(client, session, card_world):
     assert card_events[0]["amount"] == 7000.0
 
 
-def test_no_card_due_without_cycle(client, session, card_world):
+def test_no_card_due_without_cycle(freeze_time, client, session, card_world):
     session.add(
         Transaction(
             household_id=card_world["household"].id, type="expense", amount=12000,
@@ -611,7 +611,7 @@ def test_no_card_due_without_cycle(client, session, card_world):
     assert [event for event in upcoming if event["source"] == "card_due"] == []
 
 
-def test_instalment_due_events_only_for_active_plans(client, session, card_world):
+def test_instalment_due_events_only_for_active_plans(freeze_time, client, session, card_world):
     from app.models import InstalmentPlan
 
     today = date.today()
