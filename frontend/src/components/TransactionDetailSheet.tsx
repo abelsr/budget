@@ -14,7 +14,7 @@ import {
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { CHART_OTHER } from "@/lib/chart-colors"
 import { apiFetchBlob, ApiError } from "@/lib/api"
-import { formatMoney, toISODate } from "@/lib/format"
+import { formatMoney, parseAmount, toISODate } from "@/lib/format"
 import {
   useAccounts,
   useCategories,
@@ -413,7 +413,7 @@ function EditForm({
   const [date, setDate] = useState(transaction.date)
   const [note, setNote] = useState(transaction.note ?? "")
 
-  const amount = Number(amountText.replace(",", ".")) || 0
+  const amount = parseAmount(amountText)
   const visibleCategories = useMemo(
     () =>
       categories.filter(
@@ -424,13 +424,15 @@ function EditForm({
   const effectiveAccountId =
     accountId ?? accounts.find((a) => a.kind === "debit")?.id ?? accounts[0]?.id
   const splitValues: TransactionSplit[] = splits
-    .filter((split) => split.categoryId && Number(split.amountText.replace(",", ".")) > 0)
-    .map((split) => ({ categoryId: split.categoryId, amount: Number(split.amountText.replace(",", ".")) }))
-  const remaining = Math.round((amount - splitValues.reduce((total, split) => total + split.amount, 0)) * 10_000) / 10_000
-  const canSave = amount > 0 && effectiveAccountId && date && (splitMode ? splitValues.length >= 2 && splitValues.length === splits.length && remaining === 0 : categoryId !== null)
+    .map((split) => ({ categoryId: split.categoryId, amount: parseAmount(split.amountText) }))
+    .filter((split): split is { categoryId: string; amount: number } =>
+      split.categoryId !== "" && split.amount !== null && split.amount > 0,
+    )
+  const remaining = amount === null ? null : Math.round((amount - splitValues.reduce((total, split) => total + split.amount, 0)) * 10_000) / 10_000
+  const canSave = amount !== null && amount > 0 && effectiveAccountId && date && (splitMode ? splitValues.length >= 2 && splitValues.length === splits.length && remaining === 0 : categoryId !== null)
 
   function save() {
-    if (!canSave || !categoryId || !effectiveAccountId) return
+    if (!canSave || amount === null || !categoryId || !effectiveAccountId) return
     updateTransaction.mutate(
       {
         id: transaction.id,
@@ -502,18 +504,23 @@ function EditForm({
       </DrawerHeader>
 
       {/* Monto */}
-      <div className="flex items-baseline justify-center gap-1">
-        <span className="text-2xl font-semibold text-muted-foreground">$</span>
-        <input
-          inputMode="decimal"
-          placeholder="0"
-          value={amountText}
-          onChange={(e) =>
-            setAmountText(e.target.value.replace(/[^0-9.,]/g, ""))
-          }
-          className="tnum w-48 bg-transparent text-center text-5xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40"
-          aria-label="Monto"
-        />
+      <div className="flex flex-col items-center">
+        <div className="flex items-baseline justify-center gap-1">
+          <span className="text-2xl font-semibold text-muted-foreground">$</span>
+          <input
+            inputMode="decimal"
+            placeholder="0"
+            value={amountText}
+            onChange={(e) =>
+              setAmountText(e.target.value.replace(/[^0-9.,]/g, ""))
+            }
+            className="tnum w-48 bg-transparent text-center text-5xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40"
+            aria-label="Monto"
+          />
+        </div>
+        {amount === null && amountText !== "" && (
+          <p className="text-[12px] font-medium text-expense">Escribe un monto válido</p>
+        )}
       </div>
 
       {/* Categorías */}
@@ -536,7 +543,7 @@ function EditForm({
             <input inputMode="decimal" value={split.amountText} onChange={(event) => setSplits((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, amountText: event.target.value.replace(/[^0-9.,]/g, "") } : row))} className="tnum w-24 rounded-lg bg-card px-2 text-[13px]" aria-label={`Monto de asignación ${index + 1}`} />
             {splits.length > 2 && <button type="button" onClick={() => setSplits((current) => current.filter((_, rowIndex) => rowIndex !== index))} aria-label="Quitar asignación">×</button>}
           </div>)}
-          <div className="flex justify-between text-[12px]"><button type="button" onClick={() => setSplits((current) => [...current, { categoryId: "", amountText: "" }])} className="font-semibold text-primary">+ Añadir categoría</button><span className={remaining === 0 ? "text-income" : "text-muted-foreground"}>Restante: {remaining.toFixed(2)}</span></div>
+          <div className="flex justify-between text-[12px]"><button type="button" onClick={() => setSplits((current) => [...current, { categoryId: "", amountText: "" }])} className="font-semibold text-primary">+ Añadir categoría</button><span className={remaining === 0 ? "text-income" : "text-muted-foreground"}>Restante: {remaining === null ? "—" : remaining.toFixed(2)}</span></div>
         </div> : <>
         <div className="grid grid-cols-4 gap-2">
           {visibleCategories.map((c) => {

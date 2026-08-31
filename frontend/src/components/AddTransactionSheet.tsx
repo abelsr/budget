@@ -20,7 +20,7 @@ import {
   useUploadAttachment,
 } from "@/lib/queries"
 import { springIndicator } from "@/lib/springs"
-import { toISODate } from "@/lib/format"
+import { parseAmount, toISODate } from "@/lib/format"
 import { useSnackbar } from "@/components/ui/snackbar"
 import { useOffline } from "@/lib/offline"
 import type { Frequency, Transaction, TransactionSplit, TransactionType } from "@/lib/types"
@@ -91,7 +91,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   const [file, setFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const amount = Number(amountText.replace(",", ".")) || 0
+  const amount = parseAmount(amountText)
   const visibleCategories = useMemo(
     () => categories.filter((c) => c.type === type && c.active),
     [categories, type],
@@ -101,15 +101,22 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
   const selectedAccount = accounts.find((a) => a.id === effectiveAccountId)
   const effectiveDestinationAccountId = destinationAccountId ?? accounts.find((a) => a.id !== effectiveAccountId)?.id
   const splitValues: TransactionSplit[] = splits
-    .filter((split) => split.categoryId && Number(split.amountText.replace(",", ".")) > 0)
-    .map((split) => ({ categoryId: split.categoryId, amount: Number(split.amountText.replace(",", ".")) }))
+    .map((split) => ({ categoryId: split.categoryId, amount: parseAmount(split.amountText) }))
+    .filter((split): split is { categoryId: string; amount: number } =>
+      split.categoryId !== "" && split.amount !== null && split.amount > 0,
+    )
   const assigned = splitValues.reduce((total, split) => total + split.amount, 0)
-  const remaining = Math.round((amount - assigned) * 10_000) / 10_000
-  const canSave = amount > 0 && effectiveAccountId && date && (type === "transfer"
-    ? Boolean(effectiveDestinationAccountId && effectiveDestinationAccountId !== effectiveAccountId)
-    : splitMode
-      ? splitValues.length === 2 && splitValues.length === splits.length && remaining === 0
-      : categoryId !== null)
+  const remaining = amount === null ? null : Math.round((amount - assigned) * 10_000) / 10_000
+  const canSave =
+    amount !== null &&
+    amount > 0 &&
+    effectiveAccountId &&
+    date &&
+    (type === "transfer"
+      ? Boolean(effectiveDestinationAccountId && effectiveDestinationAccountId !== effectiveAccountId)
+      : splitMode
+        ? splitValues.length === 2 && splitValues.length === splits.length && remaining === 0
+        : categoryId !== null)
   const isSaving = addTransaction.isPending || uploadAttachment.isPending
 
   // "Deshacer" tras el registro rápido: descarta del outbox si quedó sin
@@ -218,17 +225,22 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
           ))}
           </div>
 
-          <div className="flex items-baseline justify-center gap-1 py-2">
-            <span className="text-2xl font-semibold text-muted-foreground">$</span>
-            <input
-              autoFocus
-              inputMode="decimal"
-              placeholder="0.00"
-              value={amountText}
-              onChange={(e) => setAmountText(e.target.value.replace(/[^0-9.,]/g, ""))}
-              className="tnum w-56 bg-transparent text-center text-5xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40"
-              aria-label="Monto"
-            />
+          <div className="flex flex-col items-center py-2">
+            <div className="flex items-baseline justify-center gap-1">
+              <span className="text-2xl font-semibold text-muted-foreground">$</span>
+              <input
+                autoFocus
+                inputMode="decimal"
+                placeholder="0.00"
+                value={amountText}
+                onChange={(e) => setAmountText(e.target.value.replace(/[^0-9.,]/g, ""))}
+                className="tnum w-56 bg-transparent text-center text-5xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/40"
+                aria-label="Monto"
+              />
+            </div>
+            {amount === null && amountText !== "" && (
+              <p className="text-[12px] font-medium text-expense">Escribe un monto válido</p>
+            )}
           </div>
 
           {type !== "transfer" && <div className="space-y-2">
@@ -259,7 +271,7 @@ function AddTransactionForm({ onDone }: { onDone: () => void }) {
               ))}
               <div className="flex items-center justify-between text-[12px]">
                 <button type="button" onClick={() => setSplits((current) => [...current, { categoryId: "", amountText: "" }])} className="font-semibold text-primary">+ Añadir categoría</button>
-                <span className={remaining === 0 ? "text-income" : "text-muted-foreground"}>Restante: {remaining.toFixed(2)}</span>
+                <span className={remaining === 0 ? "text-income" : "text-muted-foreground"}>Restante: {remaining === null ? "—" : remaining.toFixed(2)}</span>
               </div>
             </div> : <div className="relative flex h-12 items-center gap-3 rounded-xl border border-border bg-card px-3">
               {selectedCategory ? (

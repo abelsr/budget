@@ -18,7 +18,7 @@ import { AnimatePresence, motion } from "motion/react"
 import { InviteLink } from "@/components/InviteLink"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth"
-import { formatMoney } from "@/lib/format"
+import { formatMoney, parseAmount } from "@/lib/format"
 import { useAccounts, useCreateAccount } from "@/lib/queries"
 import { springAppear, springDefault } from "@/lib/springs"
 import type { AccountKind } from "@/lib/types"
@@ -247,13 +247,15 @@ function AccountsStep() {
     setBalanceText("0")
   }
 
+  const balance = parseAmount(balanceText)
+
   function save() {
-    if (!name.trim() || createAccount.isPending) return
+    if (!name.trim() || balance === null || createAccount.isPending) return
     createAccount.mutate(
       {
         name: name.trim(),
         kind,
-        openingBalance: Number(balanceText.replace(",", ".")) || 0,
+        openingBalance: balance,
       },
       { onSuccess: reset },
     )
@@ -344,7 +346,7 @@ function AccountsStep() {
             </Button>
             <Button
               onClick={save}
-              disabled={!name.trim() || createAccount.isPending}
+              disabled={!name.trim() || balance === null || createAccount.isPending}
               className="pressable h-11 flex-1 rounded-xl text-[15px] font-semibold"
             >
               {createAccount.isPending ? "Guardando…" : "Agregar"}

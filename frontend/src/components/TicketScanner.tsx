@@ -23,6 +23,7 @@ import {
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { useAccounts, useAddTransaction, useCategories } from "@/lib/queries"
 import { ApiError } from "@/lib/api"
+import { parseAmount } from "@/lib/format"
 import { analyzeTicket, type TicketScanResult } from "@/lib/scan"
 import { springAppear } from "@/lib/springs"
 
@@ -483,23 +484,34 @@ function ReviewStep({
 
   const [amountText, setAmountText] = useState(String(result.total))
   const [note, setNote] = useState(result.merchant)
-  const [categoryId, setCategoryId] = useState(result.suggestedCategoryId)
+  // Elección explícita del usuario; null = todavía no eligió (usa la sugerencia).
+  const [categoryId, setCategoryId] = useState<string | null>(null)
   const [accountId, setAccountId] = useState<string | null>(null)
 
-  const amount = Number(amountText.replace(",", ".")) || 0
+  const amount = parseAmount(amountText)
   const expenseCategories = categories.filter((c) => c.type === "expense" && c.active)
+  // La IA puede sugerir una categoría inexistente o inactiva; solo se
+  // pre-selecciona si existe entre las categorías de gasto activas. Se deriva
+  // (no se fija en el estado) para que también aplique si las categorías
+  // cargan después de montar el paso de revisión.
+  const suggestedCategoryId =
+    expenseCategories.some((c) => c.id === result.suggestedCategoryId)
+      ? result.suggestedCategoryId
+      : null
+  const effectiveCategoryId = categoryId ?? suggestedCategoryId
   const effectiveAccountId =
     accountId ?? accounts.find((a) => a.kind === "debit")?.id ?? accounts[0]?.id
-  const canSave = amount > 0 && effectiveAccountId
+  const canSave =
+    amount !== null && amount > 0 && effectiveCategoryId !== null && effectiveAccountId
   const lowConfidence = result.confidence < 0.9
 
   function save() {
-    if (!canSave || !effectiveAccountId) return
+    if (!canSave || !effectiveAccountId || effectiveCategoryId === null) return
     addTransaction.mutate(
       {
         type: "expense",
         amount,
-        categoryId,
+        categoryId: effectiveCategoryId,
         accountId: effectiveAccountId,
         date: result.date,
         note: note.trim() || undefined,
@@ -543,6 +555,12 @@ function ReviewStep({
             aria-label="Monto"
           />
         </div>
+        {amount === null && (
+          <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-expense">
+            <TriangleAlert size={13} />
+            Escribe un monto válido
+          </p>
+        )}
         <p
           className={`mt-1 flex items-center gap-1.5 text-[11px] font-medium ${
             lowConfidence ? "text-expense" : "text-income"
@@ -556,7 +574,7 @@ function ReviewStep({
       <ReviewSelector label="Categoría sugerida">
         <div className="flex gap-2 overflow-x-auto py-1">
           {expenseCategories.map((c) => {
-            const selected = categoryId === c.id
+            const selected = effectiveCategoryId === c.id
             return (
               <button
                 key={c.id}

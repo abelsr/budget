@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/drawer"
 import { ApiError } from "@/lib/api"
 import { BANK_SUGGESTIONS } from "@/lib/brands"
+import { parseAmount } from "@/lib/format"
 import {
   useCreateAccount,
   useDeleteAccount,
@@ -85,9 +86,11 @@ function AccountForm({
     account?.paymentDueDays != null ? String(account.paymentDueDays) : "",
   )
   const [isPersonal, setIsPersonal] = useState(account?.isPersonal ?? false)
+  /** Segundo toque de la confirmación en dos pasos del checkbox "Cuenta personal". */
+  const [pendingPersonal, setPendingPersonal] = useState<boolean | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
-  const openingBalance = Number(balanceText.replace(",", ".")) || 0
+  const openingBalance = parseAmount(balanceText)
   const lastFourValid = lastFour === "" || /^\d{4}$/.test(lastFour)
   const statementDay = statementDayText === "" ? null : Number(statementDayText)
   const paymentDueDays = paymentDueDaysText === "" ? null : Number(paymentDueDaysText)
@@ -98,7 +101,33 @@ function AccountForm({
     createAccount.isPending ||
     updateAccount.isPending ||
     deleteAccount.isPending
-  const canSave = name.trim().length > 0 && lastFourValid && cycleValid && !isPending
+  const canSave =
+    name.trim().length > 0 &&
+    openingBalance !== null &&
+    lastFourValid &&
+    cycleValid &&
+    !isPending
+
+  /**
+   * Cambiar la visibilidad de una cuenta existente pide confirmación inline
+   * en dos pasos (mismo patrón que el borrado): el primer toque arma la
+   * confirmación y el segundo (botón "¿Seguro?") aplica el cambio.
+   */
+  function onPersonalChange() {
+    const next = !isPersonal
+    if (pendingPersonal !== null) return
+    if (account && next !== account.isPersonal) {
+      setPendingPersonal(next)
+      return
+    }
+    setIsPersonal(next)
+  }
+
+  function confirmPersonalChange() {
+    if (pendingPersonal === null) return
+    setIsPersonal(pendingPersonal)
+    setPendingPersonal(null)
+  }
 
   const error =
     createAccount.error ?? updateAccount.error ?? deleteAccount.error
@@ -110,12 +139,7 @@ function AccountForm({
         : null
 
   function save() {
-    if (!canSave) return
-    if (account && account.isPersonal !== isPersonal && !window.confirm(
-      isPersonal
-        ? "Esta cuenta dejará de ser visible para el hogar y ya no sumará a sus balances. ¿Continuar?"
-        : "Esta cuenta y sus movimientos volverán a ser visibles para todo el hogar. ¿Continuar?",
-    )) return
+    if (!canSave || openingBalance === null) return
     // The cycle fields only apply to credit cards; clearing them on a kind
     // change is what the backend requires (422 otherwise).
     const withCycle = kind === "credit"
@@ -233,13 +257,58 @@ function AccountForm({
             }
             className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none"
           />
+          {openingBalance === null && (
+            <p className="mt-1 text-[12px] text-expense">
+              Escribe un saldo válido (ej. 1,234.56).
+            </p>
+          )}
+        </div>
+
+        {/* Cuenta personal: al editar, cambiar la visibilidad pide confirmación
+            inline en dos pasos (mismo patrón que el borrado de la cuenta). */}
+        <div className="rounded-xl bg-secondary px-4 py-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={pendingPersonal ?? isPersonal}
+              disabled={pendingPersonal !== null}
+              onChange={onPersonalChange}
+              className="mt-0.5"
+              aria-label="Cuenta personal"
+            />
+            <span>
+              <span className="block text-[14px] font-medium">Cuenta personal</span>
+              <span className="block text-[12px] text-muted-foreground">Solo tú la verás y no suma al total del hogar.</span>
+            </span>
+          </label>
+          {pendingPersonal !== null && (
+            <div className="mt-2 space-y-2">
+              <p className="text-[12px] font-medium text-expense">
+                {pendingPersonal
+                  ? "Esta cuenta dejará de ser visible para el hogar y ya no sumará a sus balances."
+                  : "Esta cuenta y sus movimientos volverán a ser visibles para todo el hogar."}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={confirmPersonalChange}
+                  className="pressable flex-1 rounded-lg bg-expense/10 px-3 py-2 text-[13px] font-semibold text-expense"
+                >
+                  ¿Seguro? Toca para confirmar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingPersonal(null)}
+                  className="pressable rounded-lg bg-card px-3 py-2 text-[13px] font-semibold text-secondary-foreground"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Datos de tarjeta (opcional) — activan el widget tipo wallet */}
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-secondary px-4 py-3">
-          <input type="checkbox" checked={isPersonal} onChange={(event) => setIsPersonal(event.target.checked)} className="mt-0.5" />
-          <span><span className="block text-[14px] font-medium">Cuenta personal</span><span className="block text-[12px] text-muted-foreground">Solo tú la verás y no suma al total del hogar.</span></span>
-        </label>
         <div>
           <p id="account-card-details-label" className="mb-2 text-[13px] font-medium text-muted-foreground">
             Datos de tarjeta <span className="font-normal">(opcional)</span>
@@ -336,7 +405,7 @@ function AccountForm({
         )}
 
         {/* Vista previa del widget tipo wallet */}
-        {lastFour !== "" && (
+        {lastFour !== "" && openingBalance !== null && (
           <div>
             <p className="mb-2 text-[13px] font-medium text-muted-foreground">
               Vista previa

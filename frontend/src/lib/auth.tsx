@@ -8,7 +8,7 @@ import {
 } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 
-import { ApiError, apiFetch, getToken, setToken } from "@/lib/api"
+import { ApiError, apiFetch, getToken, setOnUnauthorized, setToken } from "@/lib/api"
 
 const SESSION_KEY = "ff-session"
 const SESSION_TOKEN_KEY = "ff-session-token"
@@ -105,6 +105,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  const logout = useCallback(() => {
+    void queryClient.cancelQueries()
+    queryClient.clear()
+    setToken(null)
+    storeSession(null)
+    setSession(null)
+  }, [queryClient])
+
+  // Un 401 con token vigente desloguea la UI (limpieza de estado +
+  // redirección a /login vía RequireAuth). logout() es idempotente: si api.ts
+  // ya borró el token, repetir setToken(null) no hace nada, y el callback
+  // solo se dispara una vez por 401 (guarda de token obsoleto en api.ts).
+  useEffect(() => {
+    setOnUnauthorized(logout)
+    return () => setOnUnauthorized(null)
+  }, [logout])
+
   // Restaurar sesión inicial
   useEffect(() => {
     if (!getToken()) {
@@ -118,13 +135,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setSession(me)
       })
       .catch((error) => {
-        // A network error must not log out an installed app: its cached query
-        // data remains readable until the server explicitly rejects the token.
-        if (error instanceof ApiError && error.status === 401) {
-          setToken(null)
-          storeSession(null)
-          if (!cancelled) setSession(null)
-        } else if (!cancelled) {
+        // Un 401 ya deslogueó la UI vía onUnauthorized (api.ts: token + sesión
+        // + redirección a /login), así que aquí solo queda cerrar el loading.
+        // Un error de red NO debe desloguear una app instalada: sus datos en
+        // cache siguen legibles hasta que el servidor rechace el token.
+        if (!(error instanceof ApiError && error.status === 401) && !cancelled) {
           setSession(getStoredSession())
         }
       })
@@ -238,14 +253,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     [],
   )
-
-  const logout = useCallback(() => {
-    void queryClient.cancelQueries()
-    queryClient.clear()
-    setToken(null)
-    storeSession(null)
-    setSession(null)
-  }, [queryClient])
 
   return (
     <AuthContext.Provider

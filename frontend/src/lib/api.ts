@@ -18,6 +18,32 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY)
 }
 
+/**
+ * Callback de no-autorización: se invoca cuando una respuesta 401 corresponde
+ * al token vigente (ver la guarda de token obsoleto en `apiFetch`). El
+ * AuthProvider lo registra para desloguear la UI (limpieza de estado +
+ * redirección a /login); sin él el token se limpiaba en silencio y la app
+ * seguía mostrando sesión activa con un token muerto.
+ */
+let onUnauthorizedCallback: (() => void) | null = null
+
+export function setOnUnauthorized(callback: (() => void) | null) {
+  onUnauthorizedCallback = callback
+}
+
+/**
+ * Limpia el token y notifica al AuthProvider SOLO si el 401 corresponde a la
+ * sesión vigente: la petición debe haber enviado un token y ese token debe
+ * seguir siendo el actual. Así un 401 en vuelo de la sesión anterior (p. ej.
+ * /auth/me con token caducado) o de una petición sin token no borra el token
+ * de un re-login que acabe de completar.
+ */
+function handleUnauthorized(sentToken: string | null) {
+  if (sentToken === null || getToken() !== sentToken) return
+  setToken(null)
+  onUnauthorizedCallback?.()
+}
+
 export class ApiError extends Error {
   status: number
   detail: unknown
@@ -58,7 +84,7 @@ export async function apiFetch<T>(
   }
 
   const res = await fetch(`/api${path}`, { ...fetchOptions, headers })
-  if (res.status === 401 && clearTokenOnUnauthorized) setToken(null) // sesión expirada
+  if (res.status === 401 && clearTokenOnUnauthorized) handleUnauthorized(token)
   if (!res.ok) throw await parseError(res)
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
@@ -71,7 +97,7 @@ export async function apiFetchBlob(path: string): Promise<Blob> {
   if (token) headers.set("Authorization", `Bearer ${token}`)
 
   const res = await fetch(`/api${path}`, { headers })
-  if (res.status === 401) setToken(null) // sesión expirada
+  if (res.status === 401) handleUnauthorized(token)
   if (!res.ok) throw await parseError(res)
   return res.blob()
 }
