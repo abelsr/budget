@@ -8,7 +8,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ApiError } from "@/lib/api"
 import { CHART_PALETTE_LIGHT } from "@/lib/chart-colors"
-import { formatMoney } from "@/lib/format"
+import { formatMoney, parseAmount } from "@/lib/format"
 import { useAccounts, useContributeToGoal, useCreateGoal, useDeleteGoal, useUpdateGoal } from "@/lib/queries"
 import type { SavingsGoal } from "@/lib/types"
 
@@ -17,10 +17,6 @@ const COLORS = [...CHART_PALETTE_LIGHT, "#0e7490", "#4f46e5", "#e11d48", "#64748
 
 function errorMessage(error: unknown) {
   return error instanceof ApiError ? error.message : "Ocurrió un error. Intenta de nuevo."
-}
-
-function parseAmount(value: string) {
-  return Number(value.replace(",", "."))
 }
 
 function cleanAmount(value: string) {
@@ -50,10 +46,10 @@ function GoalForm({ goal, onDone }: { goal?: SavingsGoal; onDone: () => void }) 
   const pending = createGoal.isPending || updateGoal.isPending || deleteGoal.isPending
   const target = parseAmount(targetAmount)
   const current = parseAmount(currentAmount || "0")
-  const canSave = name.trim().length > 0 && target > 0 && Number.isFinite(target) && Number.isFinite(current) && !pending
+  const canSave = name.trim().length > 0 && target !== null && target > 0 && current !== null && !pending
 
   function save() {
-    if (!canSave) return
+    if (!canSave || target === null || current === null) return
     setError(null)
     const input = { name: name.trim(), targetAmount: target, targetDate: targetDate || null, accountId: accountId || null, icon, color, planPaused }
     if (editing) updateGoal.mutate({ id: goal.id, ...input }, { onSuccess: onDone, onError: (err) => setError(errorMessage(err)) })
@@ -89,8 +85,8 @@ export function SavingsGoalContributionSheet({ open, onOpenChange, goal }: { ope
   const [amount, setAmount] = useState("")
   const [error, setError] = useState<string | null>(null)
   const parsed = parseAmount(amount)
-  const canSubmit = Boolean(goal) && parsed !== 0 && Number.isFinite(parsed) && !contribute.isPending
-  function submit() { if (!goal || !canSubmit) return; setError(null); contribute.mutate({ id: goal.id, amount: parsed }, { onSuccess: () => onOpenChange(false), onError: (err) => setError(errorMessage(err)) }) }
+  const canSubmit = Boolean(goal) && parsed !== null && parsed !== 0 && !contribute.isPending
+  function submit() { if (!goal || !canSubmit || parsed === null) return; setError(null); contribute.mutate({ id: goal.id, amount: parsed }, { onSuccess: () => onOpenChange(false), onError: (err) => setError(errorMessage(err)) }) }
   return <Drawer open={open} onOpenChange={onOpenChange} showSwipeHandle><DrawerContent className="mx-auto max-w-lg">{open && <form className="flex flex-col gap-5 px-5 pb-8" onSubmit={(event) => { event.preventDefault(); submit() }}><DrawerHeader className="p-0 pt-2"><DrawerTitle className="text-center text-[17px] font-semibold">Aportar a {goal?.name}</DrawerTitle></DrawerHeader><p className="text-[13px] text-muted-foreground">Usa un monto negativo para retirar de la meta. Esto no crea un movimiento.</p><Field label="Monto"><input autoFocus inputMode="decimal" value={amount} onChange={(event) => setAmount(cleanAmount(event.target.value))} placeholder="0.00" className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none" /></Field>{error && <p className="rounded-xl bg-expense/10 px-3 py-2 text-[13px] text-expense">{error}</p>}<Button size="lg" type="submit" disabled={!canSubmit} className="pressable h-12 rounded-2xl text-[16px] font-semibold">Registrar aporte</Button></form>}</DrawerContent></Drawer>
 }
 

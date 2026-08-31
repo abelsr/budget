@@ -11,6 +11,7 @@ import {
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { MonthPicker } from "@/components/ui/month-picker"
 import { ApiError } from "@/lib/api"
+import { parseAmount } from "@/lib/format"
 import {
   useBudgets,
   useCategories,
@@ -91,10 +92,14 @@ function BudgetForm({
 
   const isPending =
     createBudget.isPending || updateBudget.isPending || deleteBudget.isPending
-  const parsedAmount = Number(amount)
+  const parsedAmount = parseAmount(amount)
   const selectedCategoryIsAvailable = isEditing || availableCategories.some((c) => c.id === categoryId)
   const canSave =
-    categoryId !== "" && selectedCategoryIsAvailable && parsedAmount > 0 && !isPending && !Number.isNaN(parsedAmount)
+    categoryId !== "" &&
+    selectedCategoryIsAvailable &&
+    parsedAmount !== null &&
+    parsedAmount > 0 &&
+    !isPending
 
   function onError(err: unknown) {
     setError(
@@ -105,7 +110,7 @@ function BudgetForm({
   }
 
   function save() {
-    if (!canSave) return
+    if (!canSave || parsedAmount === null) return
     setError(null)
     if (isEditing) {
       updateBudget.mutate(
@@ -214,6 +219,9 @@ function BudgetForm({
           className="tnum w-full rounded-xl bg-secondary px-4 py-2.5 text-[15px] outline-none placeholder:text-muted-foreground"
           aria-label="Límite mensual"
         />
+        {parsedAmount === null && amount.trim() !== "" && (
+          <p className="mt-1 text-[12px] text-expense">Escribe un monto válido.</p>
+        )}
       </div>
 
       <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-secondary px-4 py-3 text-[13px]">
