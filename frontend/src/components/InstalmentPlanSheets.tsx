@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/drawer"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ApiError } from "@/lib/api"
+import { addMonthsClamped } from "@/lib/datetime"
 import { formatMoney } from "@/lib/format"
 import {
   useAccounts,
@@ -33,9 +34,7 @@ function formatDueDate(iso: string) {
 /** Default first due date: the card's next payment date, or purchase + 1 month. */
 function defaultFirstDueDate(account: Account | undefined, transaction: Transaction) {
   if (account?.nextPaymentDueDate) return account.nextPaymentDueDate
-  const base = new Date(`${transaction.date}T12:00:00`)
-  base.setMonth(base.getMonth() + 1)
-  return base.toISOString().slice(0, 10)
+  return addMonthsClamped(transaction.date, 1)
 }
 
 export function InstalmentPlanCreateSheet({
