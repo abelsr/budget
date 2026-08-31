@@ -1,10 +1,8 @@
 import pytest
 from datetime import date, datetime, timedelta, timezone
 
-import jwt
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models import (
     Account,
     Attachment,
@@ -18,6 +16,7 @@ from app.models import (
     User,
 )
 from app.services import housekeeping
+from tests.helpers import auth_headers as _headers
 
 
 @pytest.fixture(autouse=True)
@@ -25,15 +24,6 @@ def _reset_purge_guard():
     housekeeping.reset_purge_guard()
     yield
     housekeeping.reset_purge_guard()
-
-
-def _headers(user: User) -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-    return {"Authorization": f"Bearer {token}"}
 
 
 def _setup(session: Session) -> tuple[dict, str, str, str, str]:

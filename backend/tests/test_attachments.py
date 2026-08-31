@@ -1,25 +1,15 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 
-import jwt
 import pytest
 
-from app.config import settings
-from app.models import Account, Attachment, Category, Household, Transaction, User
+from app.models import Attachment, Transaction
 from app.services import storage
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\nfake-png-content"
 
 
-def make_token(user: User) -> str:
-    return jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-
-
 @pytest.fixture(name="world")
-def world_fixture(session, monkeypatch):
+def world_fixture(session, world_factory, monkeypatch):
     """Dos hogares, cada uno con usuario, cuenta, categoría y transacción.
     Sustituye el storage S3 por un fake en memoria (dict)."""
     store: dict[str, bytes] = {}
@@ -39,62 +29,31 @@ def world_fixture(session, monkeypatch):
     monkeypatch.setattr(storage, "get_attachment", fake_get)
     monkeypatch.setattr(storage, "delete_attachment", fake_delete)
 
-    u1 = User(
-        email="uno@example.com",
-        hashed_password="x",
-        name="Uno",
+    world = world_factory(
+        accounts=(
+            {"household": 1, "name": "Efectivo", "kind": "cash"},
+            {"household": 2, "name": "Efectivo", "kind": "cash"},
+        ),
+        categories=(
+            {"household": 1, "name": "Comida", "icon": "utensils", "color": "#30b0c7", "type": "expense"},
+            {"household": 2, "name": "Comida", "icon": "utensils", "color": "#30b0c7", "type": "expense"},
+        ),
     )
-    u2 = User(
-        email="dos@example.com",
-        hashed_password="x",
-        name="Dos",
-    )
-    session.add_all([u1, u2])
-    session.flush()
-    h1 = Household(name="Hogar Uno", owner_id=u1.id)
-    h2 = Household(name="Hogar Dos", owner_id=u2.id)
-    session.add_all([h1, h2])
-    session.flush()
-    u1.household_id = h1.id
-    u2.household_id = h2.id
-    session.commit()
-
-    txs = {}
-    for key, household, user in (("tx1", h1, u1), ("tx2", h2, u2)):
-        account = Account(household_id=household.id, name="Efectivo", kind="cash")
-        category = Category(
-            household_id=household.id,
-            name="Comida",
-            icon="utensils",
-            color="#30b0c7",
-            type="expense",
-        )
-        session.add_all([account, category])
-        session.commit()
+    for index in (0, 1):
         tx = Transaction(
-            household_id=household.id,
+            household_id=world[f"h{index + 1}"].id,
             type="expense",
             amount=10.0,
-            category_id=category.id,
-            account_id=account.id,
-            member_id=user.id,
+            category_id=world["categories"][index].id,
+            account_id=world["accounts"][index].id,
+            member_id=world[f"u{index + 1}"].id,
             date=date(2026, 7, 10),
         )
+        world[f"tx{index + 1}"] = tx
         session.add(tx)
         session.commit()
-        txs[key] = tx
-
-    return {
-        "h1": h1,
-        "h2": h2,
-        "u1": u1,
-        "u2": u2,
-        "tx1": txs["tx1"],
-        "tx2": txs["tx2"],
-        "headers1": {"Authorization": f"Bearer {make_token(u1)}"},
-        "headers2": {"Authorization": f"Bearer {make_token(u2)}"},
-        "store": store,
-    }
+    world["store"] = store
+    return world
 
 
 def upload(client, headers, tx_id, content=PNG_BYTES, filename="ticket.png", content_type="image/png"):

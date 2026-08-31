@@ -1,27 +1,17 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.models import Account, Household, Transaction, User
-from tests.test_core import create_account, create_category, make_headers
+from app.models import Account, Transaction, User
+from tests.helpers import auth_headers, create_account, create_category
 
 
 @pytest.fixture(name="world")
-def world_fixture(session):
-    first = User(email="offline-one@example.com", hashed_password="x", name="One")
-    second = User(email="offline-two@example.com", hashed_password="x", name="Two")
-    session.add_all([first, second])
-    session.flush()
-    first_household = Household(name="First", owner_id=first.id)
-    second_household = Household(name="Second", owner_id=second.id)
-    session.add_all([first_household, second_household])
-    session.flush()
-    first.household_id = first_household.id
-    second.household_id = second_household.id
-    session.commit()
-    return {
-        "headers1": make_headers(first),
-        "headers2": make_headers(second),
-    }
+def world_fixture(world_factory):
+    return world_factory(
+        emails=("offline-one@example.com", "offline-two@example.com"),
+        names=("One", "Two"),
+        household_names=("First", "Second"),
+    )
 
 
 def _payload(category_id: str, account_id: str, client_id: str) -> dict[str, object]:
@@ -109,16 +99,13 @@ def _add_household_member(session, world) -> tuple[User, dict[str, str]]:
     member = User(email="offline-member@example.com", hashed_password="x", name="Member")
     session.add(member)
     session.flush()
-    # The fixture intentionally only exposes headers; obtain the existing
-    # household from the transaction owner instead of duplicating fixture data.
-    owner = session.query(User).filter_by(email="offline-one@example.com").one()
-    member.household_id = owner.household_id
+    member.household_id = world["u1"].household_id
     session.commit()
-    return member, make_headers(member)
+    return member, auth_headers(member)
 
 
 def test_private_account_client_id_replay_is_not_disclosed(client, session, world):
-    owner = session.query(User).filter_by(email="offline-one@example.com").one()
+    owner = world["u1"]
     account = Account(household_id=owner.household_id, owner_id=owner.id, name="Privada", kind="cash")
     session.add(account)
     session.commit()
@@ -133,7 +120,7 @@ def test_private_account_client_id_replay_is_not_disclosed(client, session, worl
 
 
 def test_private_account_race_replay_is_not_disclosed(client, monkeypatch, session, world):
-    owner = session.query(User).filter_by(email="offline-one@example.com").one()
+    owner = world["u1"]
     account = Account(household_id=owner.household_id, owner_id=owner.id, name="Privada", kind="cash")
     session.add(account)
     session.commit()

@@ -1,35 +1,14 @@
-import jwt
 import pytest
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy.orm import Session
-
 from app.config import settings
 from app.models import Account, Category, Household, Invitation, Transaction, User
-
-
-def _auth_headers(user: User) -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-    return {"Authorization": f"Bearer {token}"}
+from tests.helpers import auth_headers as _auth_headers
+from tests.helpers import create_user as _make_user
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-def _make_user(session: Session, email: str, name: str) -> User:
-    user = User(
-        email=email,
-        hashed_password="x",
-        name=name,
-    )
-    session.add(user)
-    session.flush()
-    return user
 
 
 @pytest.fixture(name="setup_data")

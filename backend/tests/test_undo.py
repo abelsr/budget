@@ -1,19 +1,9 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
-import jwt
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models import Account, Category, Household, ReconciliationSession, Transaction, TransferGroup, User
-
-
-def _headers(user: User) -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-    return {"Authorization": f"Bearer {token}"}
+from tests.helpers import auth_headers as _headers
 
 
 def _setup(session: Session) -> tuple[dict, str, str, str]:
