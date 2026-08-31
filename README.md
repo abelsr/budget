@@ -153,8 +153,10 @@ another machine, and keep a copy of `.env` somewhere safe too (it holds
 
 ### Automating it
 
-**Host cron (recommended).** Nothing new to install, backups are owned by your
-user, and you get a real wall-clock schedule:
+The script runs **on the host** (it drives `docker compose exec` and
+`docker run` itself), so it is scheduled with the host's `cron`. Nothing new
+to install, the backups are owned by your user, and you get a real wall-clock
+schedule:
 
 ```bash
 crontab -e
@@ -162,19 +164,10 @@ crontab -e
 0 3 * * * /path/to/budget/scripts/backup.sh >> /path/to/budget/backups/backup.log 2>&1
 ```
 
-**Compose service (alternative).** A `backup` profile service that never
-starts by default:
-
-```bash
-docker compose --profile backup up -d backup
-docker compose logs -f backup
-```
-
-It runs one backup on startup and then every `BACKUP_INTERVAL_SECONDS`
-(default 86400), so it cannot target a wall-clock hour the way cron does. It
-also mounts the host Docker socket — any process in that container can control
-Docker on the host — and its artifacts are owned by `root`. Prefer host cron
-unless you specifically want the backup to travel with the compose stack.
+There is intentionally no compose service for this: a container that drives
+the Docker CLI would need the host Docker socket mounted, which would give any
+process in it control over the whole host. Host cron does the same job without
+that trade-off.
 
 ### Restoring a backup
 

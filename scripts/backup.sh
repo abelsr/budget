@@ -5,6 +5,11 @@
 #   pgdata     -> backups/pg-<timestamp>.sql.gz      (compressed pg_dump)
 #   minio_data -> backups/minio-<timestamp>.tar.gz   (tar of the raw volume)
 #
+# This script runs ON THE HOST (not inside a container): it drives the Docker
+# CLI (`docker compose exec` for the pg_dump, `docker run` for the MinIO
+# archive) and writes the artifacts to the host filesystem. It needs the
+# `docker` CLI with the compose plugin in PATH and the `db` service running.
+#
 # Usage:
 #   scripts/backup.sh
 #
@@ -68,9 +73,8 @@ mv "$PG_FILE.part" "$PG_FILE"
 
 # The tar is streamed to stdout instead of being written through a bind mount.
 # A `-v $BACKUP_DIR:/backup` mount is resolved by the *host* Docker daemon, so
-# it silently breaks when this script itself runs inside a container (the
-# optional `backup` compose service). Redirecting stdout always writes to the
-# filesystem the script sees.
+# it silently breaks when the script itself runs inside a container. Redirecting
+# stdout always writes to the filesystem the script sees, which is the host.
 log "archiving MinIO volume '$MINIO_VOLUME'"
 docker run --rm -v "$MINIO_VOLUME":/data:ro alpine tar cz -C /data . > "$MINIO_FILE.part"
 mv "$MINIO_FILE.part" "$MINIO_FILE"
