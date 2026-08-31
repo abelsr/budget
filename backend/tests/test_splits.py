@@ -1,21 +1,9 @@
 """A divided purchase remains one ledger movement with category allocations."""
 
-from datetime import datetime, timedelta, timezone
-
-import jwt
 import pytest
 
-from app.config import settings
 from app.models import Household, User
-
-
-def _headers(user: User) -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-    return {"Authorization": f"Bearer {token}"}
+from tests.helpers import auth_headers as _headers
 
 
 @pytest.fixture(name="split_world")

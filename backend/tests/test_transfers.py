@@ -1,7 +1,5 @@
 from app.models import Transaction, TransferGroup
-from tests.test_core import create_account, create_category, world_fixture
-
-world = world_fixture
+from tests.helpers import create_account, create_category
 
 
 def transfer_payload(source_id: str, destination_id: str, **overrides):

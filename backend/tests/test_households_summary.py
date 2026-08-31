@@ -1,35 +1,14 @@
-import jwt
 import pytest
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy.orm import Session
-
 from app.config import settings
 from app.models import Account, Category, Household, Invitation, Transaction, User
-
-
-def _auth_headers(user: User) -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-    return {"Authorization": f"Bearer {token}"}
+from tests.helpers import auth_headers as _auth_headers
+from tests.helpers import create_user as _make_user
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
-def _make_user(session: Session, email: str, name: str) -> User:
-    user = User(
-        email=email,
-        hashed_password="x",
-        name=name,
-    )
-    session.add(user)
-    session.flush()
-    return user
 
 
 @pytest.fixture(name="setup_data")
@@ -190,10 +169,68 @@ def test_only_owner_can_administer_invitations(client, session, setup_data, monk
     ).status_code == 204
     # SQLite no aplica bloqueos de fila; esta aserción conserva la intención de
     # serialización que se ejecuta como FOR UPDATE en PostgreSQL.
-    assert locked_queries
+    sqls = [s.compile(compile_kwargs={"literal_binds": False}).string.upper() for s in locked_queries]
+    assert any("FOR UPDATE" in sql for sql in sqls)
     assert client.delete(
         f"/households/me/invitations/{expired.id}", headers=_auth_headers(data["user"])
     ).status_code == 404
+
+
+def test_owner_lists_active_invitations(client, session, setup_data, freeze_time):
+    data = setup_data
+    owner_headers = _auth_headers(data["user"])
+    first = client.post("/households/me/invitations", headers=owner_headers)
+    assert first.status_code == 201
+    second = client.post("/households/me/invitations", headers=owner_headers)
+    assert second.status_code == 201
+
+    first_inv = session.query(Invitation).filter_by(token=first.json()["token"]).one()
+    second_inv = session.query(Invitation).filter_by(token=second.json()["token"]).one()
+    # created_at viene de func.now() (misma microsegunda); lo fijamos explícito
+    # para que el orden desc determinístico no dependa del reloj.
+    first_inv.created_at = _now()
+    second_inv.created_at = _now() + timedelta(seconds=1)
+    session.commit()
+
+    response = client.get("/households/me/invitations", headers=owner_headers)
+    assert response.status_code == 200
+    body = response.json()
+    # Orden creado más reciente primero (created_at desc, id desc).
+    assert [row["id"] for row in body] == [second_inv.id, first_inv.id]
+    assert body[0] == {
+        "id": second_inv.id,
+        "expiresAt": second_inv.expires_at.isoformat(),
+        "createdAt": second_inv.created_at.isoformat(),
+    }
+    assert body[1] == {
+        "id": first_inv.id,
+        "expiresAt": first_inv.expires_at.isoformat(),
+        "createdAt": first_inv.created_at.isoformat(),
+    }
+
+
+def test_owner_list_excludes_used_and_expired(client, session, setup_data, freeze_time):
+    data = setup_data
+    owner_headers = _auth_headers(data["user"])
+    assert client.post("/households/me/invitations", headers=owner_headers).status_code == 201
+    assert client.post("/households/me/invitations", headers=owner_headers).status_code == 201
+    invs = session.query(Invitation).filter_by(household_id=data["household"].id).all()
+    assert len(invs) == 2
+    # Una ya usada y otra expirada: ambas deben quedar fuera de la lista activa.
+    invs[0].used_at = _now()
+    invs[1].expires_at = _now() - timedelta(days=1)
+    session.commit()
+
+    response = client.get("/households/me/invitations", headers=owner_headers)
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_member_cannot_list_invitations(client, setup_data):
+    data = setup_data
+    response = client.get("/households/me/invitations", headers=_auth_headers(data["member2"]))
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Solo la persona propietaria puede administrar el hogar"
 
 
 def test_member_cannot_revoke_an_owner_invitation(client, session, setup_data):

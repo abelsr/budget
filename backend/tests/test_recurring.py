@@ -6,61 +6,27 @@ relativas a él (`today - timedelta(...)`), así no se vuelven rojos al cambiar
 el calendario.
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
-import jwt
 import pytest
 
-from app.config import settings
-from app.models import Account, Category, Household, RecurringRule, Transaction, User
+from app.models import RecurringRule, Transaction
 from app.services.recurring import advance, materialize_due, next_future_run
 
 
-def make_headers(user: User) -> dict[str, str]:
-    token = jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-    return {"Authorization": f"Bearer {token}"}
-
-
 @pytest.fixture(name="world")
-def world_fixture(session):
+def world_fixture(world_factory):
     """Dos hogares con cuenta y categoría propias, para probar aislamiento."""
-    u1 = User(email="uno@example.com", hashed_password="x", name="Uno")
-    u2 = User(email="dos@example.com", hashed_password="x", name="Dos")
-    session.add_all([u1, u2])
-    session.flush()
-    h1 = Household(name="Hogar Uno", owner_id=u1.id)
-    h2 = Household(name="Hogar Dos", owner_id=u2.id)
-    session.add_all([h1, h2])
-    session.flush()
-    u1.household_id = h1.id
-    u2.household_id = h2.id
-    session.commit()
-    a1 = Account(household_id=h1.id, name="Débito", kind="debit", opening_balance=100)
-    a2 = Account(household_id=h2.id, name="Débito", kind="debit", opening_balance=0)
-    c1 = Category(
-        household_id=h1.id, name="Casa", icon="home", color="#30b0c7", type="expense"
+    return world_factory(
+        accounts=(
+            {"household": 1, "name": "Débito", "kind": "debit", "opening_balance": 100},
+            {"household": 2, "name": "Débito", "kind": "debit", "opening_balance": 0},
+        ),
+        categories=(
+            {"household": 1, "name": "Casa", "icon": "home", "color": "#30b0c7", "type": "expense"},
+            {"household": 2, "name": "Casa", "icon": "home", "color": "#30b0c7", "type": "expense"},
+        ),
     )
-    c2 = Category(
-        household_id=h2.id, name="Casa", icon="home", color="#30b0c7", type="expense"
-    )
-    session.add_all([a1, a2, c1, c2])
-    session.commit()
-    return {
-        "h1": h1,
-        "h2": h2,
-        "u1": u1,
-        "u2": u2,
-        "account1": a1,
-        "category1": c1,
-        "account2": a2,
-        "category2": c2,
-        "headers1": make_headers(u1),
-        "headers2": make_headers(u2),
-    }
 
 
 def make_rule(session, world, **overrides) -> RecurringRule:
@@ -71,7 +37,7 @@ def make_rule(session, world, **overrides) -> RecurringRule:
         "household_id": world["h1"].id,
         "type": "expense",
         "amount": 30,
-        "category_id": world["category1"].id,
+        "category_id": world["categories"][0].id,
         "account_id": world["account1"].id,
         "created_by_id": world["u1"].id,
         "frequency": frequency,
@@ -90,7 +56,7 @@ def create_rule_via_api(client, headers, world, **overrides):
     payload = {
         "type": "expense",
         "amount": 30.0,
-        "categoryId": world["category1"].id,
+        "categoryId": world["categories"][0].id,
         "accountId": world["account1"].id,
         "frequency": "monthly",
         "nextRunDate": date.today().isoformat(),
@@ -354,7 +320,7 @@ def test_crear_transaccion_con_repeat_crea_la_regla_ligada(client, world):
         json={
             "type": "expense",
             "amount": 1200.0,
-            "categoryId": world["category1"].id,
+            "categoryId": world["categories"][0].id,
             "accountId": world["account1"].id,
             "date": date.today().isoformat(),
             "note": "Renta",
@@ -385,7 +351,7 @@ def test_crear_transaccion_sin_repeat_no_crea_regla(client, world):
         json={
             "type": "expense",
             "amount": 10.0,
-            "categoryId": world["category1"].id,
+            "categoryId": world["categories"][0].id,
             "accountId": world["account1"].id,
             "date": date.today().isoformat(),
         },
@@ -402,7 +368,7 @@ def test_validaciones_de_la_regla(client, world):
     base = {
         "type": "expense",
         "amount": 30.0,
-        "categoryId": world["category1"].id,
+        "categoryId": world["categories"][0].id,
         "accountId": world["account1"].id,
         "frequency": "monthly",
         "nextRunDate": date.today().isoformat(),
@@ -426,7 +392,7 @@ def test_validaciones_de_la_regla(client, world):
 
     resp = client.post(
         "/recurring-rules",
-        json={**base, "categoryId": world["category2"].id},
+        json={**base, "categoryId": world["categories"][1].id},
         headers=headers,
     )
     assert resp.status_code == 404

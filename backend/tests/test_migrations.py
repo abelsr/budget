@@ -31,18 +31,37 @@ from app.db_bootstrap import INITIAL_REVISION, alembic_config
 
 ADMIN_URL = os.environ.get("MIGRATIONS_TEST_DATABASE_URL")
 
-# En CI, saltarse estos tests sería un falso verde: el job los pide con
-# MIGRATIONS_TEST_REQUIRED=1 y sin base preferimos que reviente al recolectar.
-if not ADMIN_URL and os.environ.get("MIGRATIONS_TEST_REQUIRED") == "1":
-    raise RuntimeError(
-        "MIGRATIONS_TEST_REQUIRED=1 pero falta MIGRATIONS_TEST_DATABASE_URL: "
-        "el servicio de Postgres no llegó."
-    )
+pytestmark = [
+    pytest.mark.skipif(
+        not ADMIN_URL,
+        reason="requiere MIGRATIONS_TEST_DATABASE_URL apuntando a un Postgres",
+    ),
+    pytest.mark.db,
+]
 
-pytestmark = pytest.mark.skipif(
-    not ADMIN_URL,
-    reason="requiere MIGRATIONS_TEST_DATABASE_URL apuntando a un Postgres",
-)
+
+def _require_migrations_db() -> None:
+    """En CI, saltarse estos tests sería un falso verde: el job los pide con
+    MIGRATIONS_TEST_REQUIRED=1 y sin base preferimos que revienten en vez de
+    saltarse. No vive al importar (para que `-m "not db"` / `--skip-db` puedan
+    excluir el módulo sin que el import falle). El guard de verdad está en el
+    hook de colección de conftest.py: un fixture de module scope NO se ejecuta
+    cuando todos los tests quedan skipif-skipped, que es justo el caso de
+    falso verde."""
+    if not ADMIN_URL and os.environ.get("MIGRATIONS_TEST_REQUIRED") == "1":
+        raise RuntimeError(
+            "MIGRATIONS_TEST_REQUIRED=1 pero falta MIGRATIONS_TEST_DATABASE_URL: "
+            "el servicio de Postgres no llegó."
+        )
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _require_migrations_db_fixture():
+    """Seam a nivel de módulo: corre cuando los tests del módulo se ejecutan.
+    El caso en que todos quedan skipif-skipped lo cubre el hook de colección
+    de conftest.py."""
+    _require_migrations_db()
+    yield
 
 #: Tablas de la aplicación, sin contar `alembic_version`.
 APP_TABLES = {

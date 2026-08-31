@@ -1,7 +1,5 @@
 from app.models import ReconciliationSession, Transaction
-from tests.test_core import create_account, create_category, create_transaction, world_fixture
-
-world = world_fixture
+from tests.helpers import create_account, create_category, create_transaction
 
 
 def _open(client, headers, account_id, balance=100, statement_date="2026-08-05"):

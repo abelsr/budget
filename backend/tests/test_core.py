@@ -1,94 +1,4 @@
-from datetime import datetime, timedelta, timezone
-
-import jwt
-import pytest
-
-from app.config import settings
-from app.models import Category, Household, User
-
-
-def make_token(user: User) -> str:
-    return jwt.encode(
-        {"sub": user.id, "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-    )
-
-
-def make_headers(user: User) -> dict[str, str]:
-    return {"Authorization": f"Bearer {make_token(user)}"}
-
-
-@pytest.fixture(name="world")
-def world_fixture(session):
-    """Dos hogares, cada uno con un usuario y una categoría."""
-    u1 = User(
-        email="uno@example.com",
-        hashed_password="x",
-        name="Uno",
-    )
-    u2 = User(
-        email="dos@example.com",
-        hashed_password="x",
-        name="Dos",
-    )
-    session.add_all([u1, u2])
-    session.flush()
-    h1 = Household(name="Hogar Uno", owner_id=u1.id)
-    h2 = Household(name="Hogar Dos", owner_id=u2.id)
-    session.add_all([h1, h2])
-    session.flush()
-    u1.household_id = h1.id
-    u2.household_id = h2.id
-    session.commit()
-    c2 = Category(
-        household_id=h2.id,
-        name="Cat Ajena",
-        icon="tag",
-        color="#30b0c7",
-        type="expense",
-    )
-    session.add(c2)
-    session.commit()
-    return {
-        "h1": h1,
-        "h2": h2,
-        "u1": u1,
-        "u2": u2,
-        "headers1": make_headers(u1),
-        "headers2": make_headers(u2),
-        "foreign_category_id": c2.id,
-    }
-
-
-def create_category(client, headers, **overrides):
-    payload = {"name": "Comida", "icon": "utensils", "color": "#30b0c7", "type": "expense"}
-    payload.update(overrides)
-    resp = client.post("/categories", json=payload, headers=headers)
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
-def create_account(client, headers, **overrides):
-    payload = {"name": "Efectivo", "kind": "cash", "openingBalance": 100.0}
-    payload.update(overrides)
-    resp = client.post("/accounts", json=payload, headers=headers)
-    assert resp.status_code == 201, resp.text
-    return resp.json()
-
-
-def create_transaction(client, headers, category_id, account_id, **overrides):
-    payload = {
-        "type": "expense",
-        "amount": 10.0,
-        "categoryId": category_id,
-        "accountId": account_id,
-        "date": "2026-07-10",
-    }
-    payload.update(overrides)
-    resp = client.post("/transactions", json=payload, headers=headers)
-    assert resp.status_code == 201, resp.text
-    return resp.json()
+from tests.helpers import create_account, create_category, create_transaction
 
 
 # ---------- Cuentas ----------
@@ -386,13 +296,14 @@ def test_household_isolation(client, world):
 def test_transaction_with_foreign_category_returns_404(client, world):
     headers1 = world["headers1"]
     account = create_account(client, headers1)
+    foreign_category = create_category(client, world["headers2"], name="Cat Ajena")
 
     resp = client.post(
         "/transactions",
         json={
             "type": "expense",
             "amount": 10.0,
-            "categoryId": world["foreign_category_id"],
+            "categoryId": foreign_category["id"],
             "accountId": account["id"],
             "date": "2026-07-10",
         },
