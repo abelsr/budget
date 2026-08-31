@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: budget
       POSTGRES_PASSWORD: budget
@@ -14,7 +15,8 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required (see .env.example)}
@@ -31,6 +33,7 @@ services:
 
   backend:
     build: ./backend
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://budget:budget@db:5432/budget
       # production activa el fail fast de app/config.py: sin un JWT_SECRET
@@ -61,13 +64,39 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    # python:3.14-slim has no curl, so the check uses the stdlib urllib.
+    # 127.0.0.1 (not localhost): uvicorn binds 0.0.0.0 (IPv4 only). /health also
+    # runs `SELECT 1`, so "healthy" means the DB is reachable too.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     ports:
-      - "8000:8000"
+      # Bound to localhost: the frontend reaches the backend through the
+      # compose network (nginx.conf proxies /api to backend:8000), not the
+      # published host port.
+      - "127.0.0.1:8000:8000"
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1, not localhost: nginx listens on IPv4 only, and BusyBox wget
+      # resolves localhost to ::1 first, which would make a healthy container
+      # report unhealthy.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "8081:80"
 
