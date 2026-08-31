@@ -3,21 +3,29 @@ import warnings
 from datetime import datetime, timezone
 from typing import Annotated
 
+import jwt
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Request, Response, UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    decode_token_claims,
+    hash_password,
+    revoke_user_refresh_tokens,
+    verify_password,
+)
 from app.core.rate_limit import client_ip, limiter
 from app.config import settings
-from app.models import Account, Category, Household, Invitation, User, new_id
+from app.models import Account, Category, Household, Invitation, RefreshToken, User, new_id
 from app.schemas.auth import (
     ChangePasswordRequest,
     JoinRequest,
     LoginRequest,
     OnboardingRequest,
     ProfileUpdateRequest,
+    RefreshRequest,
     RegisterRequest,
     TokenResponse,
     UserResponse,
@@ -94,9 +102,10 @@ def register(
 
     # Cuenta inicial para que el hogar no arranque vacío
     db.add(Account(household_id=household.id, name="Efectivo", kind="cash"))
+    token = create_access_token(db, user.id)
     db.commit()
 
-    return TokenResponse(access_token=create_access_token(user.id))
+    return TokenResponse(access_token=token)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -108,7 +117,9 @@ def login(
     user = _get_user_by_email(db, body.email)
     if user is None or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-    return TokenResponse(access_token=create_access_token(user.id))
+    token = create_access_token(db, user.id)
+    db.commit()
+    return TokenResponse(access_token=token)
 
 
 def _user_response(user: User) -> UserResponse:
@@ -155,8 +166,47 @@ def change_password(
     if not verify_password(body.current_password, current_user.hashed_password):
         raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta")
     current_user.hashed_password = hash_password(body.new_password)
+    # A password change voids every outstanding session (including this
+    # device: it must log in again). Legacy tokens without a jti cannot be
+    # revoked and simply live out their JWT exp.
+    revoke_user_refresh_tokens(db, current_user.id)
     db.commit()
     return Response(status_code=204)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(
+    db: DbDep,
+    body: Annotated[RefreshRequest, Body()],
+    _: Annotated[None, Depends(_limit_login)],
+):
+    """Renames an expired-but-not-revoked access token.
+
+    The presented token is decoded with ``verify_exp=False``: it may be past
+    its 15-minute life (that is the point), but it must be unrevoked and
+    inside the 30-day refresh window. On success the old token is rotated
+    (revoked) and a fresh one returned; replaying the old token then fails,
+    so a stolen token is a single-use credential once renewed.
+    """
+    try:
+        payload = decode_token_claims(body.access_token, verify_exp=False)
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Token inválido") from None
+    jti = payload.get("jti")
+    if jti is None:
+        # Legacy tokens cannot be renewed: they predate the revocation table.
+        raise HTTPException(status_code=401, detail="Token inválido")
+    row = db.scalar(select(RefreshToken).where(RefreshToken.jti == jti).with_for_update())
+    now = _now()
+    if row is None or row.revoked_at is not None or row.expires_at <= now:
+        raise HTTPException(status_code=401, detail="Token revocado o caducado")
+    user = db.get(User, payload["sub"])
+    if user is None:
+        raise HTTPException(status_code=401, detail="Token inválido")
+    row.revoked_at = now  # rotation: the presented token is now a spent credential
+    token = create_access_token(db, user.id)
+    db.commit()
+    return TokenResponse(access_token=token)
 
 
 def _avatar_key(user: User) -> str:
@@ -348,7 +398,9 @@ def join(
         onboarding_completed_at=now,
     )
     db.add(user)
+    db.flush()  # user.id (default) is needed by create_access_token
     invitation.used_at = now
+    token = create_access_token(db, user.id)
     db.commit()
 
-    return TokenResponse(access_token=create_access_token(user.id))
+    return TokenResponse(access_token=token)

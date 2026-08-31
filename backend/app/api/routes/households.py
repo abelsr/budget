@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DbDep
 from app.config import settings
+from app.core.security import revoke_user_refresh_tokens
 from app.models import Account, Household, Invitation, User
 from app.schemas.households import (
     ActiveInvitationResponse,
@@ -163,5 +164,8 @@ def remove_member(member_id: str, db: DbDep, user: CurrentUserDep) -> None:
         raise HTTPException(status_code=409, detail="La persona propietaria no puede eliminarse del hogar")
     if db.scalar(select(Account.id).where(Account.owner_id == member.id).limit(1)):
         raise HTTPException(status_code=409, detail="No se puede expulsar a una persona con cuentas personales")
+    # An expelled member's sessions die with the expulsion: their tokens are
+    # revoked so a stolen/expelled credential stops working immediately.
+    revoke_user_refresh_tokens(db, member.id)
     member.household_id = None
     db.commit()

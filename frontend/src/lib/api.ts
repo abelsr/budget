@@ -44,6 +44,45 @@ function handleUnauthorized(sentToken: string | null) {
   onUnauthorizedCallback?.()
 }
 
+/**
+ * Renovación silenciosa: a un 401 con token vigente se le intenta UN refresh
+ * (`POST /auth/refresh` con el token ya caducado pero no revocado). Si el
+ * backend lo rota, se guarda el token nuevo y la petición original se reenvía
+ * una sola vez; si no (revocado / sin jti / sin red), se desloguea.
+ *
+ * Usa `fetch` directo (no `apiFetch`) para no recursar: el refresh es el único
+ * 401 que se gestiona sin pasar por esta lógica. Una promesa compartida
+ * deduplica los 401 simultáneos (varias peticiones en vuelo caducan a la vez
+ * y solo dispara un refresh).
+ */
+let inFlightRefresh: Promise<string | null> | null = null
+
+function silentRefresh(expiredToken: string): Promise<string | null> {
+  if (inFlightRefresh) return inFlightRefresh
+  inFlightRefresh = (async () => {
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: expiredToken }),
+      })
+      if (res.status !== 200) return null
+      const body = (await res.json()) as { accessToken?: string }
+      const fresh = body.accessToken
+      if (!fresh) return null
+      // Solo adopta el token nuevo si sigue siendo el de la sesión vigente:
+      // si hubo un login/logout en paralelo, no pisar su estado.
+      if (getToken() === expiredToken) setToken(fresh)
+      return fresh
+    } catch {
+      return null // sin red / fallo de parseo → tratar como no renovable
+    } finally {
+      inFlightRefresh = null
+    }
+  })()
+  return inFlightRefresh
+}
+
 export class ApiError extends Error {
   status: number
   detail: unknown
@@ -84,7 +123,24 @@ export async function apiFetch<T>(
   }
 
   const res = await fetch(`/api${path}`, { ...fetchOptions, headers })
-  if (res.status === 401 && clearTokenOnUnauthorized) handleUnauthorized(token)
+  if (res.status === 401 && clearTokenOnUnauthorized) {
+    // Renovación silenciosa: un token caducado pero no revocado se renueva y
+    // la petición se reenvía UNA vez con el token nuevo.
+    if (token) {
+      const fresh = await silentRefresh(token)
+      if (fresh && getToken() === fresh) {
+        headers.set("Authorization", `Bearer ${fresh}`)
+        const retried = await fetch(`/api${path}`, { ...fetchOptions, headers })
+        if (retried.status === 401) {
+          handleUnauthorized(fresh) // el token nuevo tampoco pasó: sesión muerta
+        }
+        if (!retried.ok) throw await parseError(retried)
+        if (retried.status === 204) return undefined as T
+        return retried.json() as Promise<T>
+      }
+    }
+    handleUnauthorized(token) // sin renovar (revocado/legacy/fallo) → desloguear
+  }
   if (!res.ok) throw await parseError(res)
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
@@ -97,7 +153,19 @@ export async function apiFetchBlob(path: string): Promise<Blob> {
   if (token) headers.set("Authorization", `Bearer ${token}`)
 
   const res = await fetch(`/api${path}`, { headers })
-  if (res.status === 401) handleUnauthorized(token)
+  if (res.status === 401) {
+    if (token) {
+      const fresh = await silentRefresh(token)
+      if (fresh && getToken() === fresh) {
+        headers.set("Authorization", `Bearer ${fresh}`)
+        const retried = await fetch(`/api${path}`, { headers })
+        if (retried.status === 401) handleUnauthorized(fresh)
+        if (!retried.ok) throw await parseError(retried)
+        return retried.blob()
+      }
+    }
+    handleUnauthorized(token)
+  }
   if (!res.ok) throw await parseError(res)
   return res.blob()
 }
