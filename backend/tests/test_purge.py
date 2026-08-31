@@ -21,10 +21,10 @@ from app.services import housekeeping
 
 
 @pytest.fixture(autouse=True)
-def _reset_purge_guard(monkeypatch):
-    monkeypatch.setattr(housekeeping, "_last_purge_day", None)
+def _reset_purge_guard():
+    housekeeping.reset_purge_guard()
     yield
-    monkeypatch.setattr(housekeeping, "_last_purge_day", None)
+    housekeeping.reset_purge_guard()
 
 
 def _headers(user: User) -> dict[str, str]:

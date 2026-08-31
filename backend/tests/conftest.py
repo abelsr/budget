@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from freezegun import freeze_time as _freeze_time
@@ -63,3 +65,34 @@ def client_fixture(session: Session):
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
+
+
+def pytest_addoption(parser):
+    parser.addoption("--skip-db", action="store_true", default=False, help="Deselecciona los tests marcados @pytest.mark.db")
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config, items):
+    skip_db = config.getoption("--skip-db")
+    if skip_db:
+        skip = pytest.mark.skip(reason="--skip-db")
+        for item in items:
+            if "db" in item.keywords:
+                item.add_marker(skip)
+        return
+
+    # CI backstop: con MIGRATIONS_TEST_REQUIRED=1 y sin base, los tests de
+    # migraciones deben reventar en vez de saltarse (falso verde). Vive aquí y
+    # no al importar test_migrations.py para que `-m "not db"` / `--skip-db`
+    # puedan excluirlos sin que el import falle. Un fixture de module scope no
+    # sirve para esto: no se ejecuta cuando todos los tests quedan
+    # skipif-skipped, que es justo el caso de falso verde.
+    if (
+        os.environ.get("MIGRATIONS_TEST_REQUIRED") == "1"
+        and not os.environ.get("MIGRATIONS_TEST_DATABASE_URL")
+        and any("db" in item.keywords for item in items)
+    ):
+        raise RuntimeError(
+            "MIGRATIONS_TEST_REQUIRED=1 pero falta MIGRATIONS_TEST_DATABASE_URL: "
+            "el servicio de Postgres no llegó."
+        )

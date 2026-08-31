@@ -29,6 +29,12 @@ RETENTION_DAYS = 30
 _last_purge_day: date | None = None
 
 
+def reset_purge_guard() -> None:
+    """Resets the once-per-day guard. Public test seam; the global is private."""
+    global _last_purge_day
+    _last_purge_day = None
+
+
 def maybe_purge(db: Session) -> int:
     """Purge once per day per process; returns the number of purged rows."""
     global _last_purge_day
