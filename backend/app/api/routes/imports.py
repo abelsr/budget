@@ -5,7 +5,7 @@ import json
 import os
 import re
 from threading import Lock
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Annotated
 
@@ -509,7 +509,7 @@ def revert_batch(batch_id: str, db: DbDep, user: CurrentUserDep) -> ImportBatchO
     )]
     if conflicts:
         raise HTTPException(status_code=409, detail=ImportRevertConflictOut(conflicts=conflicts).model_dump(by_alias=True))
-    now = datetime.now()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     for row in rows:
         baseline = row.transaction_baseline
         conditions = [
