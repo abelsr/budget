@@ -1,11 +1,10 @@
 from typing import Annotated
 
-import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.core.security import get_current_user as _verify
 from app.database import get_db
 from app.models import User
 
@@ -18,8 +17,13 @@ def get_current_user(
     db: DbDep,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> User:
-    """Valida el JWT Bearer y regresa el usuario. Contrato del token:
-    {"sub": user.id, "exp": ...} firmado con settings.jwt_secret/algorithm."""
+    """Valida el JWT Bearer y regresa el usuario.
+
+    Contrato del token emitido por la app: ``{"sub", "exp", "jti"}`` firmado
+    con ``settings.jwt_secret/algorithm``; el ``jti`` debe corresponder a una
+    fila ``refresh_tokens`` no revocada. Tokens sin ``jti`` (pre-deploy /
+    fixtures) se aceptan solo sobre el JWT, hasta su ``exp``.
+    """
     unauthorized = HTTPException(
         status_code=401,
         detail="No autenticado o token inválido",
@@ -27,18 +31,7 @@ def get_current_user(
     )
     if credentials is None:
         raise unauthorized
-    try:
-        payload = jwt.decode(
-            credentials.credentials,
-            settings.jwt_secret,
-            algorithms=[settings.jwt_algorithm],
-        )
-        user_id = payload.get("sub")
-    except jwt.PyJWTError:
-        raise unauthorized from None
-    if not user_id:
-        raise unauthorized
-    user = db.get(User, user_id)
+    user = _verify(db, credentials.credentials)
     if user is None:
         raise unauthorized
     return user

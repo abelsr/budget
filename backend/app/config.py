@@ -15,7 +15,13 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "dev-secret-change-me"
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 24 * 30  # 30 días
+    #: Access tokens are short-lived; a 30-day token (the old default) lived a
+    #: month after a password change / member removal / device theft.
+    jwt_expire_minutes: int = 15
+    #: Window during which an expired access token can be renewed via
+    #: POST /auth/refresh (backed by the refresh_tokens table, one row per
+    #: issued token keyed by its jti).
+    refresh_token_expiry_days: int = 30
 
     # Process-local limits. Appropriate for the single-process self-host setup;
     # use a shared limiter before running multiple backend replicas.

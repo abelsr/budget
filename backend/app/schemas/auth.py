@@ -45,6 +45,10 @@ class TokenResponse(_CamelModel):
     token_type: str = "bearer"
 
 
+class RefreshRequest(_CamelModel):
+    access_token: str
+
+
 class UserResponse(_CamelModel):
     id: str
     email: str

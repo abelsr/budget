@@ -339,7 +339,7 @@ def test_profile_update_rejects_empty_and_invalid_values(client):
     )
 
 
-def test_change_password_requires_current_password_and_keeps_token_valid(client):
+def test_change_password_requires_current_password_and_revokes_old_sessions(client):
     token = _register(client).json()["accessToken"]
     wrong_current = "incorrecta"
     current = "password123"
@@ -368,7 +368,9 @@ def test_change_password_requires_current_password_and_keeps_token_valid(client)
         headers=_headers(token),
     )
     assert resp.status_code == 204
-    assert client.get("/auth/me", headers=_headers(token)).status_code == 200
+    # A password change voids the presenting session (its token had a jti and
+    # is now revoked); the device must log in again.
+    assert client.get("/auth/me", headers=_headers(token)).status_code == 401
     assert (
         client.post(
             "/auth/login", json={"email": "ana@example.com", "password": "password123"}
