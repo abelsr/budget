@@ -333,7 +333,19 @@ function AttachmentRow({ attachment }: { attachment: Attachment }) {
     try {
       const blob = await apiFetchBlob(`/attachments/${attachment.id}`)
       const url = URL.createObjectURL(blob)
-      window.open(url, "_blank")
+      // noopener: la pestaña no puede acceder a window.opener (issue #43).
+      window.open(url, "_blank", "noopener")
+      // revokeObjectURL: el blob queda en memoria (fuga) si no se libera; se
+      // revoca al cerrar la pestaña o a los 60 s como tope (issue #43, punto 4).
+      const fallback = window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      window.addEventListener(
+        "pagehide",
+        () => {
+          window.clearTimeout(fallback)
+          URL.revokeObjectURL(url)
+        },
+        { once: true },
+      )
     } catch (err) {
       console.error("Error al abrir el comprobante:", err)
     }
