@@ -35,11 +35,14 @@ function storeSession(session: Session | null) {
 /**
  * Autenticación contra el backend FastAPI.
  *
- * - El JWT lo persiste api.ts ("ff-token"); aquí solo se hidrata la sesión.
+ * - El JWT vive en una cookie httpOnly que gestiona el backend (issue #34);
+ *   api.ts solo persiste su identificador (jti) en "ff-token". Aquí se hidrata
+ *   la sesión.
  * - Al montar el provider, si hay token se llama GET /auth/me; si falla
  *   se limpia el token y la app queda deslogueada.
- * - login/register/join guardan el accessToken y luego hidratan la sesión
- *   con GET /auth/me. Los ApiError se propagan para que la página los muestre.
+ * - login/register/join guardan el tokenIdentifier (jti) devuelto y luego
+ *   hidratan la sesión con GET /auth/me. Los ApiError se propagan para que la
+ *   página los muestre.
  */
 
 export interface Session {
@@ -64,7 +67,7 @@ export interface ProfileUpdate {
 }
 
 interface TokenResponse {
-  accessToken: string
+  tokenIdentifier: string
   tokenType: string
 }
 
@@ -108,6 +111,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     void queryClient.cancelQueries()
     queryClient.clear()
+    // Borra la cookie httpOnly en el servidor (issue #34): el SPA no puede
+    // eliminarla solo. Fire-and-forget: aunque falle (offline), setToken(null)
+    // deja la UI deslogueada y el token expira en 15 min de todos modos.
+    void apiFetch<void>("/auth/logout", { method: "POST", clearTokenOnUnauthorized: false }).catch(
+      () => {},
+    )
     setToken(null)
     storeSession(null)
     setSession(null)
@@ -159,8 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear()
       storeSession(null)
       setSession(null)
-      const { accessToken } = await tokenRequest()
-      setToken(accessToken)
+      const { tokenIdentifier } = await tokenRequest()
+      setToken(tokenIdentifier)
       const me = await fetchMe()
       storeSession(me)
       setSession(me)
@@ -245,13 +254,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const changePassword = useCallback(
-    (currentPassword: string, newPassword: string) =>
-      apiFetch<void>("/auth/change-password", {
+    async (currentPassword: string, newPassword: string) => {
+      await apiFetch<void>("/auth/change-password", {
         method: "POST",
         body: JSON.stringify({ currentPassword, newPassword }),
         clearTokenOnUnauthorized: false,
-      }),
-    [],
+      })
+      // El cambio de contraseña revoca TODAS las sesiones (incluida esta) y
+      // borra la cookie httpOnly (issue #34): la sesión actual queda muerta,
+      // así que se desloguea para forzar un re-login con la nueva clave.
+      logout()
+    },
+    [logout],
   )
 
   return (

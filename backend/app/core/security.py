@@ -25,13 +25,17 @@ def verify_password(plain: str, hashed: str) -> bool:
     return password_hash.verify(plain, hashed)
 
 
-def create_access_token(db: Session, user_id: str) -> str:
+def create_access_token(db: Session, user_id: str) -> tuple[str, str]:
     """Signs a short-lived access token and records its revocation row.
+
+    Returns ``(token, jti)``.
 
     Payload: ``{"sub": user_id, "exp": now + jwt_expire_minutes, "jti": <uuid>}``.
     The ``jti`` keys the ``refresh_tokens`` row that lets ``/auth/refresh``
     renew the token within the refresh window and lets
-    ``revoke_user_refresh_tokens`` void it on password change / removal.
+    ``revoke_user_refresh_tokens`` void it on password change / removal. The
+    ``jti`` is also exposed to the frontend so the SPA can track its current
+    session without reading the JWT itself (issue #34, httpOnly cookie).
     """
     jti = uuid.uuid4().hex
     now = _utcnow()
@@ -44,7 +48,7 @@ def create_access_token(db: Session, user_id: str) -> str:
         )
     )
     db.flush()
-    return jwt.encode(
+    token = jwt.encode(
         {
             "sub": user_id,
             "exp": now + timedelta(minutes=settings.jwt_expire_minutes),
@@ -53,6 +57,7 @@ def create_access_token(db: Session, user_id: str) -> str:
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
+    return token, jti
 
 
 def decode_token_claims(token: str, *, verify_exp: bool = True) -> dict:

@@ -197,3 +197,126 @@ def test_refresh_window_expiry_revokes(client, session):
         assert client.get("/auth/me", headers=_headers(token)).status_code == 401
         resp = client.post("/auth/refresh", json={"accessToken": token})
         assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Issue #34: cookie httpOnly + token_identifier (jti) en la respuesta.
+# ---------------------------------------------------------------------------
+
+
+def _set_cookie_header(resp) -> str:
+    """Concatena los valores del header set-cookie (puede repetirse)."""
+    return "; ".join(resp.headers.get_list("set-cookie"))
+
+
+def test_register_returns_token_identifier_and_sets_cookie(client):
+    resp = client.post(
+        "/auth/register",
+        json={"email": "ana@example.com", "password": "password123", "name": "Ana", "householdName": "Hogar Ana"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    token = data["accessToken"]
+    # token_identifier expone el jti del token emitido (el SPA lo compara).
+    assert data["tokenIdentifier"]
+    payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    assert data["tokenIdentifier"] == payload["jti"]
+    # Cookie httpOnly con el JWT y atributos anti-XSS/CSRF (issue #34).
+    set_cookie = _set_cookie_header(resp)
+    assert "ff_token=" in set_cookie
+    assert "HttpOnly" in set_cookie
+    assert "SameSite=lax" in set_cookie
+    assert "Path=/" in set_cookie
+
+
+def test_cookie_authenticates_without_bearer_header(client):
+    data = _register(client)
+    token = data["accessToken"]
+    client.cookies.set(settings.session_cookie_name, token)
+    # Sin header Authorization: la cookie httpOnly autenticas sola.
+    resp = client.get("/auth/me")
+    assert resp.status_code == 200
+    assert resp.json()["email"] == "ana@example.com"
+
+
+def test_bearer_header_still_authenticates(client):
+    # Back-compat: el header Bearer sigue siendo la vía principal.
+    data = _register(client)
+    assert client.get("/auth/me", headers=_headers(data["accessToken"])).status_code == 200
+
+
+def test_login_sets_cookie(client):
+    _register(client)
+    resp = client.post("/auth/login", json={"email": "ana@example.com", "password": "password123"})
+    assert resp.status_code == 200
+    assert "ff_token=" in _set_cookie_header(resp)
+
+
+def test_refresh_reads_token_from_cookie_when_no_body(client):
+    # Issue #34: el SPA no puede leer el JWT (cookie httpOnly), así que el
+    # refresh toma el token del cookie, no del body.
+    with freeze_time(FROZEN, tz_offset=0):
+        data = _register(client)
+        token = data["accessToken"]
+        old_jti = data["tokenIdentifier"]
+    later = "2026-08-15 12:20:00"
+    with freeze_time(later, tz_offset=0):
+        client.cookies.set(settings.session_cookie_name, token)
+        resp = client.post("/auth/refresh")  # sin body
+        assert resp.status_code == 200
+        new = resp.json()
+        assert new["tokenIdentifier"] != old_jti
+        assert "ff_token=" in _set_cookie_header(resp)
+        # La cookie renovada (el token nuevo en la respuesta) autenticas.
+        client.cookies.set(settings.session_cookie_name, new["accessToken"])
+        assert client.get("/auth/me").status_code == 200
+        # El token viejo quedó rotado: ya no sirve.
+        client.cookies.set(settings.session_cookie_name, token)
+        assert client.get("/auth/me").status_code == 401
+
+
+def test_refresh_sets_cookie_and_new_identifier(client):
+    with freeze_time(FROZEN, tz_offset=0):
+        data = _register(client)
+        token = data["accessToken"]
+        old_jti = data["tokenIdentifier"]
+    later = "2026-08-15 12:20:00"
+    with freeze_time(later, tz_offset=0):
+        resp = client.post("/auth/refresh", json={"accessToken": token})
+        assert resp.status_code == 200
+        new = resp.json()
+        assert new["tokenIdentifier"] != old_jti  # rotación: jti distinto
+        assert "ff_token=" in _set_cookie_header(resp)
+
+
+def test_change_password_clears_cookie(client):
+    data = _register(client)
+    token = data["accessToken"]
+    resp = client.post(
+        "/auth/change-password",
+        json={"currentPassword": "password123", "newPassword": "nueva12345"},
+        headers=_headers(token),
+    )
+    assert resp.status_code == 204
+    # La cookie debe borrarse (max-age=0 / expires en el pasado).
+    set_cookie = _set_cookie_header(resp)
+    assert "ff_token" in set_cookie
+    assert "max-age=0" in set_cookie.lower()
+
+
+def test_logout_clears_cookie_and_revokes(client):
+    data = _register(client)
+    token = data["accessToken"]
+    client.cookies.set(settings.session_cookie_name, token)
+    # Mientras el token vive, /auth/me con la cookie funciona.
+    assert client.get("/auth/me").status_code == 200
+    # El SPA no envía Bearer (auth por cookie): el logout revoca por cookie.
+    resp = client.post("/auth/logout")
+    assert resp.status_code == 204
+    set_cookie = _set_cookie_header(resp)
+    assert "ff_token" in set_cookie
+    assert "max-age=0" in set_cookie.lower()
+    # El jti queda revocado: ni con header ni con cookie el token ya sirve.
+    assert client.get("/auth/me", headers=_headers(token)).status_code == 401
+    client.cookies.set(settings.session_cookie_name, token)
+    assert client.get("/auth/me").status_code == 401

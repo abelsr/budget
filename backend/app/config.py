@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     #: POST /auth/refresh (backed by the refresh_tokens table, one row per
     #: issued token keyed by its jti).
     refresh_token_expiry_days: int = 30
+    #: Session cookie carrying the JWT (issue #34). httpOnly + SameSite keep the
+    #: token out of JS reach (XSS can't read it). True only for HTTPS deploy.
+    session_cookie_name: str = "ff_token"
+    session_cookie_httponly: bool = True
+    session_cookie_secure: bool = False
+    session_cookie_samesite: str = "lax"
 
     # Process-local limits. Appropriate for the single-process self-host setup;
     # use a shared limiter before running multiple backend replicas.
