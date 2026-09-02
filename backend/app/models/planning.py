@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import Date, DateTime, CheckConstraint, ForeignKey, Index, JSON, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -13,7 +14,7 @@ class RecurringRule(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
     type: Mapped[str] = mapped_column(String(10))
-    amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    amount: Mapped[Decimal] = mapped_column(Numeric(19, 4))
     category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"))
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
     created_by_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
@@ -30,7 +31,7 @@ class Budget(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
     category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"))
-    amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    amount: Mapped[Decimal] = mapped_column(Numeric(19, 4))
     month: Mapped[date | None] = mapped_column(Date, nullable=True)
     rollover: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -47,8 +48,8 @@ class SavingsGoal(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
-    target_amount: Mapped[float] = mapped_column(Numeric(19, 4))
-    current_amount: Mapped[float] = mapped_column(Numeric(19, 4), default=0)
+    target_amount: Mapped[Decimal] = mapped_column(Numeric(19, 4))
+    current_amount: Mapped[Decimal] = mapped_column(Numeric(19, 4), default=0)
     target_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True, index=True)
     icon: Mapped[str] = mapped_column(String(60), default="piggy-bank")
@@ -95,8 +96,8 @@ class InstalmentPlan(Base):
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
     source_transaction_id: Mapped[str] = mapped_column(ForeignKey("transactions.id"))
     months: Mapped[int] = mapped_column()
-    total_amount: Mapped[float] = mapped_column(Numeric(19, 4))
-    monthly_amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(19, 4))
+    monthly_amount: Mapped[Decimal] = mapped_column(Numeric(19, 4))
     first_due_date: Mapped[date] = mapped_column(Date)
     paid_count: Mapped[int] = mapped_column(default=0, server_default="0")
     status: Mapped[str] = mapped_column(String(12), default="active", server_default="active")
