@@ -15,6 +15,10 @@ export type PendingTransaction = {
   createdAt: number
   attempts: number
   lastError?: string
+  /** Error 4xx del servidor: no tiene sentido reintentar (no es transitorio). */
+  permanent?: boolean
+  /** Timestamp de la próxima reintentación (backoff exponencial). */
+  retryAfter?: number
 }
 
 type OfflineState = {
@@ -23,7 +27,15 @@ type OfflineState = {
   queue: (input: SimpleTransaction) => Promise<Transaction>
   flush: () => Promise<void>
   discard: (clientId: string) => Promise<void>
+  retry: (clientId: string) => Promise<void>
   cacheUpdatedAt: number
+}
+
+const RETRY_BASE_MS = 30_000
+const RETRY_CAP_MS = 15 * 60_000
+
+function backoffMs(attempts: number): number {
+  return Math.min(RETRY_BASE_MS * 2 ** attempts, RETRY_CAP_MS)
 }
 
 const OfflineContext = createContext<OfflineState | null>(null)
@@ -90,6 +102,9 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
   const [online, setOnline] = useState(() => navigator.onLine)
   const [pending, setPending] = useState<PendingTransaction[]>([])
   const [cacheUpdatedAt, setCacheUpdatedAt] = useState(0)
+  // Evita que dos flush simultáneos (interval + focus + online) re-integren el
+  // mismo registro y lo dupliquen en el servidor (issue #35, punto 1).
+  const flushingRef = useRef(false)
 
   const refreshPending = useCallback(async () => {
     const userId = userIdRef.current
@@ -101,43 +116,83 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient])
 
   const flush = useCallback(async () => {
-    const userId = userIdRef.current
-    const token = getToken()
-    if (!navigator.onLine || !userId || !token) return
-    for (const entry of await readPending()) {
-      // Never submit an old user's mutation with a replacement token.
-      if (userIdRef.current !== userId || getToken() !== token) return
-      if (entry.userId !== userId) continue
-      if (entry.lastError) continue
-      try {
-        await apiFetch<Transaction>("/transactions", {
-          method: "POST",
-          body: JSON.stringify(entry.payload),
-        })
+    // Mutex: nunca dos flush en paralelo (issue #35 punto 1). Un segundo
+    // trigger (focus/online/interval) mientras uno está en curso lo salta, de
+    // modo que un mismo registro no se re-integra dos veces a la vez.
+    if (flushingRef.current) return
+    flushingRef.current = true
+    try {
+      const userId = userIdRef.current
+      const token = getToken()
+      if (!navigator.onLine || !userId || !token) return
+      const now = Date.now()
+      for (const entry of await readPending()) {
+        // Never submit an old user's mutation with a replacement token.
         if (userIdRef.current !== userId || getToken() !== token) return
-        const db = await dbPromise
-        await db.delete(STORE, entry.clientId)
-        queryClient.invalidateQueries({ queryKey: ["transactions"] })
-        queryClient.invalidateQueries({ queryKey: ["accounts"] })
-        queryClient.invalidateQueries({ queryKey: ["summary"] })
-        queryClient.invalidateQueries({ queryKey: ["budgets", "status"] })
-      } catch (error) {
-        if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+        if (entry.userId !== userId) continue
+        // Un 4xx del servidor no es transitorio: no tiene sentido reintentarlo
+        // (issue #35 punto 3). Queda visible en la UI para descartarse.
+        if (entry.permanent) continue
+        // Backoff exponencial entre reintentos (issue #35 punto 2).
+        if (entry.attempts > 0 && entry.retryAfter && now < entry.retryAfter) continue
+        try {
+          await apiFetch<Transaction>("/transactions", {
+            method: "POST",
+            body: JSON.stringify(entry.payload),
+          })
+          if (userIdRef.current !== userId || getToken() !== token) return
+          const db = await dbPromise
+          await db.delete(STORE, entry.clientId)
+          queryClient.invalidateQueries({ queryKey: ["transactions"] })
+          queryClient.invalidateQueries({ queryKey: ["accounts"] })
+          queryClient.invalidateQueries({ queryKey: ["summary"] })
+          queryClient.invalidateQueries({ queryKey: ["budgets", "status"] })
+        } catch (error) {
+          if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+            const db = await dbPromise
+            await db.put(STORE, {
+              ...entry,
+              attempts: entry.attempts + 1,
+              lastError: error.message,
+              permanent: true,
+            } satisfies PendingTransaction)
+            // Un 4xx no se arregla reintentando; pasa al siguiente registro.
+            continue
+          }
+          // 5xx o error de red: transitorio → se reintenta con backoff.
+          const attempts = entry.attempts + 1
           const db = await dbPromise
           await db.put(STORE, {
             ...entry,
-            attempts: entry.attempts + 1,
-            lastError: error.message,
+            attempts,
+            lastError: error instanceof Error ? error.message : String(error),
+            retryAfter: Date.now() + backoffMs(attempts),
           } satisfies PendingTransaction)
-          // A permanently invalid record must not prevent later records syncing.
-          continue
+          // Preserve ordering when the connection or server is unavailable.
+          break
         }
-        // Preserve ordering when the connection or server is unavailable.
-        break
       }
+    } finally {
+      flushingRef.current = false
     }
     await refreshPending()
   }, [queryClient, refreshPending])
+
+  // Reintento manual desde la UI (issue #35 punto 3): limpia el estado
+  // permanente/backoff de un registro y fuerza una flush inmediata.
+  const retry = useCallback(async (clientId: string) => {
+    const db = await dbPromise
+    const existing = await db.get(STORE, clientId)
+    if (existing) {
+      await db.put(STORE, {
+        ...existing,
+        permanent: false,
+        retryAfter: undefined,
+      } satisfies PendingTransaction)
+    }
+    await refreshPending()
+    await flush()
+  }, [flush, refreshPending])
 
   const queue = useCallback(async (input: SimpleTransaction) => {
     const userId = userIdRef.current
@@ -197,7 +252,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     if (session?.id) void flush()
   }, [flush, refreshPending, session?.id])
 
-  return <OfflineContext value={{ online, pending, queue, flush, discard, cacheUpdatedAt }}>{children}</OfflineContext>
+  return <OfflineContext value={{ online, pending, queue, flush, discard, retry, cacheUpdatedAt }}>{children}</OfflineContext>
 }
 
 export function useOffline() {
