@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, ForeignKeyConstraint, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,7 +22,7 @@ class Account(Base):
     owner_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(120))
     kind: Mapped[str] = mapped_column(String(20))
-    opening_balance: Mapped[float] = mapped_column(Numeric(19, 4), default=0)
+    opening_balance: Mapped[Decimal] = mapped_column(Numeric(19, 4), default=0)
     bank: Mapped[str | None] = mapped_column(String(60), nullable=True)
     card_brand: Mapped[str | None] = mapped_column(String(10), nullable=True)
     last_four: Mapped[str | None] = mapped_column(String(4), nullable=True)

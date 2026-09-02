@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, ForeignKeyConstraint, Index, JSON, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,7 +22,7 @@ class Transaction(Base):
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
     client_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     type: Mapped[str] = mapped_column(String(10))
-    amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    amount: Mapped[Decimal] = mapped_column(Numeric(19, 4))
     category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
     is_split: Mapped[bool] = mapped_column(default=False, server_default="false")
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
@@ -53,7 +54,7 @@ class TransactionSplit(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     transaction_id: Mapped[str] = mapped_column(ForeignKey("transactions.id", ondelete="CASCADE"), index=True)
     category_id: Mapped[str] = mapped_column(ForeignKey("categories.id"), index=True)
-    amount: Mapped[float] = mapped_column(Numeric(19, 4))
+    amount: Mapped[Decimal] = mapped_column(Numeric(19, 4))
 
     transaction: Mapped[Transaction] = relationship(back_populates="splits")
     category: Mapped["Category"] = relationship(lazy="joined")
@@ -66,7 +67,7 @@ class ReconciliationSession(Base):
     account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), index=True)
     household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), index=True)
     statement_date: Mapped[date] = mapped_column(Date)
-    statement_balance: Mapped[float] = mapped_column(Numeric(19, 4))
+    statement_balance: Mapped[Decimal] = mapped_column(Numeric(19, 4))
     status: Mapped[str] = mapped_column(String(12), default="open", server_default="open")
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_by_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
