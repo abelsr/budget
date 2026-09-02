@@ -10,7 +10,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, tuple_, update
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, DbDep
@@ -220,51 +220,75 @@ def _fingerprint(row: dict) -> str:
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
+def _batch_direct_duplicate_notes(
+    db, household_id: str, user_id: str, rows: list[dict]
+) -> dict[tuple, set[str]]:
+    """Para cada (fecha, |monto|) de las filas, las notas de transacciones ya
+    existentes con esa clave (issue #37: evita 1 query de duplicado por fila).
+    Devuelve {("2026-08-05", "500.0000"): {"nota1", ...}}; una fila no presente
+    en el mapa no tiene duplicado directo.
+    """
+    keys = {(row["date"].isoformat(), _canonical_amount(abs(row["amount"]))) for row in rows}
+    result: dict[tuple, set[str]] = {}
+    if not keys:
+        return result
+    matches = db.execute(select(Transaction.date, Transaction.amount, Transaction.note).join(Account).where(
+        Transaction.household_id == household_id,
+        Transaction.deleted_at.is_(None),
+        tuple_(Transaction.date, func.abs(Transaction.amount)).in_(
+            [(d, Decimal(a)) for d, a in keys]
+        ),
+        visible_accounts(user_id),
+    )).all()
+    for (d, amount, note) in matches:
+        key = (d.isoformat(), _canonical_amount(abs(amount)))
+        result.setdefault(key, set()).add(_WHITESPACE.sub(" ", (note or "").strip()))
+    return result
+
+
+def _fingerprint_set(rows: list[dict]) -> set[str]:
+    return {_fingerprint(row) for row in rows}
+
+
+def _existing_fingerprints(
+    db, household_id: str, account_id: str, rows: list[dict]
+) -> set[str]:
+    """Fingerprints ya existentes en el household/cuenta, en UNA query
+    (issue #37: evita 1 query por fila)."""
+    fps = _fingerprint_set(rows)
+    if not fps:
+        return set()
+    return set(db.scalars(select(ImportFingerprint.fingerprint).where(
+        ImportFingerprint.household_id == household_id,
+        ImportFingerprint.account_id == account_id,
+        ImportFingerprint.fingerprint.in_(fps),
+    )).all())
+
+
 def _canonical_amount(value: Decimal | str | float) -> str:
     return f"{Decimal(str(value)).quantize(_MONEY_SCALE):.4f}"
 
 
-def _direct_duplicate(db, household_id: str, user_id: str, row: dict) -> bool:
-    # A direct warning must never reveal a peer's personal-account activity.
-    direct = db.scalars(select(Transaction).join(Account).where(
-        Transaction.household_id == household_id,
-        Transaction.deleted_at.is_(None),
-        Transaction.date == row["date"],
-        func.abs(Transaction.amount) == abs(row["amount"]),
-        visible_accounts(user_id),
-    )).all()
-    return any(
-        _WHITESPACE.sub(" ", (tx.note or "").strip()) == (row["description"] or "")
-        for tx in direct
-    )
-
-
-def _advisory_reasons(
-    db, household_id: str, user_id: str, account_id: str, row: dict, file_fingerprints: set[str]
-) -> list[str]:
-    fingerprint = _fingerprint(row)
-    reasons = []
-    if fingerprint in file_fingerprints:
-        reasons.append("file")
-    file_fingerprints.add(fingerprint)
-    if db.scalar(select(ImportFingerprint.id).where(
-        ImportFingerprint.household_id == household_id,
-        ImportFingerprint.account_id == account_id,
-        ImportFingerprint.fingerprint == fingerprint,
-    ).limit(1)) is not None:
-        reasons.append("fingerprint")
-    if _direct_duplicate(db, household_id, user_id, row):
-        reasons.append("household")
-    return reasons
-
-
 def _preview_rows(db, household_id: str, user_id: str, account_id: str, rows: list[dict]) -> list[ImportPreviewRow]:
+    # Issue #37: los checks por fila (duplicado directo + fingerprint) se
+    # resuelven en 2 queries totales (1 por clave (date,|amount|) y 1 IN de
+    # fingerprints) en vez de ~2 por fila.
+    direct_notes = _batch_direct_duplicate_notes(db, household_id, user_id, rows)
+    existing_fps = _existing_fingerprints(db, household_id, account_id, rows)
     file_fingerprints: set[str] = set()
     result = []
     for row in rows:
-        reasons = _advisory_reasons(
-            db, household_id, user_id, account_id, row, file_fingerprints
-        )
+        fp = _fingerprint(row)
+        reasons = []
+        if fp in file_fingerprints:
+            reasons.append("file")
+        file_fingerprints.add(fp)
+        if fp in existing_fps:
+            reasons.append("fingerprint")
+        if (row["description"] or "") in direct_notes.get(
+            (row["date"].isoformat(), _canonical_amount(abs(row["amount"]))), set()
+        ):
+            reasons.append("household")
         result.append(ImportPreviewRow(
             source_position=row["position"], date=row["date"], amount=float(row["amount"]),
             description=row["description"], duplicate_reasons=reasons, selected=not reasons,
@@ -365,6 +389,10 @@ async def commit_import(
         db.add(batch)
         db.flush()
         file_fingerprints: set[str] = set()
+        # Issue #37: pre-carga batch de duplicados y fingerprints (2 queries)
+        # en vez de ~2 queries por fila en el bucle.
+        direct_notes = _batch_direct_duplicate_notes(db, household_id, user.id, chosen)
+        existing_fps = _existing_fingerprints(db, household_id, account_id, chosen)
         for row in chosen:
             tx_type = "income" if row["amount"] > 0 else "expense"
             amount = abs(row["amount"])
@@ -373,9 +401,17 @@ async def commit_import(
                 "type": tx_type, "amount": _canonical_amount(amount), "category_id": category_id,
                 "account_id": account_id, "date": row["date"].isoformat(), "note": row["description"],
             }
-            advisory_reasons = _advisory_reasons(
-                db, household_id, user.id, account_id, row, file_fingerprints
-            )
+            fingerprint = _fingerprint(row)
+            advisory_reasons = []
+            if fingerprint in file_fingerprints:
+                advisory_reasons.append("file")
+            file_fingerprints.add(fingerprint)
+            if fingerprint in existing_fps:
+                advisory_reasons.append("fingerprint")
+            if (row["description"] or "") in direct_notes.get(
+                (row["date"].isoformat(), _canonical_amount(amount)), set()
+            ):
+                advisory_reasons.append("household")
             import_row = ImportRow(
                 batch_id=batch.id, source_position=row["position"], source_snapshot=row["source"],
                 transaction_baseline=baseline, advisory_reasons=advisory_reasons,
@@ -383,11 +419,7 @@ async def commit_import(
             )
             db.add(import_row)
             db.flush()
-            fingerprint = _fingerprint(row)
-            if db.scalar(select(ImportFingerprint.id).where(
-                ImportFingerprint.household_id == household_id, ImportFingerprint.account_id == account_id,
-                ImportFingerprint.fingerprint == fingerprint,
-            ).limit(1)) is not None:
+            if fingerprint in existing_fps:
                 import_row.status = "skipped_fingerprint"
                 batch.skipped_count += 1
                 continue

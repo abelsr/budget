@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import extract, func, select
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DbDep
 from app.models import Account, Transaction, TransactionSplit
@@ -43,12 +43,17 @@ def get_month_summary(
         if not 1 <= month_num <= 12:
             raise HTTPException(status_code=422, detail="Mes inválido")
 
+    # Rango de fechas del mes (issue #37): `extract(year/month, date)` no es
+    # sargable (impide usar el índice de `date`); `date >= inicio AND date <
+    # fin` es semánticamente equivalente y sí es sargable.
+    month_start = date(year, month_num, 1)
+    month_end = date(year + 1, 1, 1) if month_num == 12 else date(year, month_num + 1, 1)
     base_filter = [
         Transaction.household_id == user.household_id,
         Transaction.deleted_at.is_(None),
         shared_accounts(),
-        extract("year", Transaction.date) == year,
-        extract("month", Transaction.date) == month_num,
+        Transaction.date >= month_start,
+        Transaction.date < month_end,
     ]
 
     def _sum(tx_type: str) -> float:
