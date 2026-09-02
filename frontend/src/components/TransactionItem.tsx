@@ -1,8 +1,9 @@
 import { useState } from "react"
-import { AlertCircle, ArrowLeftRight, CloudUpload, Paperclip, Repeat, Split } from "lucide-react"
+import { AlertCircle, ArrowLeftRight, CloudUpload, Paperclip, Repeat, RotateCcw, Split, Trash2 } from "lucide-react"
 
 import { formatMoney, formatShortDate } from "@/lib/format"
 import type { Account, Category, Member, Transaction } from "@/lib/types"
+import { useOffline } from "@/lib/offline"
 import { CategoryIcon } from "@/components/CategoryIcon"
 import { BrandMedallion } from "@/components/BrandMedallion"
 import { matchBrand } from "@/lib/brands"
@@ -36,6 +37,11 @@ export function TransactionItem({
   hideAmount?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [syncBusy, setSyncBusy] = useState(false)
+  const { retry, discard } = useOffline()
+  // Una fila offline se identifica por `pending:<clientId>`; el resto de la UI
+  // (reintentar/descartar) opera sobre ese clientId (issue #35 punto 3).
+  const pendingClientId = transaction.id.startsWith("pending:") ? transaction.id.slice("pending:".length) : null
   const isIncome = transaction.type === "income"
   const isTransfer = transaction.type === "transfer"
   const isInflow = transaction.transferDirection === "inflow"
@@ -67,7 +73,7 @@ export function TransactionItem({
           ledger ? "md:grid md:grid-cols-[minmax(0,1fr)_10rem_auto] md:gap-4" : ""
         }`}
         role="button"
-        onClick={() => !transaction.syncStatus && setOpen(true)}
+        onClick={() => !transaction.syncStatus && !syncBusy && setOpen(true)}
       >
         {brand ? (
           <BrandMedallion brand={brand} className="size-10 shrink-0" />
@@ -109,6 +115,36 @@ export function TransactionItem({
             )}
           </p>
           {transaction.syncStatus === "failed" && <p className="mt-0.5 truncate text-[11px] text-destructive">No se subió: {syncLabel}</p>}
+          {transaction.syncStatus && pendingClientId && (
+            <div className="mt-1.5 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                disabled={syncBusy}
+                onClick={() => {
+                  if (!pendingClientId || syncBusy) return
+                  setSyncBusy(true)
+                  void retry(pendingClientId).finally(() => setSyncBusy(false))
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-primary-soft px-2 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-50"
+              >
+                <RotateCcw size={12} />
+                {syncBusy ? "Subiendo…" : "Reintentar"}
+              </button>
+              <button
+                type="button"
+                disabled={syncBusy}
+                onClick={() => {
+                  if (!pendingClientId || syncBusy) return
+                  setSyncBusy(true)
+                  void discard(pendingClientId)
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-destructive/10 px-2 py-1 text-[11px] font-medium text-destructive transition-colors hover:bg-destructive/15 disabled:opacity-50"
+              >
+                <Trash2 size={12} />
+                Descartar
+              </button>
+            </div>
+          )}
         </div>
         {ledger && (
           <span className="hidden min-w-0 truncate text-right text-[13px] text-muted-foreground md:block">
