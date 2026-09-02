@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { ApiError, apiFetch } from "@/lib/api"
 import { useOffline, useOfflineTransactions } from "@/lib/offline"
@@ -178,6 +178,42 @@ export function useTransactions(filters: TransactionFilters = {}) {
   })
   const pending = useOfflineTransactions(filters)
   return { ...query, data: [...pending, ...(query.data ?? [])] }
+}
+
+/**
+ * Issue #44: paginación "cargar más" para la lista de movimientos.
+ *
+ * El endpoint ya soporta `limit` (≤200) y `offset`. Cada página trae hasta
+ * 200 filas; `getNextPageParam` decide que no hay más cuando el backend
+ * devuelve menos de 200. Las transacciones offline pendientes se pre-pendean
+ * al frente, igual que en `useTransactions`.
+ */
+export function useTransactionsPaged(filters: TransactionFilters = {}) {
+  const query = useInfiniteQuery({
+    queryKey: [...keys.transactions, "paged", filters],
+    queryFn: ({ pageParam }) => {
+      const search = new URLSearchParams({ limit: "200", offset: String(pageParam) })
+      for (const [key, value] of Object.entries(filters)) {
+        if (value) search.set(key, String(value))
+      }
+      return apiFetch<Transaction[]>(`/transactions?${search}`)
+    },
+    initialPageParam: 0,
+    // El tamaño de página es fijo (200) y solo hay siguiente si la última
+    // página llegó completa, así el próximo offset es `pages.length * 200`
+    // (O(1)) en vez de re-summear todas las páginas cargadas.
+    getNextPageParam: (lastPage, pages) =>
+      lastPage.length === 200 ? pages.length * 200 : undefined,
+  })
+  const pending = useOfflineTransactions(filters)
+  const serverRows = query.data?.pages.flat() ?? []
+  return {
+    ...query,
+    data: [...pending, ...serverRows],
+    hasMore: query.hasNextPage,
+    loadMore: query.fetchNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+  }
 }
 
 export function useMonthSummary() {
@@ -791,10 +827,22 @@ export function useDeleteGoal() {
 
 // ---------- Instalment plans (MSI) ----------
 
-export function useInstalmentPlans() {
+export function useInstalmentPlans(sourceTransactionId?: string) {
   return useQuery({
-    queryKey: keys.instalmentPlans,
-    queryFn: () => apiFetch<InstalmentPlan[]>("/instalment-plans"),
+    // Con filtro, la clave es `["instalment-plans", "by-transaction", <id>]`:
+    // un prefijo de `keys.instalmentPlans` (["instalment-plans"]), así las
+    // invalidaciones por `keys.instalmentPlans` (crear/pagar/pausar/cancelar)
+    // la refrescan igual que a la lista completa — evita datos MSI obsoletos
+    // en la hoja de detalle tras mutaciones (issue #44).
+    queryKey: sourceTransactionId
+      ? [keys.instalmentPlans, "by-transaction", sourceTransactionId]
+      : keys.instalmentPlans,
+    queryFn: () =>
+      apiFetch<InstalmentPlan[]>(
+        sourceTransactionId
+          ? `/instalment-plans?sourceTransactionId=${encodeURIComponent(sourceTransactionId)}`
+          : "/instalment-plans",
+      ),
   })
 }
 

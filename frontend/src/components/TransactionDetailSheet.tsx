@@ -147,8 +147,10 @@ function ViewMode({
   const isTransfer = transaction.type === "transfer"
   const isInflow = transaction.transferDirection === "inflow"
   const { data: categories = [] } = useCategories()
-  const { data: plans = [] } = useInstalmentPlans()
-  const plan = plans.find((item) => item.sourceTransactionId === transaction.id)
+  const { data: plans = [] } = useInstalmentPlans(transaction.id)
+  // Issue #44: el endpoint filtra por transacción, así solo regresa el plan
+  // de este movimiento (o ninguno) en vez de toda la lista del hogar.
+  const plan = plans[0]
   const msiEligible =
     !isTransfer && !isIncome && account?.kind === "credit" && !account.isPersonal
   const authorName = transaction.authorName ?? member?.name
