@@ -33,6 +33,7 @@ type OfflineState = {
 
 const RETRY_BASE_MS = 30_000
 const RETRY_CAP_MS = 15 * 60_000
+const MAX_ATTEMPTS = 8
 
 function backoffMs(attempts: number): number {
   return Math.min(RETRY_BASE_MS * 2 ** attempts, RETRY_CAP_MS)
@@ -162,11 +163,15 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
           // 5xx o error de red: transitorio → se reintenta con backoff.
           const attempts = entry.attempts + 1
           const db = await dbPromise
+          // Tope de intentos: al superarlo deja de reintentar solo y queda
+          // visible (permanent) para reintentarse o descartarse desde la UI.
+          const permanent = attempts >= MAX_ATTEMPTS
           await db.put(STORE, {
             ...entry,
             attempts,
+            permanent,
             lastError: error instanceof Error ? error.message : String(error),
-            retryAfter: Date.now() + backoffMs(attempts),
+            retryAfter: permanent ? undefined : Date.now() + backoffMs(attempts),
           } satisfies PendingTransaction)
           // Preserve ordering when the connection or server is unavailable.
           break
