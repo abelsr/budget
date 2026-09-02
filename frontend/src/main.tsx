@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/lib/theme'
 import { AuthProvider } from '@/lib/auth'
 import { OfflineProvider } from '@/lib/offline'
 import { AuthenticatedQueryCache } from '@/lib/query-cache'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,7 +25,9 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <AuthenticatedQueryCache>
             <OfflineProvider>
-              <App />
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
             </OfflineProvider>
           </AuthenticatedQueryCache>
         </AuthProvider>

@@ -560,6 +560,22 @@ def update_transaction(
         raise HTTPException(status_code=422, detail="Actualiza las asignaciones al cambiar el monto")
     if ("category_id" in data or "account_id" in data) and not data.get("is_split", tx.is_split):
         _validate_refs(db, household_id, user.id, category_id, account_id)
+    # Changing only `type` (e.g. expense -> income) must not leave an
+    # incompatible category behind; validate the effective type/category pair.
+    if not data.get("is_split", tx.is_split) and category_id:
+        effective_type = data.get("type", tx.type)
+        category = db.get(Category, category_id)
+        if (
+            category is None
+            or category.household_id != household_id
+            or category.deleted
+            or not category.active
+            or category.type != effective_type
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="La categoría no es compatible con el tipo de movimiento",
+            )
     before = _snapshot(tx, tuple(data))
     if splits is not None:
         before["splits"] = _split_snapshot(tx)

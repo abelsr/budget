@@ -159,7 +159,7 @@ def complete_reconciliation(
     if Decimal(str(detail.difference)).quantize(Decimal("0.0001")) != Decimal("0.0000"):
         raise HTTPException(status_code=409, detail="La diferencia debe ser cero para completar la conciliación")
     session.status = "completed"
-    session.completed_at = datetime.now()
+    session.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(session)
     return _session_out(session)
