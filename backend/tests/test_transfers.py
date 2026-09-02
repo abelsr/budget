@@ -1,3 +1,5 @@
+from sqlalchemy import event
+
 from app.models import Transaction, TransferGroup
 from tests.helpers import create_account, create_category
 
@@ -99,3 +101,52 @@ def test_transfer_client_id_cannot_collide_with_regular_transaction(client, worl
     assert client.post("/transactions", json=regular, headers=world["headers1"]).status_code == 201
     response = client.post("/transactions", json=transfer_payload(source["id"], destination["id"], clientId=client_id), headers=world["headers1"])
     assert response.status_code == 409
+
+
+def test_transfer_replay_returns_counterparty(client, world):
+    """El replay por client_id debe devolver la contraparte igual que el create
+    original (issue #37: antes llamaba _tx_out sin db/user → counterparty=None)."""
+    source = create_account(client, world["headers1"], name="Efectivo", openingBalance=1000)
+    destination = create_account(client, world["headers1"], name="Ahorro", kind="savings", openingBalance=200)
+    payload = transfer_payload(source["id"], destination["id"], clientId="aaa11111-2222-3333-4444-555566667777")
+
+    first = client.post("/transactions", json=payload, headers=world["headers1"]).json()
+    replay = client.post("/transactions", json=payload, headers=world["headers1"]).json()
+
+    assert first["id"] == replay["id"]
+    assert first["counterpartyAccountId"] == destination["id"]
+    # El replay (antes devolvía None) ahora coincide con el create.
+    assert replay["counterpartyAccountId"] == destination["id"]
+    assert replay["counterpartyAccountName"] == "Ahorro"
+
+
+def test_list_transfers_batches_counterparty_queries(client, session, world):
+    """N transferencias en la lista NO deben disparar N queries de contraparte
+    (issue #37): se resuelven en un solo IN por grupo. Se miden las queries
+    que consultan `transfer_group_id =` (una por grupo) — con el batch son 0."""
+    source = create_account(client, world["headers1"], name="Efectivo", openingBalance=1000)
+    destination = create_account(client, world["headers1"], name="Ahorro", kind="savings", openingBalance=200)
+    for i in range(1, 8):
+        client.post("/transactions", json=transfer_payload(source["id"], destination["id"], date=f"2026-08-0{i}"), headers=world["headers1"])
+
+    engine = session.get_bind()
+    per_group_queries: list[str] = []
+
+    def _record(_conn, _cursor, statement, _params, _ctx, _execopts):
+        # Una query N+1 por contraparte filtra `transfer_group_id = <un valor>`;
+        # el batch usa `transfer_group_id IN (...)`.
+        if "transfer_group_id =" in statement or "transfer_group_id=" in statement:
+            per_group_queries.append(statement)
+
+    event.listen(engine, "before_cursor_execute", _record)
+    try:
+        rows = client.get("/transactions", params={"includeTransfers": "true", "limit": 200}, headers=world["headers1"]).json()
+    finally:
+        event.remove(engine, "before_cursor_execute", _record)
+
+    transfers = [r for r in rows if r["type"] == "transfer"]
+    assert len(transfers) == 14  # 7 grupos x 2 filas
+    # Contraparte poblada en todas las filas de la lista.
+    assert all(r["counterpartyAccountId"] is not None and r["counterpartyAccountName"] in ("Efectivo", "Ahorro") for r in transfers)
+    # El N+1 (1 query de contraparte por transferencia) queda eliminado.
+    assert per_group_queries == [], f"Se detectaron queries N+1 de contraparte: {per_group_queries}"
