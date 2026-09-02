@@ -107,19 +107,37 @@ async function parseError(res: Response): Promise<ApiError> {
 export interface ApiFetchOptions extends RequestInit {
   /** Conserva el token cuando un 401 es un error esperado de la operación. */
   clearTokenOnUnauthorized?: boolean
+  /** Timeout en ms del request. Por defecto 30_000 (issue #43). */
+  timeoutMs?: number
 }
+
+const DEFAULT_TIMEOUT_MS = 30_000
 
 export async function apiFetch<T>(
   path: string,
   options: ApiFetchOptions = {},
 ): Promise<T> {
-  const { clearTokenOnUnauthorized = true, ...fetchOptions } = options
+  const {
+    clearTokenOnUnauthorized = true,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    ...fetchOptions
+  } = options
   const token = getToken()
   const headers = new Headers(fetchOptions.headers)
   if (token) headers.set("Authorization", `Bearer ${token}`)
   // FormData (multipart) define su propio Content-Type con boundary
   if (fetchOptions.body && !(fetchOptions.body instanceof FormData)) {
     headers.set("Content-Type", "application/json")
+  }
+  // Timeout por defecto: un request colgado (escaneo IA, imports grandes) no
+  // debe dejar la mutación pendiente indefinidamente (issue #43). Si el
+  // caller ya pasó un signal (ej. AbortController de un hook), se combina.
+  if (timeoutMs > 0) {
+    const timeoutSignal = AbortSignal.timeout(timeoutMs)
+    fetchOptions.signal =
+      fetchOptions.signal && typeof AbortSignal.any === "function"
+        ? AbortSignal.any([fetchOptions.signal, timeoutSignal])
+        : fetchOptions.signal ?? timeoutSignal
   }
 
   const res = await fetch(`/api${path}`, { ...fetchOptions, headers })

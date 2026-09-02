@@ -29,8 +29,10 @@ export interface TicketScanResult {
 export async function analyzeTicket(file: File): Promise<TicketScanResult> {
   const formData = new FormData()
   formData.append("file", file)
+  // El escaneo IA es lento: timeout mayor que el default de 30 s (issue #43).
   return apiFetch<TicketScanResult>("/tickets/scan", {
     method: "POST",
     body: formData,
+    timeoutMs: 120_000,
   })
 }

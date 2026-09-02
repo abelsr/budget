@@ -214,6 +214,35 @@ def test_transaction_validation(client, world):
     assert resp.status_code == 404
 
 
+def test_update_type_must_match_category_type(client, world):
+    """#39: cambiar solo `type` a uno incompatible con la categoría → 422."""
+    headers = world["headers1"]
+    account = create_account(client, headers)
+    expense_cat = create_category(client, headers)
+    income_cat = create_category(client, headers, name="Sueldo", type="income", icon="banknote")
+
+    tx = create_transaction(client, headers, expense_cat["id"], account["id"])
+
+    # Cambiar SOLO el tipo a "income" con la categoría de gasto vigente:
+    # el par tipo/categoría queda incoherente → 422.
+    resp = client.patch(f"/transactions/{tx['id']}", json={"type": "income"}, headers=headers)
+    assert resp.status_code == 422
+
+    # Cambiar tipo Y categoría a un par coherente → OK.
+    resp = client.patch(
+        f"/transactions/{tx['id']}",
+        json={"type": "income", "categoryId": income_cat["id"]},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["type"] == "income"
+    assert resp.json()["categoryId"] == income_cat["id"]
+
+    # Cambiar solo otros campos (sin tocar type/categoría) sigue permitido.
+    resp = client.patch(f"/transactions/{tx['id']}", json={"note": "ajuste"}, headers=headers)
+    assert resp.status_code == 200
+
+
 def test_transaction_author_is_authenticated_user_not_member_id(client, world):
     account = create_account(client, world["headers1"])
     category = create_category(client, world["headers1"])
