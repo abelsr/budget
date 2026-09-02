@@ -13,6 +13,12 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://budget:budget@localhost:5432/budget"
 
+    #: Pool de conexiones (issue #45). Los pools son per-proceso: con N workers
+    #: de Uvicorn el total es N * (db_pool_size + db_max_overflow), así que se
+    #: configuran por entorno para no superar Postgres `max_connections`.
+    db_pool_size: int = Field(default=10, gt=0)
+    db_max_overflow: int = Field(default=20, ge=0)
+
     jwt_secret: str = "dev-secret-change-me"
     jwt_algorithm: str = "HS256"
     #: Access tokens are short-lived; a 30-day token (the old default) lived a
