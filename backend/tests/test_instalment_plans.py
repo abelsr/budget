@@ -26,7 +26,7 @@ def _setup(session: Session, card_personal=False) -> tuple[dict[str, str], str, 
         Transaction(
             household_id=household.id, type="expense", amount=5100,
             category_id=category.id, account_id=card.id, member_id=user.id,
-            date=date(2026, 8, 10),
+            date=date.today(),
         )
     )
     session.commit()
