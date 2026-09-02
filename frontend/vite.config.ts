@@ -36,6 +36,22 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    // Issue #44: separar las libs pesadas (recharts, motion, react-day-picker)
+    // del chunk de la app. Con React.lazy por página, recharts solo se
+    // descarga al visitar Dashboard/Reports; este chunk estable se cachea
+    // entre builds mientras la app cambie.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return
+          if (id.includes("recharts")) return "recharts"
+          if (id.includes("node_modules/motion")) return "motion"
+          if (id.includes("react-day-picker")) return "day-picker"
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

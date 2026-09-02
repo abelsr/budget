@@ -289,3 +289,31 @@ def test_edit_purchase_amount_blocked_by_active_plan(client, session):
     # non-amount edits are still allowed
     res = client.patch(f"/transactions/{purchase_id}", json={"note": "hola"}, headers=headers)
     assert res.status_code == 200, res.text
+
+
+def test_list_plans_filter_by_source_transaction(client, session):
+    # Issue #44: /instalment-plans?sourceTransactionId=X returns only the plan
+    # (or no plan) tied to that transaction, so the detail sheet no longer
+    # fetches every plan in the household to `find()` one client-side.
+    headers, card_id, _, purchase_id = _setup(session)
+    plan = client.post(
+        "/instalment-plans",
+        json={"sourceTransactionId": purchase_id, "months": 6, "firstDueDate": _future(30)},
+        headers=headers,
+    ).json()
+
+    # Unfiltered listing still shows the plan.
+    full = client.get("/instalment-plans", headers=headers).json()
+    assert [row["id"] for row in full] == [plan["id"]]
+
+    # Filtered by the purchase that owns the plan.
+    filtered = client.get(
+        f"/instalment-plans?sourceTransactionId={purchase_id}", headers=headers
+    ).json()
+    assert [row["id"] for row in filtered] == [plan["id"]]
+
+    # Filtered by a transaction with no plan.
+    none = client.get(
+        "/instalment-plans?sourceTransactionId=does-not-exist", headers=headers
+    ).json()
+    assert none == []

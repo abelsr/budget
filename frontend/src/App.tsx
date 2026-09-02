@@ -1,24 +1,33 @@
+import { Suspense, lazy } from "react"
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom"
 import { MotionConfig } from "motion/react"
 
 import { useAuth } from "@/lib/auth"
 import { LandingI18nProvider } from "@/lib/landing-i18n"
 import { AppShell } from "@/components/layout/AppShell"
-import { DashboardPage } from "@/pages/DashboardPage"
-import { TransactionsPage } from "@/pages/TransactionsPage"
-import { AccountsPage } from "@/pages/AccountsPage"
-import { SettingsPage } from "@/pages/SettingsPage"
-import { CategoriesPage } from "@/pages/CategoriesPage"
-import { RecurringPage } from "@/pages/RecurringPage"
-import { LoginPage } from "@/pages/LoginPage"
-import { OnboardingPage } from "@/pages/OnboardingPage"
-import { LandingPage } from "@/pages/LandingPage"
-import { ReportsPage } from "@/pages/ReportsPage"
-import { PrivacyPage } from "@/pages/PrivacyPage"
-import { ImportPage } from "@/pages/ImportPage"
-import { MerchantRulesPage } from "@/pages/MerchantRulesPage"
-import { BudgetsPage } from "@/pages/BudgetsPage"
-import { GoalsPage } from "@/pages/GoalsPage"
+
+// Code-splitting (issue #44): cada página es un chunk que Vite carga bajo
+// demanda. Los bundles pesados (recharts en Dashboard/Reports, motion,
+// react-day-picker) solo se descargan al visitar la página que los usa.
+const DashboardPage = lazy(() => import("@/pages/DashboardPage").then((m) => ({ default: m.DashboardPage })))
+const TransactionsPage = lazy(() => import("@/pages/TransactionsPage").then((m) => ({ default: m.TransactionsPage })))
+const AccountsPage = lazy(() => import("@/pages/AccountsPage").then((m) => ({ default: m.AccountsPage })))
+const SettingsPage = lazy(() => import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })))
+const CategoriesPage = lazy(() => import("@/pages/CategoriesPage").then((m) => ({ default: m.CategoriesPage })))
+const RecurringPage = lazy(() => import("@/pages/RecurringPage").then((m) => ({ default: m.RecurringPage })))
+const LoginPage = lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })))
+const OnboardingPage = lazy(() => import("@/pages/OnboardingPage").then((m) => ({ default: m.OnboardingPage })))
+const LandingPage = lazy(() => import("@/pages/LandingPage").then((m) => ({ default: m.LandingPage })))
+const ReportsPage = lazy(() => import("@/pages/ReportsPage").then((m) => ({ default: m.ReportsPage })))
+const PrivacyPage = lazy(() => import("@/pages/PrivacyPage").then((m) => ({ default: m.PrivacyPage })))
+const ImportPage = lazy(() => import("@/pages/ImportPage").then((m) => ({ default: m.ImportPage })))
+const MerchantRulesPage = lazy(() => import("@/pages/MerchantRulesPage").then((m) => ({ default: m.MerchantRulesPage })))
+const BudgetsPage = lazy(() => import("@/pages/BudgetsPage").then((m) => ({ default: m.BudgetsPage })))
+const GoalsPage = lazy(() => import("@/pages/GoalsPage").then((m) => ({ default: m.GoalsPage })))
+
+function PageFallback() {
+  return <div className="min-h-dvh" aria-label="Cargando" />
+}
 
 const ONBOARDING_PATH = "/onboarding"
 /** La app vive bajo /app; / es la landing pública. */
@@ -66,6 +75,7 @@ function App() {
   return (
     <MotionConfig reducedMotion="user">
       <BrowserRouter>
+        <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route
             path="/login"
@@ -104,6 +114,7 @@ function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </MotionConfig>
   )

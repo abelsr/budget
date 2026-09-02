@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DbDep
@@ -46,17 +48,25 @@ def create_plan(
 
 
 @router.get("", response_model=list[InstalmentPlanOut])
-def list_plans(db: DbDep, user: CurrentUserDep) -> list[InstalmentPlanOut]:
+def list_plans(
+    db: DbDep,
+    user: CurrentUserDep,
+    source_transaction_id: Annotated[str | None, Query(alias="sourceTransactionId")] = None,
+) -> list[InstalmentPlanOut]:
     household_id = _household_id(user)
-    plan_rows = db.execute(
+    stmt = (
         select(InstalmentPlan, Account.name)
         .join(Account, Account.id == InstalmentPlan.account_id)
         .where(
             InstalmentPlan.household_id == household_id,
             InstalmentPlan.status.in_(("active", "paused")),
         )
-        .order_by(InstalmentPlan.first_due_date, InstalmentPlan.created_at)
-    ).all()
+    )
+    if source_transaction_id is not None:
+        # Issue #44: los detail sheets solo necesitan el plan (o no-plan) de
+        # una transacción concreta, sin cargar toda la lista de planes.
+        stmt = stmt.where(InstalmentPlan.source_transaction_id == source_transaction_id)
+    plan_rows = db.execute(stmt.order_by(InstalmentPlan.first_due_date, InstalmentPlan.created_at)).all()
     return [InstalmentPlanOut(**plans.plan_out(plan, name)) for plan, name in plan_rows]
 
 

@@ -8,7 +8,7 @@ import {
   useAccounts,
   useCategories,
   useMembers,
-  useTransactions,
+  useTransactionsPaged,
 } from "@/lib/queries"
 import type { TransactionFilters } from "@/lib/queries"
 import { springAppear } from "@/lib/springs"
@@ -48,7 +48,7 @@ export function TransactionsPage() {
     from: searchParams.get("from") ?? undefined,
     to: searchParams.get("to") ?? undefined,
   }
-  const { data: transactions = [] } = useTransactions(filters)
+  const { data: transactions = [], hasMore, loadMore, isFetchingNextPage } = useTransactionsPaged(filters)
   // A complete pair is one user action in the household ledger. When a member
   // can only see one side (for example, another member's personal account),
   // retain that independently reconcilable row instead.
@@ -244,6 +244,18 @@ export function TransactionsPage() {
               </section>
             )
           })}
+          {hasMore && (
+            <div className="flex justify-center border-t border-border px-4 py-3">
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={isFetchingNextPage}
+                className="pressable rounded-lg bg-secondary px-4 py-2 text-[12px] font-medium text-secondary-foreground transition-colors hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+              >
+                {isFetchingNextPage ? "Cargando…" : "Cargar más movimientos"}
+              </button>
+            </div>
+          )}
         </Card>
       )}
       {filters.accountId && accounts.find((account) => account.id === filters.accountId) && <ReconciliationSheet account={accounts.find((account) => account.id === filters.accountId)!} open={reconciliationOpen} onOpenChange={setReconciliationOpen} />}
