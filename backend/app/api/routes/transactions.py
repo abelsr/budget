@@ -66,22 +66,43 @@ def _validate_refs(db, household_id: str, user_id: str, category_id: str, accoun
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
 
 
-def _tx_out(tx: Transaction, db=None, user_id: str | None = None) -> TransactionOut:
-    counterparty = None
-    if tx.transfer_group_id and db is not None and user_id is not None:
-        counterparty = db.scalar(
-            select(Transaction)
-            .where(
-                Transaction.transfer_group_id == tx.transfer_group_id,
-                Transaction.id != tx.id,
-                Transaction.deleted_at.is_(None),
+# Sentinelo: no se pasó contraparte pre-cargada → se resuelve con la query
+# individual (behavior actual para create/get de una sola transacción).
+_CounterpartyUnset = object()
+
+
+def _tx_out(
+    tx: Transaction,
+    db=None,
+    user_id: str | None = None,
+    counterparty: "Transaction | None | object" = _CounterpartyUnset,
+) -> TransactionOut:
+    # Resolución de la contraparte de una transferencia:
+    # - counterparty es Transaction → pre-cargada por el caller (list, batch): se usa.
+    # - counterparty es None → definitivamente no hay contraparte (no se consulta).
+    # - counterparty es _CounterpartyUnset → se resuelve individualmente (query 1 a 1).
+    if counterparty is _CounterpartyUnset:
+        counterparty = None
+        if tx.transfer_group_id and db is not None and user_id is not None:
+            found = db.scalar(
+                select(Transaction)
+                .where(
+                    Transaction.transfer_group_id == tx.transfer_group_id,
+                    Transaction.id != tx.id,
+                    Transaction.deleted_at.is_(None),
+                )
+                .limit(1)
             )
-            .limit(1)
-        )
-        if counterparty is not None:
-            account = db.get(Account, counterparty.account_id)
-            if account is None or not can_operate(account, user_id):
-                counterparty = None
+            if found is not None:
+                account = db.get(Account, found.account_id)
+                if account is not None and can_operate(account, user_id):
+                    counterparty = found
+    elif counterparty is not None:
+        # Contraparte pre-cargada: aplica la misma regla de permisos. db.get no
+        # dispara query si el Account ya está en el identity map (batch).
+        account = db.get(Account, counterparty.account_id) if db is not None else None
+        if account is None or not can_operate(account, user_id):
+            counterparty = None
     return TransactionOut(
         id=tx.id,
         household_id=tx.household_id,
@@ -292,7 +313,37 @@ def list_transactions(
     stmt = stmt.order_by(Transaction.date.desc(), Transaction.created_at.desc())
     stmt = stmt.limit(limit).offset(offset)
     transactions = db.scalars(stmt.execution_options(populate_existing=True)).all()
-    return [_tx_out(tx, db, user.id) for tx in transactions]
+
+    # Pre-carga de contrapartes de transferencias en UNA query (issue #37):
+    # antes el serializador hacía 1 query de contraparte + 1 db.get por cada
+    # transferencia de la lista (hasta 200). Ahora se resuelven todos los
+    # grupos en un IN y los Account contraparte se cargan en otro IN.
+    group_ids = {tx.transfer_group_id for tx in transactions if tx.transfer_group_id}
+    counterparty_by_tx: dict[str, Transaction | None] = {}
+    if group_ids:
+        group_rows = db.scalars(
+            select(Transaction).where(
+                Transaction.transfer_group_id.in_(group_ids),
+                Transaction.deleted_at.is_(None),
+            )
+        ).all()
+        by_group: dict[str, list[Transaction]] = {}
+        for r in group_rows:
+            by_group.setdefault(r.transfer_group_id, []).append(r)
+        # Cargar los Account de las contrapartes en 1 query para que el
+        # db.get del serializador los encuentre en el identity map (0 queries).
+        cp_account_ids = {r.account_id for rows in by_group.values() for r in rows}
+        if cp_account_ids:
+            db.execute(select(Account).where(Account.id.in_(cp_account_ids)))
+        for tx in transactions:
+            if tx.transfer_group_id:
+                siblings = by_group.get(tx.transfer_group_id, [])
+                counterparty_by_tx[tx.id] = next((r for r in siblings if r.id != tx.id), None)
+
+    return [
+        _tx_out(tx, db, user.id, counterparty=counterparty_by_tx.get(tx.id, _CounterpartyUnset))
+        for tx in transactions
+    ]
 
 
 @router.post("", status_code=201)
@@ -391,7 +442,7 @@ def create_transaction(
                     status_code=409,
                     detail="El clientId ya se usó con un movimiento distinto",
                 )
-            return _tx_out(existing)
+            return _tx_out(existing, db, user.id)
     # TransactionCreate.validate_shape garantiza cuenta (y categoría, salvo splits).
     if payload.account_id is None:  # pragma: no cover
         raise HTTPException(status_code=422, detail="El movimiento requiere categoría y cuenta")
@@ -447,7 +498,7 @@ def create_transaction(
                 status_code=409,
                 detail="El clientId ya se usó con un movimiento distinto",
             ) from None
-        return _tx_out(existing)
+        return _tx_out(existing, db, user.id)
     if payload.repeat is not None:
         from datetime import timedelta
 
