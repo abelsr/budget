@@ -7,7 +7,7 @@ from fastapi import HTTPException, Request
 
 
 class InMemoryRateLimiter:
-    """Small fixed-window limiter for one Uvicorn process, keyed by route and client.
+    """Small rolling-window limiter for one Uvicorn process, keyed by route and client.
 
     Inactivity no longer leaks: every ``evict_interval_seconds`` a sweep drops
     keys whose newest attempt is already older than their window (i.e. keys
