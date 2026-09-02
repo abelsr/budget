@@ -32,4 +32,30 @@ entrypoint = "app.main:app"
 dev = [
     "freezegun>=1.5",
     "pytest>=9.1.1",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.0",
 ]
+
+# Issue #47: lint en CI. Reglas select: E (pico de PEP8), F (pyflakes:
+# imports sin usar, variables reasignadas, etc.) y B (bugbear: bugs
+# frecuentes tipo `==` en lugar de `is` con constantes). Se amplía si la
+# deuda acumulada lo justifica.
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "B"]
+# Los docstrings largos de configuración y los strings de SQL en los tests
+# exceden con frecuencia el límite; E501 se revisa a mano, no en CI.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# En `app/models/` los nombres "sin importar" son forward references de
+# SQLAlchemy (`Mapped["Household"]`, `relationship(back_populates=...)`) que el
+# ORM resuelve al registrar el mapeador, no al parsear. No son errores reales.
+"app/models/*.py" = ["F821"]
+# Los endpoints usan `Annotated[..., Depends(...)]` / `Body() = Model()` como
+# default, que es el idiom de FastAPI; B008 (llamada en default) no aplica.
+"app/api/routes/*.py" = ["B008"]
+"app/main.py" = ["B008"]

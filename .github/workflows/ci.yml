@@ -35,8 +35,16 @@ jobs:
       - name: Instalar dependencias
         run: uv sync --locked
 
-      - name: Tests
-        run: uv run pytest -q
+      # Issue #47: ruff (E/F/B) gatea la deuda nueva. Reglas configuradas en
+      # pyproject.toml; los forward-refs de models y los defaults de FastAPI
+      # están exentos por per-file-ignores.
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      # El umbral (85%) es un piso anti-regresión, no una meta: hoy la suite
+      # ronda el 91%. Si se cae por debajo, algo dejó de estar cubierto.
+      - name: Tests + coverage
+        run: uv run pytest -q --cov=app --cov-report=term --cov-fail-under=85
 
   migraciones:
     name: Migraciones (Postgres real)

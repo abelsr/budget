@@ -82,7 +82,7 @@ def upload_attachment(
         storage.put_attachment(object_key, content, content_type)
     except storage.StorageError:
         db.rollback()  # no queda registro huérfano
-        raise HTTPException(status_code=502, detail="Error al guardar el comprobante")
+        raise HTTPException(status_code=502, detail="Error al guardar el comprobante") from None
 
     attachment.storage_path = object_key
     db.commit()
@@ -99,7 +99,7 @@ def download_attachment(
     try:
         content = storage.get_attachment(attachment.storage_path)
     except storage.StorageError:
-        raise HTTPException(status_code=404, detail="Adjunto no encontrado")
+        raise HTTPException(status_code=404, detail="Adjunto no encontrado") from None
     return Response(
         content=content,
         media_type=attachment.content_type,

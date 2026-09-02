@@ -1,6 +1,8 @@
 import pytest
 from datetime import date, datetime, timedelta, timezone
 
+from sqlalchemy.orm import Session
+
 from app.config import settings
 from app.models import Account, Category, Household, Invitation, Transaction, User
 from tests.helpers import auth_headers as _auth_headers

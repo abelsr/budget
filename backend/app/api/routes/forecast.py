@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import CurrentUserDep, DbDep
-from app.models import User
 from app.schemas.forecast import ForecastPoint, ForecastResponse, ForecastUpcoming
 from app.services.forecast import build_forecast
 from app.services.recurring import materialize_due

@@ -71,6 +71,10 @@ docker compose exec -T db pg_dump -U "$PG_USER" -d "$PG_DB" --clean --if-exists 
   | gzip > "$PG_FILE.part"
 mv "$PG_FILE.part" "$PG_FILE"
 
+# Un dump que no se puede leer no es un backup: `gzip -t` verifica la
+# integridad de la compresión antes de declarar el artefacto usable (issue #47).
+gzip -t "$PG_FILE" || die "pg dump failed gzip integrity check: $(basename "$PG_FILE")"
+
 # The tar is streamed to stdout instead of being written through a bind mount.
 # A `-v $BACKUP_DIR:/backup` mount is resolved by the *host* Docker daemon, so
 # it silently breaks when the script itself runs inside a container. Redirecting
@@ -79,7 +83,30 @@ log "archiving MinIO volume '$MINIO_VOLUME'"
 docker run --rm -v "$MINIO_VOLUME":/data:ro alpine tar cz -C /data . > "$MINIO_FILE.part"
 mv "$MINIO_FILE.part" "$MINIO_FILE"
 
+# `tar -tzf` lista el archivo sin descomprimirlo: si el tar.gz estuviera
+# truncado o corrupto, esto falla y el artefacto no se cuenta como backup.
+tar -tzf "$MINIO_FILE" >/dev/null || die "minio archive failed tar integrity check: $(basename "$MINIO_FILE")"
+
 log "wrote $(basename "$PG_FILE") ($(du -h "$PG_FILE" | cut -f1)) and $(basename "$MINIO_FILE") ($(du -h "$MINIO_FILE" | cut -f1))"
+
+# ---------- Copia off-site (issue #47) ----------
+# El README pide una copia fuera de la máquina; todo lo anterior es on-site y
+# se pierde junto con el disco. OFFSITE_DIR, si se define, recibe una copia
+# de cada artefacto verificado (ej.: montaje NFS/rsync/rclone, otra partición,
+# o un bucket local). Es opcional y no bloquea el backup si falla: el log lo
+# deja marcado y el exit code se conserva para que el monitor lo vea.
+if [ -n "${OFFSITE_DIR:-}" ]; then
+  if ! command -v rsync >/dev/null 2>&1; then
+    log "WARN: OFFSITE_DIR set but rsync not found; skipping off-site copy"
+  else
+    log "copying artifacts off-site to $OFFSITE_DIR"
+    if rsync -a "$PG_FILE" "$MINIO_FILE" "$OFFSITE_DIR/"; then
+      log "off-site copy complete"
+    else
+      log "WARN: off-site copy FAILED (rsync); on-site backups are still valid"
+    fi
+  fi
+fi
 
 # *.part is swept too: one that old is a leftover from a run that died before
 # its own trap could fire, and nothing else would ever remove it.
