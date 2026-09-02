@@ -360,7 +360,11 @@ export function useAddTransaction() {
           body: JSON.stringify(offlinePayload),
         })
       } catch (error) {
-        if (!("repeat" in payload && payload.repeat) && offlineEligible && !(error instanceof ApiError)) return queue(offlinePayload as Parameters<typeof queue>[0])
+        // Error de red (no ApiError) o 5xx del servidor → transitorio: se
+        // encola offline (issue #35 punto 2). Los 4xx son definitivos y se
+        // relanzan al usuario.
+        const transient = error instanceof ApiError ? error.status >= 500 : true
+        if (!("repeat" in payload && payload.repeat) && offlineEligible && transient) return queue(offlinePayload as Parameters<typeof queue>[0])
         throw error
       }
     },
