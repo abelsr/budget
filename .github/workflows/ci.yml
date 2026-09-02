@@ -141,3 +141,5 @@ jobs:
       # de migraciones y el build de nginx.
       - name: Construir backend y frontend
         run: docker compose build
+
+# (issue #47: ruff + coverage + dependabot + backup verification)
