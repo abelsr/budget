@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import extract, func, select
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DbDep
 from app.models import Account, Budget, Category, Transaction, TransactionSplit, User
@@ -60,12 +60,16 @@ def _spent_by_category(
     if not category_ids:
         return {}
 
+    # Rango de fechas del mes (issue #37): `extract(year/month, date)` no es
+    # sargable (impide usar el índice de `date`); el rango equivalente sí.
+    month_start = date(year, month_num, 1)
+    month_end = date(year + 1, 1, 1) if month_num == 12 else date(year, month_num + 1, 1)
     base_filter = [
         Transaction.household_id == household_id,
         Transaction.deleted_at.is_(None),
         shared_accounts(),
-        extract("year", Transaction.date) == year,
-        extract("month", Transaction.date) == month_num,
+        Transaction.date >= month_start,
+        Transaction.date < month_end,
         Transaction.type == "expense",
     ]
     split_stmt = (

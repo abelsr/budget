@@ -2,6 +2,7 @@ from datetime import date, datetime
 import json
 
 import pytest
+from sqlalchemy import event
 
 from app.models import (
     Account,
@@ -453,3 +454,33 @@ def test_deleted_history_still_blocks_category_and_account_deletion(client, sess
     assert client.delete(
         f"/accounts/{imported['account']['id']}", headers=world["headers1"]
     ).status_code == 409
+
+
+def test_import_preview_batches_duplicate_query(client, session, world):
+    """Issue #37: el preview no debe disparar 1 query de duplicado por fila.
+    N filas → 1 query agregada (IN) de (date, |amount|), no N queries
+    `date = ? AND abs(amount) = ?`. Se cuentan las queries por fila: antes
+    del fix era 1 por fila (5), después 0 (el batch usa IN)."""
+    account = create_account(client, world["headers1"])
+    # 5 filas con (fecha, monto) distintos.
+    content = b"Fecha,Importe,Concepto\n01/08/2026,(10.00),Uno\n02/08/2026,(20.00),Dos\n03/08/2026,(30.00),Tres\n04/08/2026,(40.00),Cuatro\n05/08/2026,(50.00),Cinco\n"
+
+    engine = session.get_bind()
+    per_row: list[str] = []
+
+    def _record(_conn, _cursor, statement, _params, _ctx, _execopts):
+        # La query N+1 por duplicado filtra `transactions.date = ?` (con un
+        # único placeholder). El batch usa `date IN (...)` / tuple IN.
+        if "transactions.date = ?" in statement:
+            per_row.append(statement)
+
+    event.listen(engine, "before_cursor_execute", _record)
+    try:
+        response = _csv_upload(client, "/import/preview", world["headers1"], account["id"], content)
+    finally:
+        event.remove(engine, "before_cursor_execute", _record)
+
+    assert response.status_code == 200, response.text
+    assert len(response.json()["rows"]) == 5
+    # El N+1 (1 query de duplicado por fila) queda eliminado.
+    assert per_row == [], f"Se detectaron queries N+1 de duplicado por fila: {per_row}"
