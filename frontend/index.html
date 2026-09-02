@@ -12,22 +12,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="budget" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <script>
-      // Aplica el tema guardado antes del primer paint (sin flash blanco)
-      try {
-        var t = localStorage.getItem("ff-theme")
-        var dark =
-          t === "dark" ||
-          ((t === null || t === "system") &&
-            matchMedia("(prefers-color-scheme: dark)").matches)
-        if (dark) {
-          document.documentElement.classList.add("dark")
-          document
-            .querySelector('meta[name="theme-color"]')
-            .setAttribute("content", "#070c16")
-        }
-      } catch (e) {}
-    </script>
+    <!-- Tema antes del primer paint, desde un archivo: permite
+         `script-src 'self'` sin 'unsafe-inline' ni hash (issue #34). -->
+    <script src="/theme-init.js"></script>
     <title>budget · finanzas del hogar</title>
   </head>
   <body>

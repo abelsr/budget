@@ -43,10 +43,16 @@ class JoinRequest(_CamelModel):
 class TokenResponse(_CamelModel):
     access_token: str
     token_type: str = "bearer"
+    #: jti del token emitido; el SPA lo guarda para detectar token obsoleto
+    #: sin poder leer el JWT (issue #34, cookie httpOnly).
+    token_identifier: str
 
 
 class RefreshRequest(_CamelModel):
-    access_token: str
+    #: Token a renovar. Opcional con cookie httpOnly (issue #34): si el SPA no
+    #: puede leer el JWT (está en una cookie httpOnly), lo toma la app del
+    #: cookie `settings.session_cookie_name` en lugar del body.
+    access_token: str | None = None
 
 
 class UserResponse(_CamelModel):

@@ -44,6 +44,37 @@ def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _set_session_cookie(response: Response, token: str) -> None:
+    """Guarda el JWT en una cookie httpOnly (issue #34).
+
+    El token vive 15 min y el refresh window 30 días; la cookie expira con el
+    refresh window para que el navegador no retenga credenciales muertas.
+    ``SameSite=lax`` bloquea el envío en cross-site (CSRF) y ``httpOnly`` lo
+    pone fuera del alcance de ``document.cookie`` (XSS no lo exfiltra).
+    """
+    response.set_cookie(
+        key=settings.session_cookie_name,
+        value=token,
+        max_age=settings.refresh_token_expiry_days * 24 * 3600,
+        expires=None,
+        httponly=settings.session_cookie_httponly,
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
+        path="/",
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    """Borra la cookie de sesión en logout/cambio de password."""
+    response.delete_cookie(
+        key=settings.session_cookie_name,
+        httponly=settings.session_cookie_httponly,
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
+        path="/",
+    )
+
+
 def _get_user_by_email(db: DbDep, email: str) -> User | None:
     return db.scalar(select(User).where(User.email == email))
 
@@ -76,6 +107,7 @@ def _limit_join(request: Request) -> None:
 def register(
     db: DbDep,
     body: Annotated[RegisterRequest, Body()],
+    response: Response,
     _: Annotated[None, Depends(_limit_register)],
 ):
     if _get_user_by_email(db, body.email) is not None:
@@ -102,24 +134,27 @@ def register(
 
     # Cuenta inicial para que el hogar no arranque vacío
     db.add(Account(household_id=household.id, name="Efectivo", kind="cash"))
-    token = create_access_token(db, user.id)
+    token, jti = create_access_token(db, user.id)
     db.commit()
+    _set_session_cookie(response, token)
 
-    return TokenResponse(access_token=token)
+    return TokenResponse(access_token=token, token_identifier=jti)
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(
     db: DbDep,
     body: Annotated[LoginRequest, Body()],
+    response: Response,
     _: Annotated[None, Depends(_limit_login)],
 ):
     user = _get_user_by_email(db, body.email)
     if user is None or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-    token = create_access_token(db, user.id)
+    token, jti = create_access_token(db, user.id)
     db.commit()
-    return TokenResponse(access_token=token)
+    _set_session_cookie(response, token)
+    return TokenResponse(access_token=token, token_identifier=jti)
 
 
 def _user_response(user: User) -> UserResponse:
@@ -157,11 +192,39 @@ def update_profile(
     return _user_response(current_user)
 
 
+@router.post("/logout", status_code=204)
+def logout(
+    db: DbDep,
+    request: Request,
+    current_user: CurrentUserDep,
+) -> Response:
+    """Borra la cookie httpOnly de sesión del dispositivo (issue #34).
+
+    El SPA no puede eliminarla (httpOnly). Además revoca el jti del token
+    vigente (el que autenticó la petición, por cookie o Bearer) para que ni el
+    refresh ni el token en vuelo sigan sirviendo tras cerrar sesión.
+    """
+    token = request.cookies.get(settings.session_cookie_name)
+    auth_header = request.headers.get("Authorization", "")
+    if token is None and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    if token:
+        try:
+            payload = decode_token_claims(token, verify_exp=False)
+            revoke_user_refresh_tokens(db, payload["sub"])
+        except jwt.PyJWTError:
+            pass  # token caducado/revocado: nada que revocar
+    response = Response(status_code=204)
+    _clear_session_cookie(response)
+    return response
+
+
 @router.post("/change-password", status_code=204)
 def change_password(
     db: DbDep,
     current_user: CurrentUserDep,
     body: Annotated[ChangePasswordRequest, Body()],
+    response: Response,
 ) -> Response:
     if not verify_password(body.current_password, current_user.hashed_password):
         raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta")
@@ -171,14 +234,18 @@ def change_password(
     # revoked and simply live out their JWT exp.
     revoke_user_refresh_tokens(db, current_user.id)
     db.commit()
-    return Response(status_code=204)
+    response.status_code = 204
+    _clear_session_cookie(response)
+    return response
 
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh(
     db: DbDep,
-    body: Annotated[RefreshRequest, Body()],
+    request: Request,
+    response: Response,
     _: Annotated[None, Depends(_limit_login)],
+    body: Annotated[RefreshRequest, Body()] = RefreshRequest(),
 ):
     """Renames an expired-but-not-revoked access token.
 
@@ -187,9 +254,15 @@ def refresh(
     inside the 30-day refresh window. On success the old token is rotated
     (revoked) and a fresh one returned; replaying the old token then fails,
     so a stolen token is a single-use credential once renewed.
+
+    El token se toma del body si lo hay; si no, de la cookie httpOnly
+    (issue #34): el SPA no puede leer el JWT para reenviarlo.
     """
+    token = body.access_token or request.cookies.get(settings.session_cookie_name)
+    if not token:
+        raise HTTPException(status_code=401, detail="Token inválido")
     try:
-        payload = decode_token_claims(body.access_token, verify_exp=False)
+        payload = decode_token_claims(token, verify_exp=False)
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Token inválido") from None
     jti = payload.get("jti")
@@ -204,9 +277,10 @@ def refresh(
     if user is None:
         raise HTTPException(status_code=401, detail="Token inválido")
     row.revoked_at = now  # rotation: the presented token is now a spent credential
-    token = create_access_token(db, user.id)
+    token, jti = create_access_token(db, user.id)
     db.commit()
-    return TokenResponse(access_token=token)
+    _set_session_cookie(response, token)
+    return TokenResponse(access_token=token, token_identifier=jti)
 
 
 def _avatar_key(user: User) -> str:
@@ -362,6 +436,7 @@ def set_onboarding(
 def join(
     db: DbDep,
     body: Annotated[JoinRequest, Body()],
+    response: Response,
     _: Annotated[None, Depends(_limit_join)],
 ):
     invitation = db.scalar(
@@ -400,7 +475,8 @@ def join(
     db.add(user)
     db.flush()  # user.id (default) is needed by create_access_token
     invitation.used_at = now
-    token = create_access_token(db, user.id)
+    token, jti = create_access_token(db, user.id)
     db.commit()
+    _set_session_cookie(response, token)
 
-    return TokenResponse(access_token=token)
+    return TokenResponse(access_token=token, token_identifier=jti)
