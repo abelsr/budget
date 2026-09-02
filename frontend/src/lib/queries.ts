@@ -199,8 +199,11 @@ export function useTransactionsPaged(filters: TransactionFilters = {}) {
       return apiFetch<Transaction[]>(`/transactions?${search}`)
     },
     initialPageParam: 0,
+    // El tamaño de página es fijo (200) y solo hay siguiente si la última
+    // página llegó completa, así el próximo offset es `pages.length * 200`
+    // (O(1)) en vez de re-summear todas las páginas cargadas.
     getNextPageParam: (lastPage, pages) =>
-      lastPage.length === 200 ? pages.reduce((sum, page) => sum + page.length, 0) : undefined,
+      lastPage.length === 200 ? pages.length * 200 : undefined,
   })
   const pending = useOfflineTransactions(filters)
   const serverRows = query.data?.pages.flat() ?? []
@@ -826,6 +829,11 @@ export function useDeleteGoal() {
 
 export function useInstalmentPlans(sourceTransactionId?: string) {
   return useQuery({
+    // Con filtro, la clave es `["instalment-plans", "by-transaction", <id>]`:
+    // un prefijo de `keys.instalmentPlans` (["instalment-plans"]), así las
+    // invalidaciones por `keys.instalmentPlans` (crear/pagar/pausar/cancelar)
+    // la refrescan igual que a la lista completa — evita datos MSI obsoletos
+    // en la hoja de detalle tras mutaciones (issue #44).
     queryKey: sourceTransactionId
       ? [keys.instalmentPlans, "by-transaction", sourceTransactionId]
       : keys.instalmentPlans,

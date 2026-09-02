@@ -44,10 +44,11 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (!id.includes("node_modules")) return
-          if (id.includes("recharts")) return "recharts"
-          if (id.includes("node_modules/motion")) return "motion"
-          if (id.includes("react-day-picker")) return "day-picker"
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('recharts')) return 'recharts'
+          if (id.includes('node_modules/motion')) return 'motion'
+          if (id.includes('react-day-picker')) return 'day-picker'
+          return undefined
         },
       },
     },
