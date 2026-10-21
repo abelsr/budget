@@ -27,18 +27,11 @@ updates:
       - "dependencies"
       - "ci"
 
-  # Las imágenes base (postgres:17-alpine, chainguard/minio@sha256, nginx) viven
-  # en docker-compose.yml, así que el ecosistema `docker` se declara sobre la
-  # raíz del repo para que Dependabot siga también sus digests/tags. `/backend`
-  # cubre además el Dockerfile del backend.
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "docker"
-
+  # Las imágenes base (postgres:17-alpine, nginx) y la de MinIO
+  # (chainguard/minio@sha256:…) viven en docker-compose.yml. Dependabot solo
+  # soporta Dockerfiles/Kubernetes YAML: declarar `docker` sobre la raíz falla
+  # con "No Dockerfiles nor Kubernetes YAML found in /", así que las imágenes
+  # del compose se actualizan a mano (ver README, sección "MinIO image").
   - package-ecosystem: "docker"
     directory: "/backend"
     schedule:
