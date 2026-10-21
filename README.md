@@ -144,12 +144,27 @@ everything, with no third-party recourse:
 The script dumps Postgres with `pg_dump --clean --if-exists`, archives the
 MinIO volume with `tar`, and then deletes `*.gz` files older than 30 days.
 Artifacts are written as `*.part` and renamed only on success, so an
-interrupted run never leaves a truncated file that looks usable. Override
-`BACKUP_DIR`, `RETENTION_DAYS`, or `MINIO_VOLUME` via the environment.
+interrupted run never leaves a truncated file that looks usable. After both
+artifacts are written they are integrity-checked (`gzip -t` on the dump,
+`tar -tzf` on the archive) so a corrupt file is reported, not counted as a
+backup. Override `BACKUP_DIR`, `RETENTION_DAYS`, or `MINIO_VOLUME` via the
+environment.
 
-`backups/` is in `.gitignore`. It is **not** off-site: copy or `rsync` it to
-another machine, and keep a copy of `.env` somewhere safe too (it holds
-`JWT_SECRET` and the MinIO credentials, and neither is in any backup artifact).
+**Off-site copy.** Set `OFFSITE_DIR` to a directory on another machine (an
+NFS mount, a second disk, a rsync-able path) and the script `rsync`s each
+verified artifact there automatically after every successful backup. This is
+the "off-site" step the previous manual `rsync` replaced; without it, the
+backups are only as safe as the disk they sit on.
+
+**Restore verification.** `scripts/verify-restore.sh` proves the latest dump
+is actually restorable: it restores it into a throwaway `postgres:17-alpine`
+container (built, used, destroyed) and compares per-table row counts against
+the live database. Run it on a monthly cron; a green run means the backup
+would survive a real restore.
+
+`backups/` is in `.gitignore`. Keep a copy of `.env` somewhere safe too — it
+holds `JWT_SECRET` and the MinIO credentials, and neither is in any backup
+artifact.
 
 ### Automating it
 
@@ -160,8 +175,10 @@ schedule:
 
 ```bash
 crontab -e
-# every day at 03:00
+# every day at 03:00 — take the backups
 0 3 * * * /path/to/budget/scripts/backup.sh >> /path/to/budget/backups/backup.log 2>&1
+# monthly on the 1st at 04:00 — prove the latest dump actually restores
+0 4 1 * * /path/to/budget/scripts/verify-restore.sh >> /path/to/budget/backups/verify-restore.log 2>&1
 ```
 
 There is intentionally no compose service for this: a container that drives

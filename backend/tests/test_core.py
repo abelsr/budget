@@ -274,8 +274,8 @@ def test_transaction_filters_and_month_range_conflict(client, world):
                                  date="2026-07-10", note="Súper mercado")
     create_transaction(client, headers, category["id"], other_account["id"], amount=15,
                        date="2026-06-10", note="Café")
-    salary = create_transaction(client, headers, income_category["id"], account["id"], amount=100,
-                                type="income", date="2026-07-20", note="Nómina")
+    create_transaction(client, headers, income_category["id"], account["id"], amount=100,
+                       type="income", date="2026-07-20", note="Nómina")
 
     response = client.get(
         "/transactions",
@@ -313,7 +313,7 @@ def test_household_isolation(client, world):
     assert all(c["householdId"] == world["h2"].id for c in categories2)
 
     # Operar sobre ids ajenos → 404
-    assert client.get(f"/accounts", headers=headers2).status_code == 200
+    assert client.get("/accounts", headers=headers2).status_code == 200
     assert client.patch(f"/accounts/{account['id']}", json={"name": "X"}, headers=headers2).status_code == 404
     assert client.delete(f"/accounts/{account['id']}", headers=headers2).status_code == 404
     assert client.patch(f"/categories/{category['id']}", json={"name": "X"}, headers=headers2).status_code == 404

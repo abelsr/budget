@@ -142,10 +142,10 @@ def _world(
     cuentas, ``owner`` (índice 1-based del usuario) crea una cuenta
     personal de ese miembro."""
     users_: list[User] = [
-        create_user(session, email, name) for email, name in zip(emails, names)
+        create_user(session, email, name) for email, name in zip(emails, names, strict=True)
     ]
     households: list[Household] = []
-    for user, name in zip(users_, household_names):
+    for user, name in zip(users_, household_names, strict=True):
         household = Household(name=name, owner_id=user.id)
         session.add(household)
         session.flush()
@@ -174,7 +174,7 @@ def _world(
     session.commit()
 
     world: dict = {}
-    for index, (household, user) in enumerate(zip(households, users_), start=1):
+    for index, (household, user) in enumerate(zip(households, users_, strict=True), start=1):
         world[f"h{index}"] = household
         world[f"u{index}"] = user
         world[f"headers{index}"] = auth_headers(user)

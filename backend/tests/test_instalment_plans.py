@@ -91,11 +91,14 @@ def test_create_plan_rounding_remainder(client, session):
 
 def test_create_plan_guards(client, session):
     headers, card_id, cash_id, purchase_id = _setup(session)
-    create = lambda: client.post(
-        "/instalment-plans",
-        json={"sourceTransactionId": purchase_id, "months": 6, "firstDueDate": _future(30)},
-        headers=headers,
-    )
+
+    def create():
+        return client.post(
+            "/instalment-plans",
+            json={"sourceTransactionId": purchase_id, "months": 6, "firstDueDate": _future(30)},
+            headers=headers,
+        )
+
     assert create().status_code == 201
     assert create().status_code == 409  # one plan per purchase
 
@@ -183,7 +186,6 @@ def test_pay_marks_instalment(client, session):
     body = res.json()
     assert body["paidCount"] == 1
     assert body["schedule"][0]["paid"] is True
-    first = date.fromisoformat(body["schedule"][0]["date"])
     second = date.fromisoformat(body["schedule"][1]["date"])
     assert body["nextDueDate"] == second.isoformat()
 
@@ -280,11 +282,11 @@ def test_delete_purchase_blocked_by_active_plan(client, session):
 
 def test_edit_purchase_amount_blocked_by_active_plan(client, session):
     headers, _, _, purchase_id = _setup(session)
-    plan = client.post(
+    client.post(
         "/instalment-plans",
         json={"sourceTransactionId": purchase_id, "months": 6, "firstDueDate": _future(30)},
         headers=headers,
-    ).json()
+    )
     assert client.patch(f"/transactions/{purchase_id}", json={"amount": 9999}, headers=headers).status_code == 409
     # non-amount edits are still allowed
     res = client.patch(f"/transactions/{purchase_id}", json={"note": "hola"}, headers=headers)

@@ -1,0 +1,39 @@
+# Issue #47: auditoría de dependencias. Dependabot abre PRs cuando una versión
+# con CVE o un patch nuevo aparece. El backend usa uv (lockfile), el frontend
+# npm; `github-actions` actualiza las acciones del workflow.
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "backend"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "frontend"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"
+
+  # Las imágenes base (postgres:17-alpine, minio/..., nginx) viven en
+  # docker-compose.yml, no en un lockfile: Dependabot no las actualiza por sí
+  # solo. Trivy (opcional, ver CI) cubre los CVEs de esas imágenes.
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"

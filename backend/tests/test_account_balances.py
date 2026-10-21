@@ -13,7 +13,7 @@ the end. These tests pin that contract:
 from datetime import date, timedelta
 from decimal import Decimal
 
-from app.models import Account, Category, Household, Transaction, User
+from app.models import Account, Category, Household, Transaction
 from app.services.account_balances import account_balance, balance_sums
 from app.services.account_access import shared_accounts
 from tests.helpers import create_user

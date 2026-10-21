@@ -9,7 +9,6 @@ usuario. freezegun ancla los casos de expiración.
 from datetime import datetime, timedelta, timezone
 
 import jwt
-import pytest
 from freezegun import freeze_time
 
 from app.config import settings
@@ -141,7 +140,7 @@ def test_refresh_rejects_legacy_token_without_jti(client, session):
 def test_forged_token_without_refresh_row_is_rejected(client, session):
     from sqlalchemy import select
 
-    data = _register(client)
+    _register(client)
     user = session.scalar(select(User).where(User.email == "ana@example.com"))
     # A validly-signed token whose jti has no refresh_tokens row.
     forged = _forge_token(user.id, with_jti="deadbeef" * 4)
@@ -149,9 +148,7 @@ def test_forged_token_without_refresh_row_is_rejected(client, session):
 
 
 def test_remove_member_revokes_expelled_sessions(client, session):
-    from sqlalchemy import select
 
-    from app.models import Account, Household
 
     owner = _register(client, email="owner@example.com", name="Owner")
     owner_tok = owner["accessToken"]

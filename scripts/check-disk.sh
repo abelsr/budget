@@ -2,6 +2,11 @@
 # Run from cron. The webhook must accept a JSON POST, such as a Discord webhook.
 set -eu
 
+command -v jq >/dev/null 2>&1 || {
+  echo "jq is required to build the webhook payload safely" >&2
+  exit 2
+}
+
 DISK_PATH=${DISK_PATH:-/}
 DISK_THRESHOLD_PERCENT=${DISK_THRESHOLD_PERCENT:-85}
 DISK_ALERT_WEBHOOK=${DISK_ALERT_WEBHOOK:-}
@@ -36,6 +41,8 @@ if [ -z "$DISK_ALERT_WEBHOOK" ]; then
   exit 1
 fi
 
-payload=$(printf '{"text":"%s"}' "$message")
+# jq -n --arg builds the JSON safely: a hostname/message with a double quote,
+# backslash or newline can no longer break the payload (issue #47).
+payload="$(jq -n --arg text "$message" '{text: $text}')"
 curl --fail --silent --show-error --max-time 15 \
   -X POST -H 'Content-Type: application/json' -d "$payload" "$DISK_ALERT_WEBHOOK"
