@@ -246,9 +246,10 @@ docker run --rm -v budget_minio_data:/data alpine sh -c 'chown -R 65532:65532 /d
 docker compose up -d minio
 ```
 
-Dependabot watches `docker-compose.yml` (ecosystem `docker`, directory `/`) and
-opens a PR when a newer digest is published; update the comment above the
-`image:` line with the release it corresponds to.
+Dependabot cannot track `image:` entries in `docker-compose.yml` (its `docker`
+ecosystem only reads Dockerfiles), so this digest is bumped by hand: check what
+`chainguard/minio:latest` points to, and if it is a newer release, update the
+`@sha256:` and the comment above the `image:` line.
 
 ## Monitoring
 
