@@ -14,8 +14,8 @@
 # Uso:
 #   scripts/verify-restore.sh
 #
-# Cron (mensual, ej. el día 1 a las 4, tras el backup nocturno):
-#   0 4 1 * * /path/to/budget/scripts/verify-restore.sh >> /path/to/budget/backups/verify-restore.log 2>&1
+# Cron (semanal, lunes a las 4, tras el backup nocturno):
+#   0 4 * * 1 /path/to/budget/scripts/verify-restore.sh >> /path/to/budget/backups/verify-restore.log 2>&1
 #
 # Env vars:
 #   BACKUP_DIR   donde viven los dumps (default: <project>/backups)
