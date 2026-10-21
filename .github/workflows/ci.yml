@@ -116,11 +116,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # `npm test` es `vitest run` (no watch): termina siempre, así que es apto
-      # para CI. Issue #47: los tests ya existen y pasan, pero hasta ahora nadie
-      # los ejecutaba, de modo que podían romperse en main sin que el CI lo viera.
-      - name: Tests (vitest)
-        run: npm test
+      # `test:coverage` es `vitest run --coverage`: corre los tests y además
+      # hace cumplir los umbrales de vitest.config.ts, que son un piso
+      # anti-regresión (hoy ~6% de líneas; debe subir por sprint), igual que el
+      # `--cov-fail-under=85` del backend. El step falla si la cobertura baja.
+      - name: Tests + cobertura (vitest)
+        run: npm run test:coverage
 
       # `npm run build` es `tsc -b && vite build`: el typecheck y el build del
       # bundle son el último gate. Ya no es el único: lint y vitest corren antes.

@@ -6,6 +6,8 @@ node_modules/
 dist
 dist/
 dist-ssr
+coverage
+coverage/
 .env
 .env.*
 .git
