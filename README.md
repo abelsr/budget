@@ -159,7 +159,7 @@ backups are only as safe as the disk they sit on.
 **Restore verification.** `scripts/verify-restore.sh` proves the latest dump
 is actually restorable: it restores it into a throwaway `postgres:17-alpine`
 container (built, used, destroyed) and compares per-table row counts against
-the live database. Run it on a monthly cron; a green run means the backup
+the live database. Run it on a weekly cron; a green run means the backup
 would survive a real restore.
 
 `backups/` is in `.gitignore`. Keep a copy of `.env` somewhere safe too — it
@@ -177,8 +177,8 @@ schedule:
 crontab -e
 # every day at 03:00 — take the backups
 0 3 * * * /path/to/budget/scripts/backup.sh >> /path/to/budget/backups/backup.log 2>&1
-# monthly on the 1st at 04:00 — prove the latest dump actually restores
-0 4 1 * * /path/to/budget/scripts/verify-restore.sh >> /path/to/budget/backups/verify-restore.log 2>&1
+# weekly, Monday 04:00 — prove the latest dump actually restores
+0 4 * * 1 /path/to/budget/scripts/verify-restore.sh >> /path/to/budget/backups/verify-restore.log 2>&1
 ```
 
 There is intentionally no compose service for this: a container that drives
@@ -220,6 +220,35 @@ docker compose start minio backend
 
 Then log in and confirm the dashboard shows the expected balances, the
 transaction list is populated, and a receipt attachment opens.
+
+### MinIO image
+
+`minio/minio` stopped publishing images to Docker Hub (every tag now answers
+`401`/`denied`, upstream issue
+[minio/minio#21647](https://github.com/minio/minio/issues/21647)). The compose
+file uses `chainguard/minio`, a signed rebuild of the upstream release
+(`RELEASE.2026-09-22T19-25-18Z` at the time of writing), pinned by `sha256`
+digest so a `docker compose up` always starts the same bytes. The image runs as
+**non-root** (`65532:65532`) and ships `mc`, which is also its healthcheck
+(`mc ready local`); `curl` is not installed there.
+
+Because of the non-root switch, the compose file runs a `minio-init` one-shot
+container (`chown -R 65532:65532 /data`) before MinIO starts, so a **fresh**
+volume works with a plain `docker compose up -d`. On a volume written by the old
+image, `minio-init` also fixes ownership, no manual step needed; if MinIO still
+aborts with
+`FATAL Unable to initialize backend: file access denied` (e.g. a volume mounted
+with SELinux labels or read-only), re-own it by hand:
+
+```bash
+docker compose stop minio
+docker run --rm -v budget_minio_data:/data alpine sh -c 'chown -R 65532:65532 /data'
+docker compose up -d minio
+```
+
+Dependabot watches `docker-compose.yml` (ecosystem `docker`, directory `/`) and
+opens a PR when a newer digest is published; update the comment above the
+`image:` line with the release it corresponds to.
 
 ## Monitoring
 
