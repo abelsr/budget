@@ -73,6 +73,7 @@ def test_purge_removes_rows_older_than_retention(client, session):
     assert fresh is not None and fresh.deleted_at is not None  # kept, still soft-deleted
 
 
+@pytest.mark.filterwarnings("error:DELETE statement on table 'transaction_splits'")
 def test_purge_removes_dependents(client, session, monkeypatch):
     headers, account_id, category_id, household_id, user_id = _setup(session)
     tx_id = _expense(session, household_id, account_id, category_id, user_id)
