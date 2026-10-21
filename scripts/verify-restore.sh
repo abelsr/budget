@@ -63,8 +63,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-SCRATCH_ID="$(docker create "$PG_IMAGE" \
-  -e POSTGRES_USER=chk -e POSTGRES_PASSWORD=chk -e POSTGRES_DB=restore_check)"
+# Los -e van ANTES de la imagen: si van después, Docker los mete en el CMD del
+# contenedor en vez de en su entorno y el entrypoint de Postgres aborta sin
+# POSTGRES_*, agotando los 30s de espera (issue #47).
+SCRATCH_ID="$(docker create \
+  -e POSTGRES_USER=chk -e POSTGRES_PASSWORD=chk -e POSTGRES_DB=restore_check \
+  "$PG_IMAGE")"
 docker start "$SCRATCH_ID" >/dev/null
 log "esperando a que el Postgres scratch esté listo"
 for _ in $(seq 1 30); do
@@ -75,6 +79,20 @@ for _ in $(seq 1 30); do
 done
 docker exec "$SCRATCH_ID" pg_isready -U chk >/dev/null 2>&1 \
   || die "el Postgres scratch no estuvo a tiempo (30s)"
+
+# El dump otorga la propiedad de cada tabla a los roles de producción
+# (`ALTER TABLE ... OWNER TO budget`). Esos roles no existen en el scratch y,
+# con ON_ERROR_STOP=1, el restore abortaba con "role does not exist". Se crean
+# vacíos antes de restaurar: la propiedad no es lo que se verifica aquí, pero
+# un restore real la exige.
+ROLES="$(zcat "$DUMP" | sed -n 's/^ALTER .* OWNER TO \(.*\);$/\1/p' | tr -d '"' | sort -u | grep -vx chk || true)"
+if [ -n "$ROLES" ]; then
+  log "creando en el scratch los roles del dump: $(echo $ROLES)"
+  for role in $ROLES; do
+    docker exec "$SCRATCH_ID" psql -U chk -d restore_check -q -v ON_ERROR_STOP=1 \
+      -c "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$role') THEN CREATE ROLE \"$role\"; END IF; END \$\$;" >/dev/null
+  done
+fi
 
 # Copia el dump al contenedor y lo restaura. El dump ya lleva --clean
 # --if-exists, así que restaura en la base vacía sin conflictos.
@@ -99,6 +117,11 @@ if [ -n "$PG_USER" ] && [ -n "$PG_DB" ]; then
   log "comparando counts live vs restore"
   live="$(live_counts)"
   scratch="$(scratch_counts)"
+  # Un "?" significa que la tabla no existe en el dump (o el psql falló). Si
+  # ambos lados lo devolvieran, la comparación los daría por iguales y el
+  # script pasaría sin haber verificado nada.
+  bad="$(echo "$scratch" | awk -F'\t' '$2=="?"' | cut -f1 | tr '\n' ' ')"
+  [ -z "$bad" ] || die "tablas ausentes o ilegibles en el restore: $bad"
   if [ "$live" != "$scratch" ]; then
     diff <(echo "$live") <(echo "$scratch") | sed 's/^/    /' || true
     die "los counts del restore no coinciden con la base en vivo"
@@ -109,7 +132,12 @@ else
   # falló y que las tablas existen con algún dato.
   log "sin base en vivo para comparar; verificando que el restore no está vacío"
   scratch="$(scratch_counts)"
-  empty="$(echo "$scratch" | awk -F'\t' '$2==0' | cut -f1)"
+  # "?" (tabla inexistente o psql caído) es un fallo, no un dato válido: sin
+  # este guard el chequeo de abajo lo dejaba pasar y el script daba un falso
+  # PASS con un dump de un esquema anterior.
+  missing="$(echo "$scratch" | awk -F'\t' '$2=="?"' | cut -f1 | tr '\n' ' ')"
+  [ -z "$missing" ] || die "tablas ausentes o ilegibles en el restore (¿dump de un esquema anterior?): $missing"
+  empty="$(echo "$scratch" | awk -F'\t' '$2==0' | cut -f1 | tr '\n' ' ')"
   [ -z "$empty" ] || die "tablas vacías tras el restore: $empty"
   log "restore no vacío (verificación sin base en vivo)"
 fi
