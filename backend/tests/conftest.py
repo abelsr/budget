@@ -1,12 +1,15 @@
 import os
+import warnings
 
 import pytest
 from fastapi.testclient import TestClient
 from freezegun import freeze_time as _freeze_time
 from sqlalchemy import create_engine, event
+from sqlalchemy.exc import SAWarning
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.config import settings
 from app.database import Base, get_db
 from app.core.rate_limit import limiter
 from app.main import app
@@ -16,6 +19,18 @@ from tests.helpers import auth_headers, create_user
 #: Fecha fija (mediado de mes y de año, sin bordes) para los tests que
 #: dependen de date.today()/datetime.now() (issue #49).
 FROZEN_NOW = "2026-08-15 12:00:00"
+
+#: Secreto de test >=32 bytes: el default de desarrollo (20 bytes) hace que
+#: PyJWT emita InsecureKeyLengthWarning en cada token que firma la suite.
+STRONG_TEST_JWT_SECRET = "test-jwt-secret-32-bytes-long-000000"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _strong_test_jwt_secret():
+    previous = settings.jwt_secret
+    settings.jwt_secret = STRONG_TEST_JWT_SECRET
+    yield
+    settings.jwt_secret = previous
 
 
 @pytest.fixture(name="freeze_time")
@@ -65,15 +80,24 @@ def _session_factory(*, foreign_keys: bool = False):
     TestingSessionLocal = sessionmaker(
         bind=engine, autoflush=False, expire_on_commit=False
     )
-    with TestingSessionLocal() as session:
-        yield session
-    # El teardown se hace con FK APAGADAS: con FK ON el ciclo deferrable
-    # households->users (fk_households_owner_membership, DEFERRED) hace que
-    # DROP TABLE falle si quedan filas (igual que en el fixture antiguo de
-    # test_imports). Apagarlas solo para el drop no afecta a la cobertura.
-    with engine.begin() as conn:
-        conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
-    Base.metadata.drop_all(engine)
+    try:
+        with TestingSessionLocal() as session:
+            yield session
+    finally:
+        # El teardown se hace con FK APAGADAS: con FK ON el ciclo deferrable
+        # households->users (fk_households_owner_membership, DEFERRED) hace que
+        # DROP TABLE falle si quedan filas (igual que en el fixture antiguo de
+        # test_imports). Apagarlas solo para el drop no afecta a la cobertura.
+        with engine.begin() as conn:
+            conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        # El ciclo households<->users es intencional (FK compuesta diferida);
+        # en el DROP de SQLite solo produce este aviso de orden, inofensivo.
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Can't sort tables for DROP.*", category=SAWarning)
+            Base.metadata.drop_all(engine)
+        # StaticPool mantiene la única conexión SQLite abierta; sin dispose el
+        # GC la cierra tarde y emite ResourceWarning: unclosed database.
+        engine.dispose()
 
 
 @pytest.fixture(name="session")

@@ -16,7 +16,6 @@ from app.models import (
     InstalmentPlan,
     Transaction,
     TransactionEditEvent,
-    TransactionSplit,
     TransferGroup,
 )
 from app.services.storage import delete_attachment
@@ -75,7 +74,10 @@ def _purge_one(db: Session, tx: Transaction) -> None:
             logger.exception("Failed to delete attachment object %s; removing the row anyway", attachment.storage_path)
         db.delete(attachment)
     db.execute(delete(TransactionEditEvent).where(TransactionEditEvent.transaction_id == tx.id))
-    db.execute(delete(TransactionSplit).where(TransactionSplit.transaction_id == tx.id))
+    # Los splits se borran por el cascade "all, delete-orphan" de
+    # Transaction.splits al hacer db.delete(tx). Borrarlos aquí además con un
+    # DELETE masivo hacía que el unit of work intentara borrarlos una segunda
+    # vez y emitiera SAWarning ("expected to delete 1 row(s); 0 were matched").
     if tx.transfer_group_id is not None:
         sibling = db.scalar(
             select(Transaction.id).where(
