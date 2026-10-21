@@ -14,9 +14,28 @@ services:
       timeout: 3s
       retries: 10
 
+  # El contenedor de MinIO corre como 65532:65532. En un despliegue nuevo el
+  # volumen lo crea Docker con permisos de root, y MinIO abortaría con
+  # "file access denied"; este init deja el volumen listo antes de arrancarlo.
+  # En volúmenes ya existentes es idempotente (chown recursivo sin cambios).
+  minio-init:
+    image: alpine:3.22
+    restart: "no"
+    command: chown -R 65532:65532 /data
+    volumes:
+      - minio_data:/data
+
   minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # minio/minio (Docker Hub) dejó de publicarse: el registro devuelve
+    # 401/denied para todos los tags (minio/minio#21647). Usamos el rebuild de
+    # chainguard, que empaqueta el release upstream RELEASE.2026-09-22T19-25-18Z
+    # como imagen firmada y non-root (uid/gid 65532). Pin por digest para que el
+    # arranque sea reproducible; Dependabot abre PR al publicarse un digest nuevo.
+    image: chainguard/minio@sha256:32c504bea4574d8f29d719b37bc0dad920ecf3e22b81dc5cea0bb105af2ce10f
     restart: unless-stopped
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required (see .env.example)}
@@ -26,7 +45,9 @@ services:
     ports:
       - "127.0.0.1:9001:9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      # La imagen no trae curl; `mc ready local` es un proceso real (no un
+      # simple TCP/HTTP 200) y es el probe que recomienda upstream.
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 3s
       retries: 10
