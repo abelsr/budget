@@ -96,7 +96,7 @@ jobs:
         run: uv run pytest tests/test_migrations.py -v
 
   frontend:
-    name: Frontend (typecheck + build)
+    name: Frontend (lint + test + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -116,8 +116,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # `npm run build` es `tsc -b && vite build`: el typecheck es el gate real
-      # del frontend mientras no haya tests.
+      # `npm test` es `vitest run` (no watch): termina siempre, así que es apto
+      # para CI. Issue #47: los tests ya existen y pasan, pero hasta ahora nadie
+      # los ejecutaba, de modo que podían romperse en main sin que el CI lo viera.
+      - name: Tests (vitest)
+        run: npm test
+
+      # `npm run build` es `tsc -b && vite build`: el typecheck y el build del
+      # bundle son el último gate. Ya no es el único: lint y vitest corren antes.
       - name: Typecheck y build
         run: npm run build
 
