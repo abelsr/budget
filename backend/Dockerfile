@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 # Pinned to an exact release (not a floating tag) so builds are reproducible.
 COPY --from=ghcr.io/astral-sh/uv:0.12.7 /uv /usr/local/bin/uv
